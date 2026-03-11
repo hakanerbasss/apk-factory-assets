@@ -109,7 +109,11 @@ ok "Lisanslar kabul edildi"
 # ════════════════════════════════════════════════════════════════
 log "Build Tools kuruluyor..."
 set_status false "buildtools"
-"$SDKMANAGER" "build-tools;34.0.0" "platforms;android-35" >> "$LOG_FILE" 2>&1
+LATEST_BT=$("$SDKMANAGER" --list 2>/dev/null | grep "build-tools;" | grep -v "rc\|beta\|alpha" | tail -1 | awk '{print $1}' | tr -d ' ')
+LATEST_PLAT=$("$SDKMANAGER" --list 2>/dev/null | grep "platforms;android-" | grep -v "rc\|beta\|alpha" | tail -1 | awk '{print $1}' | tr -d ' ')
+[ -z "$LATEST_BT" ]   && LATEST_BT="build-tools;34.0.0"
+[ -z "$LATEST_PLAT" ] && LATEST_PLAT="platforms;android-35"
+"$SDKMANAGER" "$LATEST_BT" "$LATEST_PLAT" >> "$LOG_FILE" 2>&1
 ok "Build Tools kuruldu"
 
 # ════════════════════════════════════════════════════════════════
