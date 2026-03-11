@@ -318,25 +318,74 @@ fi
 pkill -f ws_bridge.py 2>/dev/null || true
 sleep 1
 
-# Termux:Boot klasörüne ekle (telefon açılınca otomatik başlasın)
+# Termux:Boot klasörüne dayanıklı start script yaz
 BOOT_DIR="$HOME/.termux/boot"
 mkdir -p "$BOOT_DIR"
-cat > "$BOOT_DIR/start_ws_bridge.sh" << BOOT
+
+cat > "$BOOT_DIR/start_ws_bridge.sh" << 'BOOT'
 #!/bin/bash
+# APK Factory — Dayanıklı WS Bridge Başlatıcı
+# Her telefon açılışında çalışır, eksikleri onarır
+
+GITHUB_RAW="https://raw.githubusercontent.com/hakanerbasss/apk-factory-assets/main"
+WS_DIR="$HOME/apk-factory-ws"
+WS_FILE="$WS_DIR/ws_bridge.py"
+SISTEM_DIR="/storage/emulated/0/termux-otonom-sistem"
+PROMPTS_DIR="$SISTEM_DIR/prompts"
+APILER_DIR="$SISTEM_DIR/apiler"
+
 sleep 3
+
+# 1. Klasörleri oluştur
+mkdir -p "$WS_DIR" "$SISTEM_DIR" "$PROMPTS_DIR" "$APILER_DIR"          "$SISTEM_DIR/keystores" "$SISTEM_DIR/setup/gradle/wrapper"
+
+# 2. projeler.conf yoksa oluştur
+[ ! -f "$SISTEM_DIR/projeler.conf" ] && touch "$SISTEM_DIR/projeler.conf"
+
+# 3. websockets modülü kontrol + kur
+python3 -c "import websockets" 2>/dev/null || {
+    pkg install -y python python-pip 2>/dev/null
+    pip install websockets 2>/dev/null
+}
+
+# 4. ws_bridge.py yoksa GitHub'dan indir
+if [ ! -f "$WS_FILE" ]; then
+    curl -sf --max-time 30 "$GITHUB_RAW/scripts/ws_bridge.py" -o "$WS_FILE" || true
+fi
+
+# 5. Scriptler eksikse indir
+for script in autofix.sh prj.sh factory.sh; do
+    if [ ! -f "$SISTEM_DIR/$script" ]; then
+        curl -sf --max-time 30 "$GITHUB_RAW/scripts/$script" -o "$SISTEM_DIR/$script" &&             chmod +x "$SISTEM_DIR/$script" || true
+    fi
+done
+
+# 6. gradle-wrapper.jar yoksa setup'tan kopyala
+WRAPPER="$SISTEM_DIR/setup/gradle/wrapper/gradle-wrapper.jar"
+if [ ! -f "$WRAPPER" ]; then
+    curl -sf --max-time 30 "$GITHUB_RAW/setup/gradle/wrapper/gradle-wrapper.jar" -o "$WRAPPER" || true
+fi
+
+# 7. Eski bridge'i öldür ve yeniden başlat
 pkill -f ws_bridge.py 2>/dev/null || true
-nohup python3 $WS_DIR/ws_bridge.py >> $WS_DIR/ws_bridge.log 2>&1 &
+sleep 1
+
+if [ -f "$WS_FILE" ]; then
+    nohup python3 "$WS_FILE" >> "$WS_DIR/ws_bridge.log" 2>&1 &
+fi
 BOOT
 chmod +x "$BOOT_DIR/start_ws_bridge.sh"
 
-# Şimdi başlat
+# Şimdi de çalıştır (boot bekleme olmadan)
+pkill -f ws_bridge.py 2>/dev/null || true
+sleep 1
 nohup python3 "$WS_DIR/ws_bridge.py" >> "$WS_DIR/ws_bridge.log" 2>&1 &
 sleep 2
 
 if pgrep -f ws_bridge.py > /dev/null; then
-    ok "WebSocket bridge yazıldı"
+    ok "WebSocket bridge başlatıldı"
 else
-    err "WebSocket bridge başlatılamadı"
+    err "WebSocket bridge başlatılamadı — boot script telefon yeniden başlatılınca dener"
 fi
 
 # ════════════════════════════════════════════════════════════════
