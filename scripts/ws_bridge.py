@@ -4,6 +4,7 @@ import asyncio, websockets, json, os, pty, signal, shutil, glob, re
 from datetime import datetime
 
 SISTEM_DIR    = "/storage/emulated/0/termux-otonom-sistem"
+GITHUB_RAW    = "https://raw.githubusercontent.com/hakanerbasss/apk-factory-assets/main"
 HOME          = os.path.expanduser("~")
 PRJ_SH        = f"{SISTEM_DIR}/prj.sh"
 KEYSTORE_DIR  = f"{SISTEM_DIR}/keystores"
@@ -12,66 +13,6 @@ APILER_DIR    = f"{SISTEM_DIR}/apiler"
 SETTINGS_FILE = f"{HOME}/.config/apkfactory.conf"
 APK_OUT_DIR   = "/sdcard/Download/apk-cikti"
 os.makedirs(APK_OUT_DIR, exist_ok=True)
-
-
-# ── GitHub Deps Check ─────────────────────────────────────────────────────────
-GITHUB_RAW     = "https://raw.githubusercontent.com/hakanerbasss/apk-factory-assets/main"
-PROMPT_VER_FILE = f"{SISTEM_DIR}/prompt_version.txt"
-
-def check_and_fix_deps():
-    """Eksik scriptleri GitHub'dan indir, prompt güncellemesi varsa al."""
-    import urllib.request, json as _json, stat
-
-    def fetch(url, timeout=10):
-        try:
-            with urllib.request.urlopen(url, timeout=timeout) as r:
-                return r.read().decode()
-        except Exception:
-            return None
-
-    updated = []
-    # version.json kontrol
-    raw = fetch(f"{GITHUB_RAW}/version.json")
-    remote_ver = "0"
-    if raw:
-        try: remote_ver = _json.loads(raw).get("prompt_version", "0")
-        except: pass
-
-    # Eksik scriptleri indir
-    scripts = {
-        "autofix.sh":  f"{SISTEM_DIR}/autofix.sh",
-        "prj.sh":      f"{SISTEM_DIR}/prj.sh",
-        "factory.sh":  f"{SISTEM_DIR}/factory.sh",
-    }
-    for fname, dest in scripts.items():
-        if not os.path.exists(dest):
-            content = fetch(f"{GITHUB_RAW}/scripts/{fname}", timeout=30)
-            if content:
-                os.makedirs(os.path.dirname(dest), exist_ok=True)
-                open(dest, "w").write(content)
-                os.chmod(dest, os.stat(dest).st_mode | stat.S_IEXEC)
-                updated.append(fname)
-
-    # Prompt güncellemesi
-    local_ver = "0"
-    if os.path.exists(PROMPT_VER_FILE):
-        local_ver = open(PROMPT_VER_FILE).read().strip()
-
-    if remote_ver not in ("0", "") and remote_ver != local_ver:
-        prompts_dir = f"{SISTEM_DIR}/prompts"
-        os.makedirs(prompts_dir, exist_ok=True)
-        ok = True
-        for pf in ["autofix_system.txt", "autofix_task.txt"]:
-            c = fetch(f"{GITHUB_RAW}/prompts/{pf}", timeout=15)
-            if c:
-                open(f"{prompts_dir}/{pf}", "w").write(c)
-                updated.append(pf)
-            else:
-                ok = False
-        if ok:
-            open(PROMPT_VER_FILE, "w").write(remote_ver)
-
-    return updated
 
 ANSI = re.compile(rb'\x1b\[[0-9;]*[mKABCDEFGHJKSTfhilmnprsu]|\x1b\([AB]|\r')
 def strip(b): return ANSI.sub(b'', b).decode('utf-8', errors='replace')
@@ -575,21 +516,82 @@ async def handle(ws):
                     await ws.send(json.dumps({"type":"task_done","success":True}))
 
 
-                elif t == "check_deps":
-                    import threading
-                    def _check(_ws=ws):
-                        import asyncio as _a
-                        updated = check_and_fix_deps()
-                        _a.run_coroutine_threadsafe(
-                            _ws.send(json.dumps({
-                                "type": "deps_status",
-                                "ok": True,
-                                "updated": updated,
-                                "missing": []
-                            })),
-                            asyncio.get_event_loop()
-                        )
-                    threading.Thread(target=_check, daemon=True).start()
+
+                elif t == "list_prompt_archives":
+                    arc_dir = f"{SISTEM_DIR}/prompts/arsiv"
+                    os.makedirs(arc_dir, exist_ok=True)
+                    files = sorted([
+                        f for f in os.listdir(arc_dir) if f.endswith(".txt")
+                    ], reverse=True)
+                    await ws.send(json.dumps({"type":"prompt_archives","list": files}))
+
+                elif t == "save_prompt_archive":
+                    arc_name = d.get("arc_name","").strip()
+                    prompt_name = d.get("prompt_name","autofix_system")
+                    content_txt = d.get("content","")
+                    if not arc_name:
+                        await ws.send(json.dumps({"type":"error","text":"Arşiv adı boş olamaz"}))
+                    else:
+                        arc_dir = f"{SISTEM_DIR}/prompts/arsiv"
+                        os.makedirs(arc_dir, exist_ok=True)
+                        fname = f"{prompt_name}_{arc_name}.txt"
+                        open(f"{arc_dir}/{fname}",'w').write(content_txt)
+                        await ws.send(json.dumps({"type":"task_done","success":True,
+                            "text":f"✅ '{arc_name}' arşive eklendi"}))
+
+                elif t == "load_prompt_archive":
+                    arc_file = d.get("arc_file","")
+                    arc_dir = f"{SISTEM_DIR}/prompts/arsiv"
+                    fpath = f"{arc_dir}/{arc_file}"
+                    if os.path.exists(fpath):
+                        cnt = open(fpath).read()
+                        # prompt_name'i dosya adından çıkar
+                        pname = "autofix_system" if arc_file.startswith("autofix_system") else "autofix_task"
+                        await ws.send(json.dumps({"type":"prompt_content","name":pname,
+                            "content":cnt,"is_default":False}))
+                    else:
+                        await ws.send(json.dumps({"type":"error","text":"Arşiv dosyası bulunamadı"}))
+
+                elif t == "delete_prompt_archive":
+                    arc_file = d.get("arc_file","")
+                    arc_dir = f"{SISTEM_DIR}/prompts/arsiv"
+                    fpath = f"{arc_dir}/{arc_file}"
+                    if os.path.exists(fpath):
+                        os.remove(fpath)
+                        await ws.send(json.dumps({"type":"task_done","success":True,
+                            "text":"🗑 Arşiv silindi"}))
+                elif t == "get_prompt":
+                    name = d.get("name","autofix_system")
+                    pfile = f"{SISTEM_DIR}/prompts/{name}.txt"
+                    if os.path.exists(pfile):
+                        cnt = open(pfile).read()
+                        is_def = False
+                    else:
+                        import urllib.request
+                        try:
+                            cnt = urllib.request.urlopen(f"{GITHUB_RAW}/prompts/{name}.txt", timeout=10).read().decode()
+                            is_def = True
+                        except:
+                            cnt = ""; is_def = True
+                    await ws.send(json.dumps({"type":"prompt_content","name":name,"content":cnt,"is_default":is_def}))
+
+                elif t == "save_prompt":
+                    name = d.get("name",""); cnt = d.get("content","")
+                    os.makedirs(f"{SISTEM_DIR}/prompts", exist_ok=True)
+                    open(f"{SISTEM_DIR}/prompts/{name}.txt",'w').write(cnt)
+                    await ws.send(json.dumps({"type":"task_done","success":True,"text":f"✅ {name} kaydedildi"}))
+
+                elif t == "reset_prompt":
+                    name = d.get("name","")
+                    import urllib.request
+                    try:
+                        cnt = urllib.request.urlopen(f"{GITHUB_RAW}/prompts/{name}.txt", timeout=15).read().decode()
+                        os.makedirs(f"{SISTEM_DIR}/prompts", exist_ok=True)
+                        open(f"{SISTEM_DIR}/prompts/{name}.txt",'w').write(cnt)
+                        await ws.send(json.dumps({"type":"prompt_content","name":name,"content":cnt,"is_default":True}))
+                        await ws.send(json.dumps({"type":"task_done","success":True,"text":f"✅ {name} sıfırlandı"}))
+                    except Exception as ex:
+                        await ws.send(json.dumps({"type":"error","text":f"GitHub hatası: {ex}"}))
                 elif t == "system_info":
                     await ws.send(json.dumps({"type":"system_info","data":{
                         "sistem_dir":SISTEM_DIR,"home":HOME,
@@ -617,15 +619,6 @@ async def handle(ws):
             except: pass
 
 async def main():
-
-    # Başlangıçta eksik dosya/prompt kontrolü (arka planda)
-    import threading
-    def _startup_check():
-        import time; time.sleep(2)
-        updated = check_and_fix_deps()
-        if updated:
-            print(f"[deps] Güncellendi: {updated}")
-    threading.Thread(target=_startup_check, daemon=True).start()
     print("APK Factory WS Bridge v11 (asyncio-PTY) — 0.0.0.0:8765")
     print(f"prj.sh: {'✅' if os.path.exists(PRJ_SH) else '❌ BULUNAMADI!'}")
     async with websockets.serve(handle, "0.0.0.0", 8765, ping_interval=None, ping_timeout=None):

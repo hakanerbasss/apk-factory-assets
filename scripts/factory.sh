@@ -109,13 +109,9 @@ rootProject.name = "$P_NAME"
 include ':app'
 GRADLE
 
-TMPL="$SETUP_DIR/gradle.properties.template"
-if [ -f "$TMPL" ]; then
-    cp "$TMPL" "$P_DIR/gradle.properties"
-else
-    TERMUX_AAPT2=$(which aapt2 2>/dev/null || echo "/data/data/com.termux/files/usr/bin/aapt2")
-    printf "android.useAndroidX=true\nandroid.enableJetifier=true\nandroid.aapt2FromMavenOverride=%s\norg.gradle.jvmargs=-Xmx512m -XX:MaxMetaspaceSize=256m\norg.gradle.daemon=false\n" "$TERMUX_AAPT2" > "$P_DIR/gradle.properties"
-fi
+echo "android.useAndroidX=true
+android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
+org.gradle.jvmargs=-Xmx512m -XX:MaxMetaspaceSize=256m" > "$P_DIR/gradle.properties"
 
 echo "sdk.dir=/data/data/com.termux/files/home/android-sdk" > "$P_DIR/local.properties"
 
