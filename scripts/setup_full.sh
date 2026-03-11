@@ -1,36 +1,151 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════
-#  APK Factory — Bootstrap
-#  Bu dosya uygulamanın içinde gömülü gelir.
-#  GitHub'dan güncel setup.sh'ı indirir ve çalıştırır.
+#  APK Factory — Tam Kurulum Scripti
+#  Bootstrap tarafından indirilip çalıştırılır.
 # ═══════════════════════════════════════════════════════
 
 GITHUB_RAW="https://raw.githubusercontent.com/hakanerbasss/apk-factory-assets/main"
 LOG_FILE="LOG_PATH_PLACEHOLDER"
 STATUS_FILE="STATUS_PATH_PLACEHOLDER"
-SETUP_CACHE="$HOME/.cache/apkfactory_setup.sh"
+SISTEM_DIR="/storage/emulated/0/termux-otonom-sistem"
+WS_BRIDGE_DIR="$HOME/apk-factory-ws"
 
-echo '{"done":false,"step":"indiriliyor"}' > "$STATUS_FILE"
+log() { echo "$(date '+%H:%M:%S') ► $1" >> "$LOG_FILE"; }
+status() { echo "{\"done\":false,\"step\":\"$1\"}" > "$STATUS_FILE"; }
+done_status() { echo '{"done":true,"step":"tamamlandı"}' > "$STATUS_FILE"; }
 
-mkdir -p "$(dirname "$SETUP_CACHE")"
+# ══════════════════════════════════════════════
+# ADIM 1: Paket listesi güncelleniyor
+# ══════════════════════════════════════════════
+status "paket listesi güncelleniyor"
+log "Paket listesi güncelleniyor..."
+pkg update -y >> "$LOG_FILE" 2>&1
+log "✅ ADIM_1_TAMAM: Paket listesi güncellendi"
 
-# GitHub'dan güncel setup.sh'ı indir
-if curl -sf --max-time 30 "$GITHUB_RAW/scripts/setup.sh" -o "$SETUP_CACHE"; then
-    # Log ve status yollarını yerleştir
-    sed -i "s|LOG_FILE=.*|LOG_FILE=\"$LOG_FILE\"|" "$SETUP_CACHE"
-    sed -i "s|STATUS_FILE=.*|STATUS_FILE=\"$STATUS_FILE\"|" "$SETUP_CACHE"
-    sed -i "s|GITHUB_RAW=.*|GITHUB_RAW=\"$GITHUB_RAW\"|" "$SETUP_CACHE"
-    chmod +x "$SETUP_CACHE"
-    bash "$SETUP_CACHE"
+# ══════════════════════════════════════════════
+# ADIM 2: Temel araçlar
+# ══════════════════════════════════════════════
+status "temel araçlar kuruluyor"
+log "Temel araçlar kuruluyor..."
+pkg install -y curl wget git unzip zip tar nano >> "$LOG_FILE" 2>&1
+log "✅ ADIM_2_TAMAM: Temel araçlar kuruldu"
+
+# ══════════════════════════════════════════════
+# ADIM 3: Python + WebSocket
+# ══════════════════════════════════════════════
+status "python websocket kuruluyor"
+log "Python + WebSocket kuruluyor..."
+pkg install -y python >> "$LOG_FILE" 2>&1
+pip install websockets --quiet >> "$LOG_FILE" 2>&1
+log "✅ ADIM_3_TAMAM: Python + WebSocket kuruldu"
+
+# ══════════════════════════════════════════════
+# ADIM 4: Java (OpenJDK 17)
+# ══════════════════════════════════════════════
+status "java kuruluyor"
+log "Java (OpenJDK 17) kuruluyor..."
+pkg install -y openjdk-17 >> "$LOG_FILE" 2>&1
+log "✅ ADIM_4_TAMAM: Java kuruldu"
+
+# ══════════════════════════════════════════════
+# ADIM 5: Android SDK
+# ══════════════════════════════════════════════
+status "android sdk indiriliyor"
+log "Android SDK indiriliyor..."
+SDK_DIR="$HOME/android-sdk"
+if [ ! -f "$SDK_DIR/platforms/android-34/android.jar" ]; then
+    mkdir -p "$SDK_DIR" && cd "$SDK_DIR"
+    wget -q --show-progress \
+        https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
+        -O cmdtools.zip >> "$LOG_FILE" 2>&1
+    unzip -q cmdtools.zip >> "$LOG_FILE" 2>&1
+    mkdir -p cmdline-tools/latest
+    mv cmdline-tools/bin cmdline-tools/latest/ 2>/dev/null || true
+    mv cmdline-tools/lib cmdline-tools/latest/ 2>/dev/null || true
+    mv cmdline-tools/NOTICE.txt cmdline-tools/latest/ 2>/dev/null || true
+    mv cmdline-tools/source.properties cmdline-tools/latest/ 2>/dev/null || true
+    rm -f cmdtools.zip
+
+    # ══════════════════════════════════════════════
+    # ADIM 6: Lisanslar kabul ediliyor
+    # ══════════════════════════════════════════════
+    status "lisanslar kabul ediliyor"
+    log "Lisanslar kabul ediliyor..."
+    export ANDROID_SDK_ROOT="$SDK_DIR"
+    export PATH="$SDK_DIR/cmdline-tools/latest/bin:$PATH"
+    yes | sdkmanager --licenses >> "$LOG_FILE" 2>&1 || true
+    log "✅ ADIM_6_TAMAM: Lisanslar kabul edildi"
+
+    # ══════════════════════════════════════════════
+    # ADIM 7: Build Tools
+    # ══════════════════════════════════════════════
+    status "build tools kuruluyor"
+    log "Build Tools kuruluyor..."
+    sdkmanager "build-tools;34.0.0" "platforms;android-34" >> "$LOG_FILE" 2>&1
+    log "✅ ADIM_7_TAMAM: Build Tools kuruldu"
+    cd "$HOME"
 else
-    # İnternet yoksa veya GitHub'a ulaşılamazsa: bu dosyanın yanındaki setup_full.sh
-    echo '{"done":false,"step":"offline kurulum"}' > "$STATUS_FILE"
-    SELF_DIR="$(dirname "$(realpath "$0")")"
-    if [ -f "$SELF_DIR/setup_full.sh" ]; then
-        bash "$SELF_DIR/setup_full.sh"
-    else
-        echo '{"done":false,"step":"hata: internet yok"}' > "$STATUS_FILE"
-        echo "❌ GitHub'a ulaşılamadı ve offline kurulum bulunamadı."
-        exit 1
-    fi
+    log "✅ ADIM_5_TAMAM: SDK zaten kurulu"
+    log "✅ ADIM_6_TAMAM: Lisanslar zaten kabul edildi"
+    log "✅ ADIM_7_TAMAM: Build Tools zaten kurulu"
 fi
+log "✅ ADIM_5_TAMAM: Android SDK hazır"
+
+# ══════════════════════════════════════════════
+# ADIM 8: aapt2 düzeltiliyor
+# ══════════════════════════════════════════════
+status "aapt2 düzeltiliyor"
+log "aapt2 düzeltiliyor..."
+AAPT2_PATH=$(find "$HOME/android-sdk/build-tools" -name "aapt2" 2>/dev/null | head -1)
+if [ -n "$AAPT2_PATH" ]; then
+    wget -q "https://github.com/lzhiyong/android-sdk-tools/releases/download/34.0.0/android-sdk-tools-aarch64.zip" \
+        -O /tmp/sdk-tools.zip >> "$LOG_FILE" 2>&1
+    unzip -qo /tmp/sdk-tools.zip aapt2 -d "$(dirname "$AAPT2_PATH")" >> "$LOG_FILE" 2>&1 || true
+    chmod +x "$AAPT2_PATH" 2>/dev/null || true
+    rm -f /tmp/sdk-tools.zip
+fi
+log "✅ ADIM_8_TAMAM: aapt2 düzeltildi"
+
+# ══════════════════════════════════════════════
+# ADIM 9: Factory scriptler
+# ══════════════════════════════════════════════
+status "factory scriptler indiriliyor"
+log "Factory scriptler indiriliyor..."
+mkdir -p "$SISTEM_DIR/prompts" "$SISTEM_DIR/keystores" "$SISTEM_DIR/setup" "$SISTEM_DIR/apiler"
+
+for f in sistem.sh prj.sh autofix.sh factory.sh; do
+    curl -sf "$GITHUB_RAW/scripts/$f" -o "$SISTEM_DIR/$f" >> "$LOG_FILE" 2>&1 && chmod +x "$SISTEM_DIR/$f"
+done
+
+for f in autofix_system.txt autofix_task.txt; do
+    curl -sf "$GITHUB_RAW/prompts/$f" -o "$SISTEM_DIR/prompts/$f" >> "$LOG_FILE" 2>&1 || true
+done
+
+touch "$SISTEM_DIR/projeler.conf"
+log "✅ ADIM_9_TAMAM: Factory scriptler indirildi"
+
+# ══════════════════════════════════════════════
+# ADIM 10: WebSocket sunucusu
+# ══════════════════════════════════════════════
+status "websocket sunucusu başlatılıyor"
+log "WebSocket sunucusu indiriliyor..."
+mkdir -p "$WS_BRIDGE_DIR"
+curl -sf "$GITHUB_RAW/scripts/ws_bridge.py" -o "$WS_BRIDGE_DIR/ws_bridge.py" >> "$LOG_FILE" 2>&1
+chmod +x "$WS_BRIDGE_DIR/ws_bridge.py"
+
+pkill -9 -f ws_bridge.py 2>/dev/null || true
+sleep 1
+nohup python3 "$WS_BRIDGE_DIR/ws_bridge.py" >> "$WS_BRIDGE_DIR/ws_bridge.log" 2>&1 &
+sleep 3
+
+if pgrep -f ws_bridge.py > /dev/null; then
+    log "✅ ADIM_10_TAMAM: WebSocket sunucusu başlatıldı"
+else
+    log "❌ WebSocket başlatılamadı!"
+fi
+
+# ══════════════════════════════════════════════
+# TAMAMLANDI
+# ══════════════════════════════════════════════
+log "✅ Kurulum tamamlandı!"
+done_status
