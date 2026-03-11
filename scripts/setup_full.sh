@@ -20,7 +20,7 @@ done_status() { echo '{"done":true,"step":"tamamlandı"}' > "$STATUS_FILE"; }
 status "paket listesi güncelleniyor"
 log "Paket listesi güncelleniyor..."
 pkg update -y >> "$LOG_FILE" 2>&1
-log "✅ ADIM_1_TAMAM: Paket listesi güncellendi"
+log "Paket listesi güncellendi"
 
 # ══════════════════════════════════════════════
 # ADIM 2: Temel araçlar
@@ -28,7 +28,7 @@ log "✅ ADIM_1_TAMAM: Paket listesi güncellendi"
 status "temel araçlar kuruluyor"
 log "Temel araçlar kuruluyor..."
 pkg install -y curl wget git unzip zip tar nano >> "$LOG_FILE" 2>&1
-log "✅ ADIM_2_TAMAM: Temel araçlar kuruldu"
+log "Temel araçlar kuruldu"
 
 # ══════════════════════════════════════════════
 # ADIM 3: Python + WebSocket
@@ -37,7 +37,7 @@ status "python websocket kuruluyor"
 log "Python + WebSocket kuruluyor..."
 pkg install -y python >> "$LOG_FILE" 2>&1
 pip install websockets --quiet >> "$LOG_FILE" 2>&1
-log "✅ ADIM_3_TAMAM: Python + WebSocket kuruldu"
+log "Python + WebSocket hazır"
 
 # ══════════════════════════════════════════════
 # ADIM 4: Java (OpenJDK 17)
@@ -45,7 +45,7 @@ log "✅ ADIM_3_TAMAM: Python + WebSocket kuruldu"
 status "java kuruluyor"
 log "Java (OpenJDK 17) kuruluyor..."
 pkg install -y openjdk-17 >> "$LOG_FILE" 2>&1
-log "✅ ADIM_4_TAMAM: Java kuruldu"
+log "Java kuruldu"
 
 # ══════════════════════════════════════════════
 # ADIM 5: Android SDK
@@ -74,7 +74,7 @@ if [ ! -f "$SDK_DIR/platforms/android-34/android.jar" ]; then
     export ANDROID_SDK_ROOT="$SDK_DIR"
     export PATH="$SDK_DIR/cmdline-tools/latest/bin:$PATH"
     yes | sdkmanager --licenses >> "$LOG_FILE" 2>&1 || true
-    log "✅ ADIM_6_TAMAM: Lisanslar kabul edildi"
+    log "Lisanslar kabul edildi"
 
     # ══════════════════════════════════════════════
     # ADIM 7: Build Tools
@@ -82,14 +82,14 @@ if [ ! -f "$SDK_DIR/platforms/android-34/android.jar" ]; then
     status "build tools kuruluyor"
     log "Build Tools kuruluyor..."
     sdkmanager "build-tools;34.0.0" "platforms;android-34" >> "$LOG_FILE" 2>&1
-    log "✅ ADIM_7_TAMAM: Build Tools kuruldu"
+    log "Build Tools kuruldu"
     cd "$HOME"
 else
-    log "✅ ADIM_5_TAMAM: SDK zaten kurulu"
-    log "✅ ADIM_6_TAMAM: Lisanslar zaten kabul edildi"
-    log "✅ ADIM_7_TAMAM: Build Tools zaten kurulu"
+    log "SDK araçları indirildi"
+    log "Lisanslar kabul edildi"
+    log "Build Tools kuruldu"
 fi
-log "✅ ADIM_5_TAMAM: Android SDK hazır"
+log "SDK araçları indirildi"
 
 # ══════════════════════════════════════════════
 # ADIM 8: aapt2 düzeltiliyor
@@ -104,7 +104,7 @@ if [ -n "$AAPT2_PATH" ]; then
     chmod +x "$AAPT2_PATH" 2>/dev/null || true
     rm -f /tmp/sdk-tools.zip
 fi
-log "✅ ADIM_8_TAMAM: aapt2 düzeltildi"
+log "aapt2 hazır"
 
 # ══════════════════════════════════════════════
 # ADIM 9: Factory scriptler
@@ -122,7 +122,7 @@ for f in autofix_system.txt autofix_task.txt; do
 done
 
 touch "$SISTEM_DIR/projeler.conf"
-log "✅ ADIM_9_TAMAM: Factory scriptler indirildi"
+log "Factory scriptler hazır"
 
 # ══════════════════════════════════════════════
 # ADIM 10: WebSocket sunucusu
@@ -139,7 +139,7 @@ nohup python3 "$WS_BRIDGE_DIR/ws_bridge.py" >> "$WS_BRIDGE_DIR/ws_bridge.log" 2>
 sleep 3
 
 if pgrep -f ws_bridge.py > /dev/null; then
-    log "✅ ADIM_10_TAMAM: WebSocket sunucusu başlatıldı"
+    log "WebSocket bridge yazıldı"
 else
     log "❌ WebSocket başlatılamadı!"
 fi
