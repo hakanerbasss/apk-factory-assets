@@ -10,7 +10,16 @@ STATUS_FILE="/sdcard/apkfactory_status.json"
 SISTEM_DIR="/storage/emulated/0/termux-otonom-sistem"
 WS_BRIDGE_DIR="$HOME/apk-factory-ws"
 
-log() { echo "$(date '+%H:%M:%S') ► $1" >> "$LOG_FILE"; }
+# Depolama izni kontrolu
+if ! touch "$LOG_FILE" 2>/dev/null; then
+    termux-setup-storage
+    sleep 5
+    touch "$LOG_FILE" || exit 1
+fi
+chmod 666 "$LOG_FILE" 2>/dev/null || true
+chmod 666 "$STATUS_FILE" 2>/dev/null || true
+
+log() { echo "$(date '+%H:%M:%S') ► $1" >> "$LOG_FILE"; chmod 666 "$LOG_FILE" 2>/dev/null; }
 status() { echo "{\"done\":false,\"step\":\"$1\"}" > "$STATUS_FILE"; }
 done_status() { echo '{"done":true,"step":"tamamlandı"}' > "$STATUS_FILE"; }
 
