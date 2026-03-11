@@ -66,8 +66,8 @@ ok "Temel araçlar kuruldu"
 # ════════════════════════════════════════════════════════════════
 log "Python + WebSocket kuruluyor..."
 set_status false "python"
-pkg install -y python >> "$LOG_FILE" 2>&1
-pip install websockets --quiet >> "$LOG_FILE" 2>&1
+pkg install -y python python-pip >> "$LOG_FILE" 2>&1
+pip install websockets >> "$LOG_FILE" 2>&1
 ok "Python + WebSocket hazır"
 
 # ════════════════════════════════════════════════════════════════
@@ -249,8 +249,9 @@ ok "Gradle wrapper hazır"
 log "Alias'lar ekleniyor..."
 
 # Eski alias'ları temizle
-grep -v "alias prj=\|alias autofix=\|alias factory=\|alias af=" "$BASHRC" > /tmp/bashrc_clean 2>/dev/null
-cp /tmp/bashrc_clean "$BASHRC" 2>/dev/null || true
+grep -v "alias prj=\|alias autofix=\|alias factory=\|alias af=" "$BASHRC" > "$HOME/.bashrc_clean" 2>/dev/null
+cp "$HOME/.bashrc_clean" "$BASHRC" 2>/dev/null || true
+rm -f "$HOME/.bashrc_clean"
 
 cat >> "$BASHRC" << ALIASES
 
