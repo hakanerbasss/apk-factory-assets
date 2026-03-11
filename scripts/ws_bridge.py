@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/python3
 """APK Factory WS Bridge v11 — asyncio-native PTY (fork yok)"""
-import asyncio, websockets, json, os, pty, signal, shutil, glob, re
+import asyncio, websockets, json, os, pty, signal, shutil, glob, re, subprocess
 from datetime import datetime
 
 SISTEM_DIR    = "/storage/emulated/0/termux-otonom-sistem"
@@ -321,7 +321,6 @@ async def handle(ws):
                         except: pass
                     # Tüm ilgili processleri temizle (gradle daemon vs)
                     try:
-                        import subprocess
                         subprocess.run(["pkill", "-9", "-f", "gradlew"], capture_output=True)
                         subprocess.run(["pkill", "-9", "-f", "GradleDaemon"], capture_output=True)
                     except: pass
@@ -560,6 +559,13 @@ async def handle(ws):
                         os.remove(fpath)
                         await ws.send(json.dumps({"type":"task_done","success":True,
                             "text":"🗑 Arşiv silindi"}))
+                elif t == "run_setup":
+                    setup_script = "/sdcard/apkfactory_setup_run.sh"
+                    if os.path.exists(setup_script):
+                        subprocess.Popen(["bash", setup_script], stdout=open("/sdcard/apkfactory_setup.log","a"), stderr=subprocess.STDOUT)
+                        await ws.send(json.dumps({"type":"run_setup","status":"started"}))
+                    else:
+                        await ws.send(json.dumps({"type":"run_setup","status":"error","msg":"script bulunamadi"}))
                 elif t == "get_prompt":
                     name = d.get("name","autofix_system")
                     pfile = f"{SISTEM_DIR}/prompts/{name}.txt"
