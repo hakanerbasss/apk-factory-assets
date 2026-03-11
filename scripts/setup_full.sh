@@ -5,8 +5,8 @@
 # ═══════════════════════════════════════════════════════
 
 GITHUB_RAW="https://raw.githubusercontent.com/hakanerbasss/apk-factory-assets/main"
-LOG_FILE="/sdcard/apkfactory_setup.log"
-STATUS_FILE="/sdcard/apkfactory_status.json"
+LOG_FILE="/sdcard/Download/apkfactory_setup.log"
+STATUS_FILE="/sdcard/Download/apkfactory_status.json"
 SISTEM_DIR="/storage/emulated/0/termux-otonom-sistem"
 WS_BRIDGE_DIR="$HOME/apk-factory-ws"
 
