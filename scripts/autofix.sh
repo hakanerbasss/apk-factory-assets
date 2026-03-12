@@ -231,13 +231,13 @@ parse_errors() {
     local build_out="$TMP_DIR/build_output.txt"
     local errors_file="$TMP_DIR/errors.txt"
     local files_file="$TMP_DIR/error_files.txt"
-    grep -E "^e: file://|error:|^ERROR|AAPT: error|Could not find|checkDebugAarMetadata|FAILED in" \
-        "$build_out" > "$errors_file" 2>/dev/null || true
-    grep -oE '/[^ :]+\.kt' "$errors_file" | sort -u > "$files_file" 2>/dev/null || true
+    grep -E "^e: file://|error:|^ERROR|AAPT: error|Could not find|FAILED in" \
+        "$build_out" | head -n 2 > "$errors_file" 2>/dev/null || true
+    grep -oE '/[^ :]+\.kt' "$errors_file" | head -n 2 | sort -u > "$files_file" 2>/dev/null || true
     if [[ ! -s "$files_file" ]]; then
         grep -oE 'com/[a-z/]+/[A-Za-z]+\.kt' "$build_out" \
         | while read -r rel; do find "$SRC_ROOT" -path "*$rel" 2>/dev/null | head -1; done \
-        | sort -u > "$files_file"
+        | head -n 2 | sort -u > "$files_file"
     fi
     echo "$errors_file"
 }
@@ -310,7 +310,8 @@ print(json.dumps({'model':'${MODEL}','max_tokens':${MAX_TOKENS},'temperature':0.
 
 _call_gemini() {
     local sp="$1" um="$2" rf="$TMP_DIR/api_response.json"
-    local url="${API_URL}?key=${API_KEY}"
+    local gemini_base="https://generativelanguage.googleapis.com/v1beta/models"
+    local url="${gemini_base}/${MODEL}:generateContent?key=${API_KEY}"
     local payload; payload=$(python3 -c "
 import json,sys
 print(json.dumps({'system_instruction':{'parts':[{'text':sys.argv[1]}]},
