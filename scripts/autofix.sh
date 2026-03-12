@@ -57,6 +57,21 @@ select_provider() {
     local default_provider=""
     [[ -f "$CONF_FILE" ]] && default_provider=$(grep "^DEFAULT_PROVIDER=" "$CONF_FILE" 2>/dev/null | cut -d'"' -f2)
 
+    # Varsayılan provider varsa direkt seç
+    if [[ -n "$default_provider" ]]; then
+        for i in "${!providers[@]}"; do
+            if [[ "${providers[$i]}" == "$default_provider" ]]; then
+                PROVIDER_CONF="${confs[$i]}"
+                NAME=$(grep "^NAME=" "$PROVIDER_CONF" | cut -d'"' -f2)
+                API_URL=$(grep "^API_URL=" "$PROVIDER_CONF" | cut -d'"' -f2)
+                API_KEY=$(grep "^API_KEY=" "$PROVIDER_CONF" | cut -d'"' -f2)
+                MODEL=$(grep "^MODEL=" "$PROVIDER_CONF" | cut -d'"' -f2)
+                MAX_TOKENS=$(grep "^MAX_TOKENS=" "$PROVIDER_CONF" | cut -d'=' -f2)
+                return
+            fi
+        done
+    fi
+
     title "Hangi AI ile çalışalım?"
     for i in "${!providers[@]}"; do
         local kv; kv=$(grep "^API_KEY=" "${confs[$i]}" | cut -d'"' -f2)
