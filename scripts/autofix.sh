@@ -86,7 +86,7 @@ select_provider() {
     API_KEY=$(grep "^API_KEY=" "$PROVIDER_CONF" | cut -d'"' -f2)
     MODEL=$(grep "^MODEL="    "$PROVIDER_CONF" | cut -d'"' -f2)
     MAX_TOKENS=$(grep "^MAX_TOKENS=" "$PROVIDER_CONF" | cut -d'=' -f2)
-    MAX_TOKENS=${MAX_TOKENS:-8000}
+    MAX_TOKENS=$(grep "^MAX_TOKENS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo 8000)
 
     # --- CLAUDE TÜM MODELLER MENÜSÜ ---
     if [[ "$NAME" == "Claude" ]]; then
