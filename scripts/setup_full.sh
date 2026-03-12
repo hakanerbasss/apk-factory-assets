@@ -145,7 +145,7 @@ chmod +x "$WS_BRIDGE_DIR/ws_bridge.py"
 pkill -9 -f ws_bridge.py 2>/dev/null || true
 sleep 1
 nohup python3 "$WS_BRIDGE_DIR/ws_bridge.py" >> "$WS_BRIDGE_DIR/ws_bridge.log" 2>&1 &
-sleep 3
+sleep 5
 
 if pgrep -f ws_bridge.py > /dev/null; then
     log "WebSocket bridge yazıldı"
