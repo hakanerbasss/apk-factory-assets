@@ -115,23 +115,39 @@ if [ -n "$AAPT2_PATH" ]; then
 fi
 log "aapt2 hazır"
 
+
+
 # ══════════════════════════════════════════════
-# ADIM 9: Factory scriptler
+# ADIM 9: Factory scriptler ve Taslaklar
 # ══════════════════════════════════════════════
 status "factory scriptler indiriliyor"
 log "Factory scriptler indiriliyor..."
 mkdir -p "$SISTEM_DIR/prompts" "$SISTEM_DIR/keystores" "$SISTEM_DIR/setup" "$SISTEM_DIR/apiler"
 
+# 1. Ana scriptleri indir
 for f in sistem.sh prj.sh autofix.sh factory.sh; do
     curl -sf "$GITHUB_RAW/scripts/$f" -o "$SISTEM_DIR/$f" >> "$LOG_FILE" 2>&1 && chmod +x "$SISTEM_DIR/$f"
 done
 
+# 2. PROJE TASLAKLARINI (GRADLEW VB.) İNDİR VE AÇ
+log "setup.zip indiriliyor..."
+curl -sf "$GITHUB_RAW/setup.zip" -o "$SISTEM_DIR/setup.zip" >> "$LOG_FILE" 2>&1
+if [ -f "$SISTEM_DIR/setup.zip" ]; then
+    unzip -qo "$SISTEM_DIR/setup.zip" -d "$SISTEM_DIR/" >> "$LOG_FILE" 2>&1
+    rm -f "$SISTEM_DIR/setup.zip"
+    log "Taslaklar (setup) başarıyla kuruldu"
+else
+    log "⚠️ setup.zip indirilemedi!"
+fi
+
+# 3. Promptları indir
 for f in autofix_system.txt autofix_task.txt; do
     curl -sf "$GITHUB_RAW/prompts/$f" -o "$SISTEM_DIR/prompts/$f" >> "$LOG_FILE" 2>&1 || true
 done
 
 touch "$SISTEM_DIR/projeler.conf"
 log "Factory scriptler hazır"
+
 
 # ══════════════════════════════════════════════
 # ADIM 10: WebSocket sunucusu
