@@ -15,7 +15,7 @@ PROMPTS_DIR="$SISTEM_DIR/prompts"
 CONF_FILE="$HOME/.config/autofix.conf"
 TMP_DIR="${TMPDIR:-$PREFIX/tmp}/autofix_$$"
 LOG_FILE="$TMP_DIR/autofix.log"
-MAX_LOOPS=8
+MAX_LOOPS=$(grep "^MAX_LOOPS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo 8)
 
 # --- YENİ: Gölge Yedekleme Sistemi ---
 AGENT_YEDEK_DIR="$SISTEM_DIR/agent_yedekler"
