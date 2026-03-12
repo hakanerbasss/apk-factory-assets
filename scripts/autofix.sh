@@ -106,22 +106,20 @@ select_provider() {
     # --- CLAUDE TÜM MODELLER MENÜSÜ ---
     if [[ "$NAME" == "Claude" ]]; then
         title "Claude Modeli Seçin (Tüm Nesiller)"
-        echo -e "  ${BOLD}1) 4.6 Opus${NC}   - [\$\$\$] Zirve Zeka (Mimari/Ağır Bug)   | \$5/\$25"
-        echo -e "  ${BOLD}2) 4.6 Sonnet${NC} - [\$\$ ] Yeni & Zeki (UI/UX Tasarımı)    | \$3/\$15"
-        echo -e "  ${BOLD}3) 4.5 Sonnet${NC} - [\$\$ ] 1M Context (Büyük Dosyalar)     | \$3/\$15"
-        echo -e "  ${BOLD}4) 4.5 Haiku${NC}  - [\$  ] 4. Nesil Hız (Genel Hatalar)     | \$1/\$5"
-        echo -e "  ${BOLD}5) 3.5 Sonnet${NC} - [\$  ] Efsanevi Kararlılık (LTS)       | \$3/\$15"
-        echo -e "  ${BOLD}6) 3.5 Haiku${NC}  - [¢  ] En Ucuz & Seri (Basit/Import)    | \$0.25/\$1.25"
+        echo -e "  ${BOLD}1) 4.5 Opus${NC}    - [\$\$\$] En Güçlü (Mimari/Ağır Bug)      | \$15/\$75"
+        echo -e "  ${BOLD}2) 4.5 Sonnet${NC}  - [\$\$ ] Dengeli (UI/UX Tasarımı)     | \$3/\$15"
+        echo -e "  ${BOLD}3) 4.5 Haiku${NC}   - [\$  ] Hızlı (Genel Hatalar)          | \$1/\$5"
+        echo -e "  ${BOLD}4) 3.5 Sonnet${NC}  - [\$  ] Kararlı LTS                     | \$3/\$15"
+        echo -e "  ${BOLD}5) 3.5 Haiku${NC}   - [¢  ] En Ucuz & Seri                  | \$0.25/\$1.25"
         echo
-        read -r -p "$(echo -e "${YELLOW}  Seçim yap (1-6) [Enter=$MODEL]: ${NC}")" m_choice
+        read -r -p "$(echo -e "${YELLOW}  Seçim yap (1-5) [Enter=$MODEL]: ${NC}")" m_choice
         
         case "$m_choice" in
-            1) MODEL="claude-3-opus-20240229" ;;
+            1) MODEL="claude-opus-4-5-20251101" ;;
             2) MODEL="claude-sonnet-4-5-20250929" ;;
-            3) MODEL="claude-3-5-sonnet-latest" ;;
-            4) MODEL="claude-3-haiku-20240307" ;;
-            5) MODEL="claude-sonnet-4-5-20250929" ;;
-            6) MODEL="claude-3-haiku-20240307" ;;
+            3) MODEL="claude-haiku-4-5-20251001" ;;
+            4) MODEL="claude-3-5-sonnet-20241022" ;;
+            5) MODEL="claude-3-5-haiku-20241022" ;;
         esac
         
                 # Seçilen modeli Claude.conf dosyasına kalıcı olarak yazar
