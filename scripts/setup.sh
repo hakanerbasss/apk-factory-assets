@@ -15,7 +15,7 @@ echo '{"done":false,"step":"indiriliyor"}' > "$STATUS_FILE"
 mkdir -p "$(dirname "$SETUP_CACHE")"
 
 # GitHub'dan güncel setup.sh'ı indir
-if curl -sf --max-time 30 "$GITHUB_RAW/scripts/setup_full.sh" -o "$SETUP_CACHE"; then
+if curl -sf --max-time 30 "$GITHUB_RAW/scripts/setup.sh" -o "$SETUP_CACHE"; then
     # Log ve status yollarını yerleştir
     sed -i "s|LOG_FILE=.*|LOG_FILE=\"$LOG_FILE\"|" "$SETUP_CACHE"
     sed -i "s|STATUS_FILE=.*|STATUS_FILE=\"$STATUS_FILE\"|" "$SETUP_CACHE"
