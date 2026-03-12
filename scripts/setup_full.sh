@@ -12,6 +12,7 @@ WS_BRIDGE_DIR="$HOME/apk-factory-ws"
 
 # Depolama izni kontrolu
 if ! touch "$LOG_FILE" 2>/dev/null; then
+    termux-setup-storage
     sleep 5
     touch "$LOG_FILE" || exit 1
 fi
@@ -115,29 +116,16 @@ fi
 log "aapt2 hazır"
 
 # ══════════════════════════════════════════════
-# ADIM 9: Factory scriptler ve Taslaklar
+# ADIM 9: Factory scriptler
 # ══════════════════════════════════════════════
 status "factory scriptler indiriliyor"
 log "Factory scriptler indiriliyor..."
 mkdir -p "$SISTEM_DIR/prompts" "$SISTEM_DIR/keystores" "$SISTEM_DIR/setup" "$SISTEM_DIR/apiler"
 
-# 1. Ana scriptleri indir
 for f in sistem.sh prj.sh autofix.sh factory.sh; do
     curl -sf "$GITHUB_RAW/scripts/$f" -o "$SISTEM_DIR/$f" >> "$LOG_FILE" 2>&1 && chmod +x "$SISTEM_DIR/$f"
 done
 
-# 2. PROJE TASLAKLARINI (GRADLEW VB.) İNDİR VE AÇ
-log "setup.zip indiriliyor..."
-curl -sf "$GITHUB_RAW/setup.zip" -o "$SISTEM_DIR/setup.zip" >> "$LOG_FILE" 2>&1
-if [ -f "$SISTEM_DIR/setup.zip" ]; then
-    unzip -qo "$SISTEM_DIR/setup.zip" -d "$SISTEM_DIR/" >> "$LOG_FILE" 2>&1
-    rm -f "$SISTEM_DIR/setup.zip"
-    log "Taslaklar (setup) başarıyla kuruldu"
-else
-    log "⚠️ setup.zip indirilemedi!"
-fi
-
-# 3. Promptları indir
 for f in autofix_system.txt autofix_task.txt; do
     curl -sf "$GITHUB_RAW/prompts/$f" -o "$SISTEM_DIR/prompts/$f" >> "$LOG_FILE" 2>&1 || true
 done
@@ -157,7 +145,7 @@ chmod +x "$WS_BRIDGE_DIR/ws_bridge.py"
 pkill -9 -f ws_bridge.py 2>/dev/null || true
 sleep 1
 nohup python3 "$WS_BRIDGE_DIR/ws_bridge.py" >> "$WS_BRIDGE_DIR/ws_bridge.log" 2>&1 &
-sleep 5
+sleep 3
 
 if pgrep -f ws_bridge.py > /dev/null; then
     log "WebSocket bridge yazıldı"
@@ -170,57 +158,3 @@ fi
 # ══════════════════════════════════════════════
 log "✅ Kurulum tamamlandı!"
 done_status
-
-# ── API Conf Dosyaları ──────────────────────────────────────────
-log "API conf dosyaları oluşturuluyor..."
-APILER_DIR="$SISTEM_DIR/apiler"
-
-cat > "$APILER_DIR/deepseek.conf" << 'CONF'
-NAME="DeepSeek"
-API_URL="https://api.deepseek.com/chat/completions"
-API_KEY=""
-MODEL="deepseek-chat"
-MAX_TOKENS=8000
-CONF
-
-cat > "$APILER_DIR/gemini.conf" << 'CONF'
-NAME="Gemini"
-API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-API_KEY=""
-MODEL="gemini-2.0-flash"
-MAX_TOKENS=8000
-CONF
-
-cat > "$APILER_DIR/openai.conf" << 'CONF'
-NAME="OpenAI"
-API_URL="https://api.openai.com/v1/chat/completions"
-API_KEY=""
-MODEL="gpt-4o-mini"
-MAX_TOKENS=8000
-CONF
-
-cat > "$APILER_DIR/claude.conf" << 'CONF'
-NAME="Claude"
-API_URL="https://api.anthropic.com/v1/messages"
-API_KEY=""
-MODEL="claude-haiku-4-5-20251001"
-MAX_TOKENS=8000
-CONF
-
-cat > "$APILER_DIR/groq.conf" << 'CONF'
-NAME="Groq"
-API_URL="https://api.groq.com/openai/v1/chat/completions"
-API_KEY=""
-MODEL="llama-3.3-70b-versatile"
-MAX_TOKENS=8000
-CONF
-
-cat > "$APILER_DIR/qwen.conf" << 'CONF'
-NAME="Qwen"
-API_URL="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-API_KEY=""
-MODEL="qwen-plus"
-MAX_TOKENS=8000
-CONF
-
-log "API conf dosyaları hazır"
