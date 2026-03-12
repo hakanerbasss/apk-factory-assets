@@ -12,7 +12,6 @@ WS_BRIDGE_DIR="$HOME/apk-factory-ws"
 
 # Depolama izni kontrolu
 if ! touch "$LOG_FILE" 2>/dev/null; then
-    termux-setup-storage
     sleep 5
     touch "$LOG_FILE" || exit 1
 fi
