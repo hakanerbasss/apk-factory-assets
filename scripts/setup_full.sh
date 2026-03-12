@@ -157,3 +157,57 @@ fi
 # ══════════════════════════════════════════════
 log "✅ Kurulum tamamlandı!"
 done_status
+
+# ── API Conf Dosyaları ──────────────────────────────────────────
+log "API conf dosyaları oluşturuluyor..."
+APILER_DIR="$SISTEM_DIR/apiler"
+
+cat > "$APILER_DIR/deepseek.conf" << 'CONF'
+NAME="DeepSeek"
+API_URL="https://api.deepseek.com/chat/completions"
+API_KEY=""
+MODEL="deepseek-chat"
+MAX_TOKENS=8000
+CONF
+
+cat > "$APILER_DIR/gemini.conf" << 'CONF'
+NAME="Gemini"
+API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+API_KEY=""
+MODEL="gemini-2.0-flash"
+MAX_TOKENS=8000
+CONF
+
+cat > "$APILER_DIR/openai.conf" << 'CONF'
+NAME="OpenAI"
+API_URL="https://api.openai.com/v1/chat/completions"
+API_KEY=""
+MODEL="gpt-4o-mini"
+MAX_TOKENS=8000
+CONF
+
+cat > "$APILER_DIR/claude.conf" << 'CONF'
+NAME="Claude"
+API_URL="https://api.anthropic.com/v1/messages"
+API_KEY=""
+MODEL="claude-haiku-4-5-20251001"
+MAX_TOKENS=8000
+CONF
+
+cat > "$APILER_DIR/groq.conf" << 'CONF'
+NAME="Groq"
+API_URL="https://api.groq.com/openai/v1/chat/completions"
+API_KEY=""
+MODEL="llama-3.3-70b-versatile"
+MAX_TOKENS=8000
+CONF
+
+cat > "$APILER_DIR/qwen.conf" << 'CONF'
+NAME="Qwen"
+API_URL="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+API_KEY=""
+MODEL="qwen-plus"
+MAX_TOKENS=8000
+CONF
+
+log "API conf dosyaları hazır"
