@@ -23,8 +23,7 @@ PROMPT_PATTERNS = [
     ("Devam / İ=İptal",             "apply_changes"),
 ]
 AUTO_ENTER = [
-    "Seçim (1-", "Enter=DeepSeek", "Enter=Claude",
-    "Enter=Gemini", "Seçim yap (1-",
+    "Seçim (", "Enter=", "Seçim yap (",
 ]
 # factory.sh read promptları → otomatik cevap vereceğimiz pattern:key eşlemeleri
 FACTORY_PROMPTS = [
@@ -36,7 +35,7 @@ FACTORY_PROMPTS = [
 # ── Settings ──────────────────────────────────────────────────────────────────
 def read_settings():
     d = {"DEFAULT_PROVIDER":"Claude","DEFAULT_MODEL":"claude-haiku-4-5-20251001",
-         "MAX_LOOPS":"5","KEYSTORE_PASS":"android123"}
+         "MAX_LOOPS":"5","MAX_TOKENS":"8000","KEYSTORE_PASS":"android123"}
     if not os.path.exists(SETTINGS_FILE): return d
     for line in open(SETTINGS_FILE):
         line = line.strip()
@@ -47,19 +46,37 @@ def read_settings():
 
 def save_settings(data):
     os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
-    open(SETTINGS_FILE,'w').writelines([f'{k}="{v}"\n' for k,v in data.items()])
+    with open(SETTINGS_FILE, 'w') as f:
+        f.writelines([f'{k}="{v}"\n' for k,v in data.items()])
+
     ac = f"{HOME}/.config/autofix.conf"
     os.makedirs(os.path.dirname(ac), exist_ok=True)
-    ls = [l for l in (open(ac).readlines() if os.path.exists(ac) else [])
-          if 'DEFAULT_PROVIDER=' not in l and 'MAX_LOOPS=' not in l]
+    ls = []
+    if os.path.exists(ac):
+        with open(ac, 'r') as f:
+            ls = [l for l in f.readlines() if 'DEFAULT_PROVIDER=' not in l and 'MAX_LOOPS=' not in l and 'MAX_TOKENS=' not in l]
+    
     ls += [f'DEFAULT_PROVIDER="{data.get("DEFAULT_PROVIDER","Claude")}"\n',
-           f'MAX_LOOPS={data.get("MAX_LOOPS","5")}\n']
-    open(ac,'w').writelines(ls)
-    cf = f"{APILER_DIR}/claude.conf"
+           f'MAX_LOOPS={data.get("MAX_LOOPS","5")}\n',
+           f'MAX_TOKENS={data.get("MAX_TOKENS","8000")}\n']
+    
+    with open(ac, 'w') as f:
+        f.writelines(ls)
+
+    prov_name = data.get("DEFAULT_PROVIDER","Claude").lower()
+    cf = f"{APILER_DIR}/{prov_name}.conf"
     if os.path.exists(cf) and data.get("DEFAULT_MODEL"):
-        open(cf,'w').writelines(
-            [f'MODEL="{data["DEFAULT_MODEL"]}"\n' if l.strip().startswith('MODEL=') else l
-             for l in open(cf)])
+        # ÖNCE OKU (Hata buradaydı, çözüldü)
+        with open(cf, 'r') as f:
+            lines = f.readlines()
+        
+        # SONRA YAZ
+        with open(cf, 'w') as f:
+            for l in lines:
+                if l.strip().startswith('MODEL='):
+                    f.write(f'MODEL="{data["DEFAULT_MODEL"]}"\n')
+                else:
+                    f.write(l)
 
 def read_projeler():
     conf = f"{SISTEM_DIR}/projeler.conf"
@@ -475,7 +492,7 @@ async def handle(ws):
                             key = read_api_key(f"{APILER_DIR}/{f}")
                             apis.append({"name":nm,"file":f,
                                          "key_preview":key[:12]+"..." if len(key)>12 else key,
-                                         "has_key":len(key)>10})
+                                         "has_key":len(key)>5})
                     await ws.send(json.dumps({"type":"api_list","data":apis}))
 
                 elif t == "save_api":
@@ -483,20 +500,61 @@ async def handle(ws):
                     cf = f"{APILER_DIR}/{nm}.conf"
                     if not os.path.exists(cf):
                         await ws.send(json.dumps({"type":"error","text":"API dosyası bulunamadı"})); continue
-                    ls = open(cf).readlines(); nl = []; upd = False
+                        
+                    with open(cf, 'r') as f:
+                        ls = f.readlines()
+                        
+                    nl = []; upd = False
                     for l in ls:
-                        if l.strip().startswith('API_KEY='): nl.append(f'API_KEY="{key}"\n'); upd = True
-                        else: nl.append(l)
+                        if l.strip().startswith('API_KEY='): 
+                            nl.append(f'API_KEY="{key}"\n')
+                            upd = True
+                        else: 
+                            nl.append(l)
                     if not upd: nl.append(f'API_KEY="{key}"\n')
-                    open(cf,'w').writelines(nl)
+                    
+                    with open(cf, 'w') as f:
+                        f.writelines(nl)
+                        
                     ev = {"claude":"ANTHROPIC_API_KEY","deepseek":"DEEPSEEK_API_KEY",
                           "gemini":"GEMINI_API_KEY","openai":"OPENAI_API_KEY",
                           "groq":"GROQ_API_KEY","qwen":"QWEN_API_KEY"}.get(nm, f"{nm.upper()}_API_KEY")
                     br = f"{HOME}/.bashrc"
-                    bls = [l for l in (open(br).readlines() if os.path.exists(br) else []) if ev not in l]
+                    bls = []
+                    if os.path.exists(br):
+                        with open(br, 'r') as f:
+                            bls = [l for l in f.readlines() if ev not in l]
                     bls.append(f'export {ev}="{key}"\n')
-                    open(br,'w').writelines(bls)
+                    with open(br, 'w') as f:
+                        f.writelines(bls)
+                        
                     await ws.send(json.dumps({"type":"task_done","success":True,"text":f"✅ {nm} kaydedildi"}))
+                
+
+                elif t == "get_providers":
+                    providers = []
+                    if os.path.exists(APILER_DIR):
+                        for cf in sorted(os.listdir(APILER_DIR)):
+                            if cf.endswith('.conf'):
+                                data = {}
+                                for line in open(f"{APILER_DIR}/{cf}").readlines():
+                                    line = line.strip()
+                                    if '=' in line:
+                                        k, v = line.split('=', 1)
+                                        data[k] = v.strip('"')
+                                model_infos = {}
+                                for item in data.get("MODEL_INFOS", "").split("|"):
+                                    if ":" in item:
+                                        mid, mdesc = item.split(":", 1)
+                                        model_infos[mid.strip()] = mdesc.strip()
+                                providers.append({
+                                    "name": data.get("NAME", cf.replace(".conf","")),
+                                    "model": data.get("MODEL", ""),
+                                    "models": data.get("MODELS", "").split(",") if data.get("MODELS") else [],
+                                    "model_infos": model_infos,
+                                    "hasKey": bool(data.get("API_KEY", "").strip())
+                                })
+                    await ws.send(json.dumps({"type":"providers","data":providers}))
 
                 elif t == "get_settings":
                     await ws.send(json.dumps({"type":"settings","data":read_settings()}))

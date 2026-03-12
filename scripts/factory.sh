@@ -18,7 +18,7 @@ echo -e "${BOLD}${B}╚═══════════════════
 
 # 1. GİRDİLERİ AL
 read -p "$(echo -e "${C}Proje Adı (örn: hesap-makinesi): ${NC}")" P_NAME
-P_NAME=$(echo "$P_NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-')
+P_NAME=$(echo "$P_NAME" | tr A-Z a-z | tr ' ' '-' | tr -cd 'a-z0-9-')
 if [ -z "$P_NAME" ]; then echo -e "${R}Proje adı boş olamaz!${NC}"; exit 1; fi
 
 P_DIR="$HOME/$P_NAME"
@@ -29,7 +29,8 @@ read -p "$(echo -e "${Y}Yapay Zekaya Görevi Ver (Örn: Bilimsel hesap makinesi 
 if [ -z "$AI_PROMPT" ]; then echo -e "${R}Görev boş olamaz!${NC}"; exit 1; fi
 
 # 2. OTOMATİK DEĞİŞKENLER (Arka planda uydurulur)
-P_PKG="com.$(echo $P_NAME | tr '-' '.')"
+# Tireleri alt çizgiye çevirerek wizaicorp paket adını oluştur
+P_PKG="com.wizaicorp.$(echo $P_NAME | tr '-' '_')"
 KS_PASS=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 12)
 KS_ALIAS=$(echo "$P_NAME" | tr '-' '' | head -c 12)
 KS_FILE="${P_NAME}-release.keystore"
