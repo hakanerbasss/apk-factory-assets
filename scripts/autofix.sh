@@ -511,7 +511,7 @@ run_autofix() {
             ok "BUILD BAŞARILI! 🎉  (${elapsed}s)"
             
             local apk; apk=$(find "$PROJECT_ROOT/app/build/outputs/apk" -name "*.apk" 2>/dev/null | head -1)
-            [[ -n "$apk" ]] && mkdir -p "/sdcard/Download/apk-cikti" && cp "$apk" "/sdcard/Download/apk-cikti/$(basename "$apk")" 2>/dev/null && ok "APK → Download"
+            [[ -n "$apk" ]] && mkdir -p "/sdcard/Download/apk-cikti" && cp "$apk" "/sdcard/Download/apk-cikti/$(basename "$apk")" 2>/dev/null && ok "APK → Download/apk-cikti"
 
             read -r -p "$(echo -e "\n${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B=Yedeğe Dön]: ${NC}")" res
             if [[ "$res" == "b" || "$res" == "B" ]]; then
