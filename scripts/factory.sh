@@ -12,6 +12,25 @@ CONF_FILE="$SISTEM_DIR/projeler.conf"
 SETUP_DIR="$SISTEM_DIR/setup"
 KEYSTORE_DIR="$SISTEM_DIR/keystores"
 
+
+# 🛠️ KENDİ KENDİNİ ONARMA (Klasör silinmişse kurtar)
+if [ ! -f "$SETUP_DIR/gradlew" ]; then
+    echo -e "${Y}⚠️ Kritik bileşenler (setup) eksik! Otomatik kurtarma başlatılıyor...${NC}"
+    GITHUB_RAW="https://raw.githubusercontent.com/hakanerbasss/apk-factory-assets/main"
+    curl -sf "$GITHUB_RAW/setup.zip" -o "$SISTEM_DIR/setup.zip"
+    if [ -f "$SISTEM_DIR/setup.zip" ]; then
+        unzip -qo "$SISTEM_DIR/setup.zip" -d "$SISTEM_DIR/"
+        rm -f "$SISTEM_DIR/setup.zip"
+        echo -e "${G}✅ Eksik dosyalar başarıyla geri getirildi.${NC}"
+    else
+        echo -e "${R}❌ Kurtarma başarısız! Lütfen internet bağlantınızı kontrol edin.${NC}"
+        exit 1
+    fi
+fi
+
+
+
+
 echo -e "\n${BOLD}${B}╔══════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}${B}║   🤖 OTONOM APK FABRİKASI               ║${NC}"
 echo -e "${BOLD}${B}╚══════════════════════════════════════════╝${NC}\n"
