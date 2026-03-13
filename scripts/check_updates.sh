@@ -1,0 +1,52 @@
+#!/bin/bash
+exec >> /sdcard/Download/apkfactory_update.log 2>&1
+date
+GITHUB_RAW="https://raw.githubusercontent.com/hakanerbasss/apk-factory-assets/main"
+SISTEM_DIR="/storage/emulated/0/termux-otonom-sistem"
+APILER_DIR="$SISTEM_DIR/apiler"
+PROMPTS_DIR="$SISTEM_DIR/prompts"
+VER_FILE="$SISTEM_DIR/prompt_version.txt"
+SCRIPT_VER_FILE="$SISTEM_DIR/script_version.txt"
+WS_BRIDGE="/data/data/com.termux/files/home/apk-factory-ws/ws_bridge.py"
+
+remote=$(curl -sf --max-time 5 "$GITHUB_RAW/version.json" || echo '{}')
+remote_prompt=$(echo "$remote" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("prompt_version","0"))' 2>/dev/null)
+remote_script=$(echo "$remote" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("script_version","0"))' 2>/dev/null)
+local_prompt=$(cat "$VER_FILE" 2>/dev/null || echo "0")
+local_script=$(cat "$SCRIPT_VER_FILE" 2>/dev/null || echo "0")
+
+# API conf - her zaman güncelle (key korunarak)
+mkdir -p "$APILER_DIR"
+for conf in deepseek gemini openai claude groq qwen; do
+    tmp="$APILER_DIR/${conf}.tmp"
+    dst="$APILER_DIR/${conf}.conf"
+    if curl -sf --max-time 10 "$GITHUB_RAW/apiler/${conf}.conf" -o "$tmp"; then
+        if [ -f "$dst" ]; then
+            key=$(grep "^API_KEY=" "$dst" | cut -d= -f2- | tr -d '"')
+            [ -n "$key" ] && sed -i "s|^API_KEY=.*|API_KEY=\"$key\"|" "$tmp"
+        fi
+        mv "$tmp" "$dst"
+        echo "$conf.conf güncellendi"
+    fi
+done
+
+# Scriptler - versiyon değişmişse
+if [ "$remote_script" != "$local_script" ] && [ -n "$remote_script" ] && [ "$remote_script" != "0" ]; then
+    for f in autofix.sh prj.sh factory.sh; do
+        curl -sf --max-time 30 "$GITHUB_RAW/scripts/$f" -o "$SISTEM_DIR/$f" && chmod +x "$SISTEM_DIR/$f" && echo "$f güncellendi"
+    done
+    curl -sf --max-time 30 "$GITHUB_RAW/scripts/ws_bridge.py" -o "$WS_BRIDGE" && echo "ws_bridge güncellendi"
+    echo "$remote_script" > "$SCRIPT_VER_FILE"
+    pkill -9 -f ws_bridge.py 2>/dev/null; sleep 1
+    nohup python3 "$WS_BRIDGE" >> /data/data/com.termux/files/home/apk-factory-ws/ws_bridge.log 2>&1 &
+fi
+
+# Promptlar - versiyon değişmişse
+if [ "$remote_prompt" != "$local_prompt" ] && [ -n "$remote_prompt" ] && [ "$remote_prompt" != "0" ]; then
+    mkdir -p "$PROMPTS_DIR"
+    curl -sf --max-time 15 "$GITHUB_RAW/prompts/autofix_system.txt" -o "$PROMPTS_DIR/autofix_system.txt" && echo "autofix_system güncellendi"
+    curl -sf --max-time 15 "$GITHUB_RAW/prompts/autofix_task.txt" -o "$PROMPTS_DIR/autofix_task.txt" && echo "autofix_task güncellendi"
+    echo "$remote_prompt" > "$VER_FILE"
+fi
+
+echo "check_updates tamamlandı"
