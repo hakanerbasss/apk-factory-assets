@@ -72,8 +72,8 @@ bump_version() {
     NEW_NAME="$MAJOR.$((MINOR + 1))"
     
     # Format ne olursa olsun temiz bir şekilde yenisiyle değiştir
-    sed -i "s/versionCode.*/versionCode $NEW_CODE/" "$GRADLE_FILE"
-    sed -i "s/versionName.*/versionName \"$NEW_NAME\"/" "$GRADLE_FILE"
+    sed -i "s/versionCode [0-9]*/versionCode $NEW_CODE/" "$GRADLE_FILE"
+    sed -i "s/versionName \"[^\"]*\"/versionName \"$NEW_NAME\"/" "$GRADLE_FILE"
     
     V_CODE=$NEW_CODE; V_NAME=$NEW_NAME
     echo -e "  ${DIM}v$V_NAME ($V_CODE)${NC}"
