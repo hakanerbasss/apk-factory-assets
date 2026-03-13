@@ -102,6 +102,7 @@ cmd_build() {
         ERRORS=$(echo "$OUTPUT" | grep -E "^e: " | head -5)
         [ -n "$ERRORS" ] && echo "$ERRORS" | while read l; do echo -e "  ${R}→${NC} $(echo $l | sed 's|e: file:///.*\.kt||')"; done
         echo -e "  ${DIM}dd yazarak hata dosyalarını indirebilirsin${NC}"
+        exit 1
     fi
 }
 
