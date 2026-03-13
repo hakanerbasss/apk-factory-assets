@@ -1,11 +1,12 @@
 {
   "prompt_version": "1.1",
-  "script_version": "5.7",
+  "script_version": "5.8",
   "updated": "2026-03-13",
   "changelog": [
     "Gemini modelleri güncellendi",
-    "Claude model listesi güncellendi", 
+    "Claude model listesi güncellendi",
     "autofix_system.txt dependency kuralı eklendi",
-    "Güncelleme sistemi eklendi"
+    "Güncelleme sistemi eklendi",
+    "Güncelleme butonu eklendi"
   ]
 }
