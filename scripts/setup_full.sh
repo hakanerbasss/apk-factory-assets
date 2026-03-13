@@ -158,9 +158,26 @@ mkdir -p "$WS_BRIDGE_DIR"
 curl -sf "$GITHUB_RAW/scripts/ws_bridge.py" -o "$WS_BRIDGE_DIR/ws_bridge.py" >> "$LOG_FILE" 2>&1
 chmod +x "$WS_BRIDGE_DIR/ws_bridge.py"
 
-pkill -9 -f ws_bridge.py 2>/dev/null || true
-sleep 1
-nohup python3 "$WS_BRIDGE_DIR/ws_bridge.py" >> "$WS_BRIDGE_DIR/ws_bridge.log" 2>&1 &
+# restart_bridge.sh oluştur
+cat > ~/restart_bridge.sh << 'RBEOF'
+#!/data/data/com.termux/files/usr/bin/bash
+pkill -9 -f ws_bridge.py 2>/dev/null
+fuser -k 8765/tcp 2>/dev/null
+sleep 2
+nohup python3 /data/data/com.termux/files/home/apk-factory-ws/ws_bridge.py >> /data/data/com.termux/files/home/apk-factory-ws/ws_bridge.log 2>&1 &
+RBEOF
+chmod +x ~/restart_bridge.sh
+
+# Termux Boot
+mkdir -p ~/.termux/boot
+cat > ~/.termux/boot/start_ws_bridge.sh << 'BEOF'
+#!/data/data/com.termux/files/usr/bin/bash
+sleep 10
+bash /data/data/com.termux/files/home/restart_bridge.sh
+BEOF
+chmod +x ~/.termux/boot/start_ws_bridge.sh
+
+bash ~/restart_bridge.sh
 sleep 3
 
 if pgrep -f ws_bridge.py > /dev/null; then
