@@ -426,6 +426,9 @@ async def handle(ws):
                     # ile değil, özel olarak cevaplıyoruz
                     # factory.sh prompt'una ek kural ekle - MyApplicationTheme referansı kullanma
                     full_task = task + ". ÖNEMLİ: Tema için sadece MaterialTheme kullan, özel tema sınıfı oluşturma."
+                    pkg = d.get("pkg","")
+                    if pkg: os.environ["PKG_OVERRIDE"] = pkg
+                    else: os.environ.pop("PKG_OVERRIDE", None)
                     state["_factory_name"] = n
                     state["_factory_task"] = full_task
                     state["_factory_task_default"] = full_task   # "→ " için yedek
