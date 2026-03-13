@@ -656,6 +656,10 @@ async def handle(ws):
                         await ws.send(json.dumps({"type":"task_done","success":True,"text":f"✅ {name} sıfırlandı"}))
                     except Exception as ex:
                         await ws.send(json.dumps({"type":"error","text":f"GitHub hatası: {ex}"}))
+                elif t == "check_updates":
+                    subprocess.Popen(["bash", "/storage/emulated/0/termux-otonom-sistem/check_updates.sh"])
+                    await ws.send(json.dumps({"type":"task_done","success":True,"text":"🔄 Güncelleme başlatıldı"}))
+
                 elif t == "system_info":
                     await ws.send(json.dumps({"type":"system_info","data":{
                         "sistem_dir":SISTEM_DIR,"home":HOME,
