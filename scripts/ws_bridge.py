@@ -656,6 +656,18 @@ async def handle(ws):
                         await ws.send(json.dumps({"type":"task_done","success":True,"text":f"✅ {name} sıfırlandı"}))
                     except Exception as ex:
                         await ws.send(json.dumps({"type":"error","text":f"GitHub hatası: {ex}"}))
+                elif t == "get_version":
+                    import urllib.request
+                    try:
+                        raw = urllib.request.urlopen(f"{GITHUB_RAW}/version.json", timeout=5).read().decode()
+                        vdata = json.loads(raw)
+                        local_sv = open(f"{SISTEM_DIR}/script_version.txt").read().strip() if os.path.exists(f"{SISTEM_DIR}/script_version.txt") else "0"
+                        local_pv = open(f"{SISTEM_DIR}/prompt_version.txt").read().strip() if os.path.exists(f"{SISTEM_DIR}/prompt_version.txt") else "0"
+                        has_update = (vdata.get("script_version","0") != local_sv or vdata.get("prompt_version","0") != local_pv)
+                        await ws.send(json.dumps({"type":"version_info","data":vdata,"has_update":has_update}))
+                    except Exception as ex:
+                        await ws.send(json.dumps({"type":"error","text":f"Versiyon alınamadı: {ex}"}))
+
                 elif t == "check_updates":
                     subprocess.Popen(["bash", "/storage/emulated/0/termux-otonom-sistem/check_updates.sh"])
                     await ws.send(json.dumps({"type":"task_done","success":True,"text":"🔄 Güncelleme başlatıldı"}))
