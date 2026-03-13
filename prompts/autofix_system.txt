@@ -29,3 +29,5 @@ ANDROID KURALLARI:
    combinedClickable kullanan HER Composable fonksiyonu @OptIn(ExperimentalFoundationApi::class) ister.
    ExperimentalMaterial3Api kullanan HER Composable @OptIn(ExperimentalMaterial3Api::class) ister.
    Birden fazla varsa: @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+
+- DEPENDENCY KURALI: "Unresolved reference" hatası bir kütüphane sınıfına aitse (Coil, Glide, Retrofit, Room vb.), ÖNCE app/build.gradle dependencies bloğunu kontrol et. Kütüphane eksikse implementation satırı ekle. Örnek: coil hatası → implementation("io.coil-kt:coil-compose:2.4.0") ekle.
