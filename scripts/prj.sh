@@ -263,7 +263,8 @@ cmd_bundle() {
     else
         echo -e "  ${Y}⚠️  Keystore bulunamadı, imzalanmadı${NC}"
     fi
-    DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE}).aab"
+    mkdir -p "$DOWNLOAD/apk-cikti"
+    DEST="$DOWNLOAD/apk-cikti/${P_NAME}-v${V_NAME}(${V_CODE}).aab"
     cp "$AAB" "$DEST"
     SIZE=$(ls -lh "$DEST" | awk '{print $5}')
     echo -e "  ${G}✅ AAB hazır!${NC}  $SIZE"

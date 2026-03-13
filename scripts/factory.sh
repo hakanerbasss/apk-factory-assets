@@ -49,7 +49,7 @@ if [ -z "$AI_PROMPT" ]; then echo -e "${R}Görev boş olamaz!${NC}"; exit 1; fi
 
 # 2. OTOMATİK DEĞİŞKENLER (Arka planda uydurulur)
 # Tireleri alt çizgiye çevirerek wizaicorp paket adını oluştur
-P_PKG="com.wizaicorp.$(echo $P_NAME | tr '-' '_')"
+P_PKG="${PKG_OVERRIDE:-com.wizaicorp.$(echo $P_NAME | tr '-' '_')}"
 KS_PASS=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 12)
 KS_ALIAS=$(echo "$P_NAME" | tr -d '-' | head -c 12)
 KS_FILE="${P_NAME}-release.keystore"

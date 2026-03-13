@@ -1,10 +1,12 @@
 {
   "prompt_version": "1.1",
-  "script_version": "5.9",
+  "script_version": "6.0",
   "updated": "2026-03-13",
   "changelog": [
-    "factory.sh keystore alias hatası düzeltildi",
-    "Güncelleme butonu eklendi",
-    "Gemini modelleri güncellendi"
+    "AAB çıktısı apk-cikti klasörüne taşındı",
+    "Paket adı seçeneği eklendi",
+    "Yeniden başlat butonu eklendi",
+    "APK silme özelliği eklendi",
+    "Güncelleme sistemi eklendi"
   ]
 }
