@@ -179,6 +179,7 @@ chmod +x ~/.termux/boot/start_ws_bridge.sh
 
 bash ~/restart_bridge.sh
 sleep 3
+bash /storage/emulated/0/termux-otonom-sistem/check_updates.sh &
 
 if pgrep -f ws_bridge.py > /dev/null; then
     log "WebSocket bridge yazıldı"
