@@ -92,9 +92,8 @@ cmd_build() {
         APK=$(find "$P_DIR/app/build/outputs/apk/debug/" -name "*.apk" 2>/dev/null | head -1)
         if [ -n "$APK" ]; then
             rm -f "$DOWNLOAD/${P_NAME}"*.apk 2>/dev/null
-    rm -f "$DOWNLOAD/${P_NAME}"*.apk 2>/dev/null
-    DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
-            cp "$APK" "$DEST"
+            DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
+            cp "$APK" "$DEST" && touch "$DEST"
             SIZE=$(ls -lh "$DEST" | awk '{print $5}')
             echo -e "  ${G}✅ APK hazır!${NC}  $SIZE"
             echo -e "  📁 ${DIM}$DEST${NC}"
@@ -270,7 +269,7 @@ cmd_bundle() {
     mkdir -p "$DOWNLOAD/apk-cikti"
     rm -f "$DOWNLOAD/apk-cikti/${P_NAME}"*.aab 2>/dev/null
     DEST="$DOWNLOAD/apk-cikti/${P_NAME}-v${V_NAME}(${V_CODE}).aab"
-    cp "$AAB" "$DEST"
+    cp "$AAB" "$DEST" && touch "$DEST"
     SIZE=$(ls -lh "$DEST" | awk '{print $5}')
     echo -e "  ${G}✅ AAB hazır!${NC}  $SIZE"
     echo -e "  📁 ${DIM}$DEST${NC}"
