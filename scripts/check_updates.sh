@@ -49,4 +49,12 @@ for pf in autofix_system.txt autofix_task.txt; do
     fi
 done
 
+# Setup klasörü - yoksa indir
+SETUP_DIR="$SISTEM_DIR/setup"
+if [ ! -f "$SETUP_DIR/gradlew" ]; then
+    curl -sf --max-time 60 "$GITHUB_RAW/setup.zip" -o "$SISTEM_DIR/setup.zip" && \
+    unzip -qo "$SISTEM_DIR/setup.zip" -d "$SISTEM_DIR/" && \
+    rm -f "$SISTEM_DIR/setup.zip" && echo "setup klasörü geri yüklendi"
+fi
+
 echo "check_updates tamamlandı"
