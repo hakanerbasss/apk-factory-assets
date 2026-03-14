@@ -31,3 +31,4 @@ ANDROID KURALLARI:
    Birden fazla varsa: @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 
 - DEPENDENCY KURALI: "Unresolved reference" hatası bir kütüphane sınıfına aitse (Coil, Glide, Retrofit, Room vb.), ÖNCE app/build.gradle dependencies bloğunu kontrol et. Kütüphane eksikse implementation satırı ekle. Örnek: coil hatası → implementation("io.coil-kt:coil-compose:2.4.0") ekle.
+- AndroidManifest.xml içindeki android:theme değerini ASLA değiştirme. Tema hatası varsa build.gradle veya values/themes.xml dosyasını düzelt.

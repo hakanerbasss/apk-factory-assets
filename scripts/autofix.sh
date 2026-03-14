@@ -305,6 +305,8 @@ print(json.dumps({'model':'${MODEL}','max_tokens':${MAX_TOKENS},'temperature':0.
     local c; c=$(jq -r '.choices[0].message.content' "$rf" 2>/dev/null)
     [[ -z "$c" || "$c" == "null" ]] && { err "Boş yanıt"; return 1; }
     echo "$c" > "$TMP_DIR/ai_content.txt"
+    echo "=== GEMINI RAW ===" >> /sdcard/Download/gemini_debug.log
+    echo "$c" >> /sdcard/Download/gemini_debug.log
 }
 
 _call_gemini() {
@@ -322,6 +324,8 @@ print(json.dumps({'contents':[{'parts':[{'text':sys.argv[1]+'\n\n'+sys.argv[2]}]
     local c; c=$(jq -r '.candidates[0].content.parts[0].text' "$rf" 2>/dev/null)
     [[ -z "$c" || "$c" == "null" ]] && { err "Boş yanıt"; return 1; }
     echo "$c" > "$TMP_DIR/ai_content.txt"
+    echo "=== GEMINI RAW ===" >> /sdcard/Download/gemini_debug.log
+    echo "$c" >> /sdcard/Download/gemini_debug.log
 }
 
 _call_claude() {
@@ -338,6 +342,8 @@ print(json.dumps({'model':'${MODEL}','max_tokens':${MAX_TOKENS},
     local c; c=$(jq -r '.content[0].text' "$rf" 2>/dev/null)
     [[ -z "$c" || "$c" == "null" ]] && { err "Boş yanıt"; return 1; }
     echo "$c" > "$TMP_DIR/ai_content.txt"
+    echo "=== GEMINI RAW ===" >> /sdcard/Download/gemini_debug.log
+    echo "$c" >> /sdcard/Download/gemini_debug.log
 }
 
 # --- YENİ: Yedek Geri Yükleme ---
