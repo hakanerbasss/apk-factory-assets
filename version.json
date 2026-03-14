@@ -1,11 +1,10 @@
 {
   "prompt_version": "1.1",
-  "script_version": "6.3",
+  "script_version": "6.4",
   "updated": "2026-03-14",
   "changelog": [
-    "autofix: evrensel dosya tarama (grep -Iq)",
-    "autofix: max_chars 200K",
-    "autofix: Manifest hata filtresi",
-    "autofix: head-100 genişletildi"
+    "APK/AAB silme özelliği eklendi",
+    "autofix: iskelet kodu düzeltmesi",
+    "factory: broken pipe düzeltildi"
   ]
 }
