@@ -592,7 +592,8 @@ run_task() {
 
     echo -e "${YELLOW}🔍 Görev için ilgili dosyalar keşfediliyor...${NC}"
     local sp="Sen uzman bir Android asistanısın. Sadece JSON formatında dosya yollarını döndürürsün."
-    local um="PROJE DOSYALARI:\n$(cat "$tree_file")\n\nGÖREV: $user_task\n\nSadece bu görevi yapmak için okumam ve değiştirmem gereken dosyaların yollarını içeren bir JSON dizisi döndür. Başka hiçbir açıklama yapma.\nÖrnek: [\"app/src/main/java/com/.../MainActivity.kt\"]"
+    local pkg=$(grep "applicationId" "$PROJECT_ROOT/app/build.gradle" 2>/dev/null | head -1 | grep -oE '"[^"]+"'  | head -1 | tr -d '"')
+    local um="PROJE DOSYALARI:\n$(cat "$tree_file")\n\nPROJE PAKET ADI: $pkg\n\nGÖREV: $user_task\n\nSadece bu görevi yapmak için okumam ve değiştirmem gereken dosyaların yollarını içeren bir JSON dizisi döndür. DOSYA YOLLARI MUTLAKA PROJE DOSYALARI LİSTESİNDEN SEÇİLMELİ, uydurma yol yazma.\nÖrnek: [\"app/src/main/java/com/.../MainActivity.kt\"]"
 
     if ! _call_active_ai "$sp" "$um"; then
         err "Keşif başarısız oldu."; return 1
