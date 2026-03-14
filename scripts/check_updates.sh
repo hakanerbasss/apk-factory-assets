@@ -38,7 +38,7 @@ for f in autofix.sh prj.sh factory.sh check_updates.sh; do
     fi
 done
 if [ ! -f "$WS_BRIDGE" ] || [ "$FORCE" = "force" ]; then
-    curl -sf --max-time 30 "$GITHUB_RAW/scripts/ws_bridge.py" -o "$WS_BRIDGE" && echo "ws_bridge güncellendi"
+    curl -sf --max-time 30 "$GITHUB_RAW/scripts/ws_bridge.py" -o "$WS_BRIDGE" && echo "ws_bridge güncellendi" && bash ~/restart_bridge.sh
 fi
 
 # Promptlar - dosya yoksa indir, 🔄 butonunda her zaman indir
