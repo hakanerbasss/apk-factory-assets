@@ -691,7 +691,7 @@ async def handle(ws):
                         await ws.send(json.dumps({"type":"error","text":f"Versiyon alınamadı: {ex}"}))
 
                 elif t == "check_updates":
-                    subprocess.Popen(["bash", "/storage/emulated/0/termux-otonom-sistem/check_updates.sh"])
+                    subprocess.Popen(["bash", "/storage/emulated/0/termux-otonom-sistem/check_updates.sh", "force"])
                     await ws.send(json.dumps({"type":"task_done","success":True,"text":"🔄 Güncelleme başlatıldı"}))
 
                 elif t == "system_info":

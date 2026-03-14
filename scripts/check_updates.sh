@@ -30,23 +30,23 @@ for conf in deepseek gemini openai claude groq qwen; do
     fi
 done
 
-# Scriptler - versiyon değişmişse
-if [ "$remote_script" != "$local_script" ] && [ -n "$remote_script" ] && [ "$remote_script" != "0" ]; then
-    for f in autofix.sh prj.sh factory.sh; do
+# Scriptler - dosya yoksa indir, 🔄 butonunda her zaman indir
+FORCE="${1:-}"
+for f in autofix.sh prj.sh factory.sh check_updates.sh; do
+    if [ ! -f "$SISTEM_DIR/$f" ] || [ "$FORCE" = "force" ]; then
         curl -sf --max-time 30 "$GITHUB_RAW/scripts/$f" -o "$SISTEM_DIR/$f" && chmod +x "$SISTEM_DIR/$f" && echo "$f güncellendi"
-    done
+    fi
+done
+if [ ! -f "$WS_BRIDGE" ] || [ "$FORCE" = "force" ]; then
     curl -sf --max-time 30 "$GITHUB_RAW/scripts/ws_bridge.py" -o "$WS_BRIDGE" && echo "ws_bridge güncellendi"
-    echo "$remote_script" > "$SCRIPT_VER_FILE"
-    pkill -9 -f ws_bridge.py 2>/dev/null; sleep 1
-    nohup python3 "$WS_BRIDGE" >> /data/data/com.termux/files/home/apk-factory-ws/ws_bridge.log 2>&1 &
 fi
 
-# Promptlar - versiyon değişmişse
-if [ "$remote_prompt" != "$local_prompt" ] && [ -n "$remote_prompt" ] && [ "$remote_prompt" != "0" ]; then
-    mkdir -p "$PROMPTS_DIR"
-    curl -sf --max-time 15 "$GITHUB_RAW/prompts/autofix_system.txt" -o "$PROMPTS_DIR/autofix_system.txt" && echo "autofix_system güncellendi"
-    curl -sf --max-time 15 "$GITHUB_RAW/prompts/autofix_task.txt" -o "$PROMPTS_DIR/autofix_task.txt" && echo "autofix_task güncellendi"
-    echo "$remote_prompt" > "$VER_FILE"
-fi
+# Promptlar - dosya yoksa indir, 🔄 butonunda her zaman indir
+mkdir -p "$PROMPTS_DIR"
+for pf in autofix_system.txt autofix_task.txt; do
+    if [ ! -f "$PROMPTS_DIR/$pf" ] || [ "$FORCE" = "force" ]; then
+        curl -sf --max-time 15 "$GITHUB_RAW/prompts/$pf" -o "$PROMPTS_DIR/$pf" && echo "$pf güncellendi"
+    fi
+done
 
 echo "check_updates tamamlandı"
