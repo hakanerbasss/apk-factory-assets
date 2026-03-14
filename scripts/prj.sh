@@ -91,7 +91,9 @@ cmd_build() {
     if echo "$OUTPUT" | grep -q "BUILD SUCCESSFUL"; then
         APK=$(find "$P_DIR/app/build/outputs/apk/debug/" -name "*.apk" 2>/dev/null | head -1)
         if [ -n "$APK" ]; then
-            DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
+            rm -f "$DOWNLOAD/${P_NAME}"*.apk 2>/dev/null
+    rm -f "$DOWNLOAD/${P_NAME}"*.apk 2>/dev/null
+    DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
             cp "$APK" "$DEST"
             SIZE=$(ls -lh "$DEST" | awk '{print $5}')
             echo -e "  ${G}✅ APK hazır!${NC}  $SIZE"
@@ -115,6 +117,7 @@ cmd_transfer() {
         echo -e "  ${R}❌ APK bulunamadı. Önce build al (d).${NC}"; return
     fi
     get_version
+    rm -f "$DOWNLOAD/${P_NAME}"*.apk 2>/dev/null
     DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
     cp "$APK" "$DEST"
     SIZE=$(ls -lh "$DEST" | awk '{print $5}')
@@ -134,7 +137,8 @@ cmd_build_errors() {
         APK=$(find "$P_DIR/app/build/outputs/apk/debug/" -name "*.apk" 2>/dev/null | head -1)
         if [ -n "$APK" ]; then
             get_version
-            DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
+            rm -f "$DOWNLOAD/${P_NAME}"*.apk 2>/dev/null
+    DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
             cp "$APK" "$DEST"
             SIZE=$(ls -lh "$DEST" | awk '{print $5}')
             echo -e "  ${G}✅ Build başarılı! APK hazır.${NC}  $SIZE"
@@ -264,6 +268,7 @@ cmd_bundle() {
         echo -e "  ${Y}⚠️  Keystore bulunamadı, imzalanmadı${NC}"
     fi
     mkdir -p "$DOWNLOAD/apk-cikti"
+    rm -f "$DOWNLOAD/apk-cikti/${P_NAME}"*.aab 2>/dev/null
     DEST="$DOWNLOAD/apk-cikti/${P_NAME}-v${V_NAME}(${V_CODE}).aab"
     cp "$AAB" "$DEST"
     SIZE=$(ls -lh "$DEST" | awk '{print $5}')
