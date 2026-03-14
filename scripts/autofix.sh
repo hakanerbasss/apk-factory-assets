@@ -15,7 +15,7 @@ PROMPTS_DIR="$SISTEM_DIR/prompts"
 CONF_FILE="$HOME/.config/autofix.conf"
 TMP_DIR="${TMPDIR:-$PREFIX/tmp}/autofix_$$"
 LOG_FILE="$TMP_DIR/autofix.log"
-MAX_LOOPS=$(grep "^MAX_LOOPS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo 8)
+MAX_LOOPS=8
 
 # --- YENİ: Gölge Yedekleme Sistemi ---
 AGENT_YEDEK_DIR="$SISTEM_DIR/agent_yedekler"
@@ -57,21 +57,6 @@ select_provider() {
     local default_provider=""
     [[ -f "$CONF_FILE" ]] && default_provider=$(grep "^DEFAULT_PROVIDER=" "$CONF_FILE" 2>/dev/null | cut -d'"' -f2)
 
-    # Varsayılan provider varsa direkt seç
-    if [[ -n "$default_provider" ]]; then
-        for i in "${!providers[@]}"; do
-            if [[ "${providers[$i]}" == "$default_provider" ]]; then
-                PROVIDER_CONF="${confs[$i]}"
-                NAME=$(grep "^NAME=" "$PROVIDER_CONF" | cut -d'"' -f2)
-                API_URL=$(grep "^API_URL=" "$PROVIDER_CONF" | cut -d'"' -f2)
-                API_KEY=$(grep "^API_KEY=" "$PROVIDER_CONF" | cut -d'"' -f2)
-                MODEL=$(grep "^MODEL=" "$PROVIDER_CONF" | cut -d'"' -f2)
-                MAX_TOKENS=$(grep "^MAX_TOKENS=" "$PROVIDER_CONF" | cut -d'=' -f2)
-                return
-            fi
-        done
-    fi
-
     title "Hangi AI ile çalışalım?"
     for i in "${!providers[@]}"; do
         local kv; kv=$(grep "^API_KEY=" "${confs[$i]}" | cut -d'"' -f2)
@@ -101,25 +86,27 @@ select_provider() {
     API_KEY=$(grep "^API_KEY=" "$PROVIDER_CONF" | cut -d'"' -f2)
     MODEL=$(grep "^MODEL="    "$PROVIDER_CONF" | cut -d'"' -f2)
     MAX_TOKENS=$(grep "^MAX_TOKENS=" "$PROVIDER_CONF" | cut -d'=' -f2)
-    MAX_TOKENS=$(grep "^MAX_TOKENS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo 8000)
+    MAX_TOKENS=${MAX_TOKENS:-8000}
 
     # --- CLAUDE TÜM MODELLER MENÜSÜ ---
     if [[ "$NAME" == "Claude" ]]; then
         title "Claude Modeli Seçin (Tüm Nesiller)"
-        echo -e "  ${BOLD}1) 4.5 Opus${NC}    - [\$\$\$] En Güçlü (Mimari/Ağır Bug)      | \$15/\$75"
-        echo -e "  ${BOLD}2) 4.5 Sonnet${NC}  - [\$\$ ] Dengeli (UI/UX Tasarımı)     | \$3/\$15"
-        echo -e "  ${BOLD}3) 4.5 Haiku${NC}   - [\$  ] Hızlı (Genel Hatalar)          | \$1/\$5"
-        echo -e "  ${BOLD}4) 3.5 Sonnet${NC}  - [\$  ] Kararlı LTS                     | \$3/\$15"
-        echo -e "  ${BOLD}5) 3.5 Haiku${NC}   - [¢  ] En Ucuz & Seri                  | \$0.25/\$1.25"
+        echo -e "  ${BOLD}1) 4.6 Opus${NC}   - [\$\$\$] Zirve Zeka (Mimari/Ağır Bug)   | \$5/\$25"
+        echo -e "  ${BOLD}2) 4.6 Sonnet${NC} - [\$\$ ] Yeni & Zeki (UI/UX Tasarımı)    | \$3/\$15"
+        echo -e "  ${BOLD}3) 4.5 Sonnet${NC} - [\$\$ ] 1M Context (Büyük Dosyalar)     | \$3/\$15"
+        echo -e "  ${BOLD}4) 4.5 Haiku${NC}  - [\$  ] 4. Nesil Hız (Genel Hatalar)     | \$1/\$5"
+        echo -e "  ${BOLD}5) 3.5 Sonnet${NC} - [\$  ] Efsanevi Kararlılık (LTS)       | \$3/\$15"
+        echo -e "  ${BOLD}6) 3.5 Haiku${NC}  - [¢  ] En Ucuz & Seri (Basit/Import)    | \$0.25/\$1.25"
         echo
-        read -r -p "$(echo -e "${YELLOW}  Seçim yap (1-5) [Enter=$MODEL]: ${NC}")" m_choice
+        read -r -p "$(echo -e "${YELLOW}  Seçim yap (1-6) [Enter=$MODEL]: ${NC}")" m_choice
         
         case "$m_choice" in
-            1) MODEL="claude-opus-4-5-20251101" ;;
+            1) MODEL="claude-3-opus-20240229" ;;
             2) MODEL="claude-sonnet-4-5-20250929" ;;
-            3) MODEL="claude-haiku-4-5-20251001" ;;
-            4) MODEL="claude-3-5-sonnet-20241022" ;;
-            5) MODEL="claude-3-5-haiku-20241022" ;;
+            3) MODEL="claude-3-5-sonnet-latest" ;;
+            4) MODEL="claude-3-haiku-20240307" ;;
+            5) MODEL="claude-sonnet-4-5-20250929" ;;
+            6) MODEL="claude-3-haiku-20240307" ;;
         esac
         
                 # Seçilen modeli Claude.conf dosyasına kalıcı olarak yazar
@@ -229,13 +216,13 @@ parse_errors() {
     local build_out="$TMP_DIR/build_output.txt"
     local errors_file="$TMP_DIR/errors.txt"
     local files_file="$TMP_DIR/error_files.txt"
-    grep -E "^e: file://|error:|^ERROR|AAPT: error|Could not find|FAILED in" \
-        "$build_out" | head -n 2 > "$errors_file" 2>/dev/null || true
-    grep -oE '/[^ :]+\.kt' "$errors_file" | head -n 2 | sort -u > "$files_file" 2>/dev/null || true
+    grep -E "^e: file://|error:|^ERROR|AAPT: error|Could not find|checkDebugAarMetadata|Manifest merger failed|Attribute|Suggestion:|Element" \
+        "$build_out" > "$errors_file" 2>/dev/null || true
+    grep -oE '/[^ :]+\.kt' "$errors_file" | sort -u > "$files_file" 2>/dev/null || true
     if [[ ! -s "$files_file" ]]; then
         grep -oE 'com/[a-z/]+/[A-Za-z]+\.kt' "$build_out" \
         | while read -r rel; do find "$SRC_ROOT" -path "*$rel" 2>/dev/null | head -1; done \
-        | head -n 2 | sort -u > "$files_file"
+        | sort -u > "$files_file"
     fi
     echo "$errors_file"
 }
@@ -276,7 +263,7 @@ call_ai() {
     local errors="$1" sources="$2"
     local error_text; error_text=$(cat "$errors")
     local source_text; source_text=$(cat "$sources")
-    local max_chars=30000
+    local max_chars=200000
     [[ ${#source_text} -gt $max_chars ]] && source_text="${source_text:0:$max_chars}"
 
     local system_prompt
@@ -308,8 +295,7 @@ print(json.dumps({'model':'${MODEL}','max_tokens':${MAX_TOKENS},'temperature':0.
 
 _call_gemini() {
     local sp="$1" um="$2" rf="$TMP_DIR/api_response.json"
-    local gemini_base="https://generativelanguage.googleapis.com/v1beta/models"
-    local url="${gemini_base}/${MODEL}:generateContent?key=${API_KEY}"
+    local url="${API_URL}?key=${API_KEY}"
     local payload; payload=$(python3 -c "
 import json,sys
 print(json.dumps({'system_instruction':{'parts':[{'text':sys.argv[1]}]},
@@ -510,7 +496,7 @@ run_autofix() {
             ok "BUILD BAŞARILI! 🎉  (${elapsed}s)"
             
             local apk; apk=$(find "$PROJECT_ROOT/app/build/outputs/apk" -name "*.apk" 2>/dev/null | head -1)
-            [[ -n "$apk" ]] && mkdir -p "/sdcard/Download/apk-cikti" && cp "$apk" "/sdcard/Download/apk-cikti/$(basename "$apk")" 2>/dev/null && ok "APK → Download/apk-cikti"
+            [[ -n "$apk" ]] && cp "$apk" "/sdcard/Download/$(basename "$apk")" 2>/dev/null && ok "APK → Download"
 
             read -r -p "$(echo -e "\n${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B=Yedeğe Dön]: ${NC}")" res
             if [[ "$res" == "b" || "$res" == "B" ]]; then
@@ -542,7 +528,7 @@ run_autofix() {
         local ef; ef=$(parse_errors)
         [[ ! -s "$ef" ]] && cp "$TMP_DIR/build_output.txt" "$ef"
         log "Hata Logu Oku: $(wc -l < "$ef") satır"
-        head -8 "$ef"; echo
+        head -100 "$ef"; echo
 
         local src; src=$(collect_source_files)
         
@@ -576,7 +562,18 @@ run_task() {
 
     local tree_file="$TMP_DIR/tree.txt"
     cd "$PROJECT_ROOT"
-    find app/src/main app/build.gradle build.gradle settings.gradle -type f -name "*.kt" -o -name "*.xml" -o -name "*.gradle" 2>/dev/null | grep -v "/build/" > "$tree_file"
+    find . -maxdepth 4 -type f \
+        -not -path "*/.*" \
+        -not -path "*/build/*" \
+        -not -path "*/bin/*" \
+        -not -path "*/outputs/*" \
+        | while read -r file; do
+            if grep -Iq . "$file" 2>/dev/null; then
+                if [ $(stat -c%s "$file") -lt 102400 ]; then
+                    echo "$file"
+                fi
+            fi
+        done > "$tree_file"
 
     echo -e "${YELLOW}🔍 Görev için ilgili dosyalar keşfediliyor...${NC}"
     local sp="Sen uzman bir Android asistanısın. Sadece JSON formatında dosya yollarını döndürürsün."
