@@ -276,7 +276,7 @@ call_ai() {
     local errors="$1" sources="$2"
     local error_text; error_text=$(cat "$errors")
     local source_text; source_text=$(cat "$sources")
-    local max_chars=30000
+    local max_chars=200000
     [[ ${#source_text} -gt $max_chars ]] && source_text="${source_text:0:$max_chars}"
 
     local system_prompt
@@ -542,7 +542,7 @@ run_autofix() {
         local ef; ef=$(parse_errors)
         [[ ! -s "$ef" ]] && cp "$TMP_DIR/build_output.txt" "$ef"
         log "Hata Logu Oku: $(wc -l < "$ef") satır"
-        head -8 "$ef"; echo
+        head -100 "$ef"; echo
 
         local src; src=$(collect_source_files)
         
@@ -576,7 +576,18 @@ run_task() {
 
     local tree_file="$TMP_DIR/tree.txt"
     cd "$PROJECT_ROOT"
-    find app/src/main app/build.gradle build.gradle settings.gradle -type f -name "*.kt" -o -name "*.xml" -o -name "*.gradle" 2>/dev/null | grep -v "/build/" > "$tree_file"
+    find . -maxdepth 4 -type f \
+        -not -path "*/.*" \
+        -not -path "*/build/*" \
+        -not -path "*/bin/*" \
+        -not -path "*/outputs/*" \
+        | while read -r file; do
+            if grep -Iq . "$file" 2>/dev/null; then
+                if [ $(stat -c%s "$file") -lt 102400 ]; then
+                    echo "$file"
+                fi
+            fi
+        done > "$tree_file"
 
     echo -e "${YELLOW}🔍 Görev için ilgili dosyalar keşfediliyor...${NC}"
     local sp="Sen uzman bir Android asistanısın. Sadece JSON formatında dosya yollarını döndürürsün."
