@@ -313,9 +313,8 @@ _call_gemini() {
     local url="${gemini_base}/${MODEL}:generateContent?key=${API_KEY}"
     local payload; payload=$(python3 -c "
 import json,sys
-print(json.dumps({'system_instruction':{'parts':[{'text':sys.argv[1]}]},
-'contents':[{'parts':[{'text':sys.argv[2]}]}],
-'generationConfig':{'maxOutputTokens':${MAX_TOKENS},'temperature':0.1}}))" "$sp" "$um")
+print(json.dumps({'contents':[{'parts':[{'text':sys.argv[1]+'\n\n'+sys.argv[2]}]}],
+'generationConfig':{'maxOutputTokens':${MAX_TOKENS},'temperature':0.1,'responseMimeType':'application/json'}}))" "$sp" "$um")
     local hc; hc=$(curl -s -w "%{http_code}" -X POST "$url" \
         -H "Content-Type: application/json" -d "$payload" \
         -o "$rf" --connect-timeout 30 --max-time 600 2>/dev/null)
