@@ -91,7 +91,7 @@ cmd_build() {
     if echo "$OUTPUT" | grep -q "BUILD SUCCESSFUL"; then
         APK=$(find "$P_DIR/app/build/outputs/apk/debug/" -name "*.apk" 2>/dev/null | head -1)
         if [ -n "$APK" ]; then
-            rm -f "$DOWNLOAD/${P_NAME}"*.apk 2>/dev/null
+            rm -f "$DOWNLOAD/apk-cikti/${P_NAME}"*.apk 2>/dev/null
             DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
             cp "$APK" "$DEST" && touch "$DEST"
             SIZE=$(ls -lh "$DEST" | awk '{print $5}')
@@ -116,7 +116,7 @@ cmd_transfer() {
         echo -e "  ${R}❌ APK bulunamadı. Önce build al (d).${NC}"; return
     fi
     get_version
-    rm -f "$DOWNLOAD/${P_NAME}"*.apk 2>/dev/null
+    rm -f "$DOWNLOAD/apk-cikti/${P_NAME}"*.apk 2>/dev/null
     DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
     cp "$APK" "$DEST"
     SIZE=$(ls -lh "$DEST" | awk '{print $5}')
@@ -136,7 +136,7 @@ cmd_build_errors() {
         APK=$(find "$P_DIR/app/build/outputs/apk/debug/" -name "*.apk" 2>/dev/null | head -1)
         if [ -n "$APK" ]; then
             get_version
-            rm -f "$DOWNLOAD/${P_NAME}"*.apk 2>/dev/null
+            rm -f "$DOWNLOAD/apk-cikti/${P_NAME}"*.apk 2>/dev/null
     DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
             cp "$APK" "$DEST"
             SIZE=$(ls -lh "$DEST" | awk '{print $5}')

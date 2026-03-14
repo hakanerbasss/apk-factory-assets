@@ -129,7 +129,7 @@ def list_apks(project=""):
         proj = f.split('-202')[0] if '-202' in f else f.rsplit('.', 1)[0]
         res.append({"name":f,"project":proj,"path":path,"size":st.st_size,
                     "type": ext,
-                    "date":datetime.fromtimestamp(st.st_mtime).strftime("%d.%m.%Y %H:%M:%S")})
+                    "date":(lambda m: datetime.strptime(m.group(1), "%Y%m%d-%H%M%S").strftime("%d.%m.%Y %H:%M:%S") if m else datetime.fromtimestamp(st.st_mtime).strftime("%d.%m.%Y %H:%M:%S"))(__import__("re").search(r"-(202\d{5}-\d{6})", f))})
     return res
 
 # ── PTY runner (asyncio-native, fork yok) ─────────────────────────────────────
