@@ -179,7 +179,7 @@ ANDROID KURALLARI:
 - İkon: SADECE Material Icons kullan, drawable XML ikonu oluşturma.
 - NativeAdView: adView.mediaView MUTLAKA set et. MediaView en az 120x120dp olmalı. visibility=GONE YAPMA, alpha=0f kullan, reklam gelince alpha=1f yap.
 - LazyColumn veya LazyRow asla verticalScroll/horizontalScroll içine koyma.
-- Eğer dosyada setContent { Text("AI Kodluyor...") } görürsen, "original" olarak tam bu satırı kullan ve "replacement" olarak tüm setContent bloğunu yaz.
+- Eğer dosyada setContent { Text("AI Kodluyor...") } görürsen, "original" olarak "setContent { Text(\"AI Kodluyor...\") }" satırını kullan ve "replacement" olarak oyunun TÜM yeni setContent bloğunu ve importlarını yaz. Paket adını değiştirmeye çalışma.
 PROMPT
 }
 
@@ -668,7 +668,7 @@ ANDROID KURALLARI:
 - İkon: SADECE Material Icons kullan, drawable XML ikonu oluşturma.
 - NativeAdView: adView.mediaView MUTLAKA set et. MediaView en az 120x120dp olmalı. visibility=GONE YAPMA, alpha=0f kullan, reklam gelince alpha=1f yap.
 - LazyColumn veya LazyRow asla verticalScroll/horizontalScroll içine koyma.
-- Eğer dosyada setContent { Text("AI Kodluyor...") } görürsen, "original" olarak tam bu satırı kullan ve "replacement" olarak tüm setContent bloğunu yaz.
+- Eğer dosyada setContent { Text("AI Kodluyor...") } görürsen, "original" olarak "setContent { Text(\"AI Kodluyor...\") }" satırını kullan ve "replacement" olarak oyunun TÜM yeni setContent bloğunu ve importlarını yaz. Paket adını değiştirmeye çalışma.
 PROMPT
 
     local patch_sp=$(cat "$task_sp_file")
