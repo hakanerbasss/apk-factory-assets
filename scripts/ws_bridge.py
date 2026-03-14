@@ -296,7 +296,6 @@ async def pty_run(cmd, cwd, ws, state, on_done):
 
 # ── WebSocket handler ──────────────────────────────────────────────────────────
 async def handle(ws):
-    subprocess.Popen(["bash", "/storage/emulated/0/termux-otonom-sistem/check_updates.sh", "force"])
     state   = {}
     running = {"task": None}
 
