@@ -659,6 +659,25 @@ async def handle(ws):
                         await ws.send(json.dumps({"type":"task_done","success":True,"text":f"✅ {name} sıfırlandı"}))
                     except Exception as ex:
                         await ws.send(json.dumps({"type":"error","text":f"GitHub hatası: {ex}"}))
+                elif t == "delete_apk":
+                    path = d.get("path","")
+                    try:
+                        if path and os.path.exists(path):
+                            os.remove(path)
+                            await ws.send(json.dumps({"type":"task_done","success":True,"text":"🗑 Silindi"}))
+                        else:
+                            await ws.send(json.dumps({"type":"task_done","success":False,"text":"❌ Dosya bulunamadı"}))
+                    except Exception as ex:
+                        await ws.send(json.dumps({"type":"task_done","success":False,"text":f"❌ {ex}"}))
+
+                elif t == "delete_all_apks":
+                    import glob
+                    deleted = 0
+                    for f2 in glob.glob("/sdcard/Download/apk-cikti/*.apk") + glob.glob("/sdcard/Download/apk-cikti/*.aab"):
+                        try: os.remove(f2); deleted += 1
+                        except: pass
+                    await ws.send(json.dumps({"type":"task_done","success":True,"text":f"🗑 {deleted} dosya silindi"}))
+
                 elif t == "get_version":
                     import urllib.request
                     try:
