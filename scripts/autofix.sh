@@ -562,6 +562,31 @@ run_task() {
 
     local tree_file="$TMP_DIR/tree.txt"
     cd "$PROJECT_ROOT"
+        -not -path "*/.*" \
+        -not -path "*/build/*" \
+        -not -path "*/bin/*" \
+        -not -path "*/outputs/*" \
+        | while read -r file; do
+            if file --mime-type "$file" 2>/dev/null | grep -q "text/"; then
+                if [ $(stat -c%s "$file") -lt 102400 ]; then
+                    echo "$file"
+                fi
+            fi
+        done > "$tree_file"
+        -not -path "*/.*" \
+        -not -path "*/build/*" \
+        -not -path "*/bin/*" \
+        -not -path "*/outputs/*" \
+        | while read -r file; do
+            # grep -I metin olmayan (binary) dosyalarda eşleşme aramaz.
+            # . (nokta) ise "dosyada herhangi bir karakter var mı" diye bakar.
+            if grep -Iq . "$file" 2>/dev/null; then
+                # Boyut kontrolü (Sistemi yormamak için 100 KB altı)
+                if [ $(stat -c%s "$file") -lt 102400 ]; then
+                    echo "$file"
+                fi
+            fi
+        done > "$tree_file"
     find . -maxdepth 4 -type f \
         -not -path "*/.*" \
         -not -path "*/build/*" \
