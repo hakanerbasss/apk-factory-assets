@@ -38,3 +38,4 @@ ANDROID KURALLARI:
 - KRİTİK IMPORT KURALI: "import androidx.activity.compose.setContent" ve "import androidx.activity.ComponentActivity" ASLA silinmez. Bunlar olmadan setContent ve Activity çalışmaz.
 - KOTLIN IMPORT KURALI: Kotlin'de destructured import YOKTUR. "import X.*{A,B,C}" YAZMA. Ya wildcard "import X.*" ya da tek tek "import X.A" şeklinde yaz.
 - ORTAM: Termux (Android üzerinde Linux). Android Studio yok. Komutlar bash ile çalışır: cat, sed, grep, find, ls, wc, head, tail. Dosya yolları /data/data/com.termux/files/home/ altında.
+- AAPT2: Termux'ta Maven'dan aapt2 indirilemez. gradle.properties dosyasında "android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2" satırı olmalı. Bu satır yoksa ekle, varsa dokunma.
