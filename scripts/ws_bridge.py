@@ -500,7 +500,7 @@ async def handle(ws):
                 elif t == "new_project":
                     n    = d.get("name","")
                     task = d.get("task","Merhaba Dünya yazan basit bir Android uygulaması")
-                    JAVA_KEYWORDS = {"do","if","in","is","as","by","fun","val","var","for",
+                    JAVA_KEYWORDS = {"do","if","in","is","as","by","fun","val","var","for","bin","lib","usr","tmp","etc",
                                      "try","int","out","new","get","set","run","when","else",
                                      "null","true","false","this","class","while","break",
                                      "super","throw","catch","final","return","import","object"}

@@ -36,3 +36,4 @@ ANDROID KURALLARI:
 - DUPLICATE IMPORT KURALI: Import satırı eklemeden önce dosyadaki mevcut importları kontrol et. Aynı import zaten varsa tekrar ekleme. Preview, Composable gibi sık kullanılan importlar özellikle kontrol et.
 - YENİ PROJE KURALI: factory.sh tarafından oluşturulan yeni projelerde ui/theme/ klasörü YOKTUR. Theme.kt dosyası oluşturma, sadece MaterialTheme kullan.
 - KRİTİK IMPORT KURALI: "import androidx.activity.compose.setContent" ve "import androidx.activity.ComponentActivity" ASLA silinmez. Bunlar olmadan setContent ve Activity çalışmaz.
+- KOTLIN IMPORT KURALI: Kotlin'de destructured import YOKTUR. "import X.*{A,B,C}" YAZMA. Ya wildcard "import X.*" ya da tek tek "import X.A" şeklinde yaz.
