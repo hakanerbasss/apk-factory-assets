@@ -186,6 +186,9 @@ ANDROID KURALLARI:
 - TEMA KURALI: Özel tema sınıfı (YourAppTheme, AppTheme, MyTheme vb.) KULLANMA. ui.theme.* paketi yoksa import etme. Sadece MaterialTheme kullan.
 - DUPLICATE IMPORT KURALI: Import satırı eklemeden önce dosyadaki mevcut importları kontrol et. Aynı import zaten varsa tekrar ekleme.
 - YENİ PROJE KURALI: factory.sh tarafından oluşturulan yeni projelerde ui/theme/ klasörü YOKTUR. Theme.kt dosyası oluşturma, sadece MaterialTheme kullan.
+- AndroidManifest.xml içindeki android:theme değerini ASLA değiştirme.
+- BÜYÜK KOD KURALI: Eğer bir dosyaya 50 satırdan fazla kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" alanını kullan. full_content dosyanın TAM içeriğini içerir. Bu JSON escape sorununu önler.
+  Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity..."}
 PROMPT
 }
 
@@ -416,14 +419,33 @@ open('$clean_file','w').write(t.strip())"
     local py_script="$TMP_DIR/patch_apply.py"
     cat > "$py_script" << 'PYEOF'
 import json, os, shutil
-with open(os.environ['CLEAN_FILE']) as f: t = f.read()
-try: data = json.loads(t)
-except:
+
+def try_parse_json(t):
+    """JSON parse et — bozuksa en uzun geçerli bloğu bul"""
+    # Önce direkt parse
+    try: return json.loads(t)
+    except: pass
+    # { ... } bloğunu bul
     s = t.find('{'); e = t.rfind('}')+1
     if s >= 0 and e > s:
-        try: data = json.loads(t[s:e])
-        except Exception as ex: print("JSON_ERROR"); exit(1)
-    else: print("JSON_NOT_FOUND"); exit(1)
+        try: return json.loads(t[s:e])
+        except: pass
+    # Truncated JSON — eksik kapanış parantezlerini tamamla
+    try:
+        depth = 0; last_valid = 0
+        for i, ch in enumerate(t):
+            if ch == '{': depth += 1
+            elif ch == '}': depth -= 1; last_valid = i
+        if last_valid > 0:
+            candidate = t[t.find('{'):last_valid+1]
+            return json.loads(candidate)
+    except: pass
+    return None
+
+with open(os.environ['CLEAN_FILE']) as f: t = f.read()
+data = try_parse_json(t)
+if data is None:
+    print("JSON_ERROR"); exit(1)
 
 explanation = data.get('explanation', 'Açıklama belirtilmedi.')
 print(f"EXPLANATION:{explanation}")
@@ -432,41 +454,54 @@ changes = data.get('changes', [])
 count = 0
 bak_dir = os.environ['AGENT_YEDEK_DIR']
 map_file = os.environ['BACKUP_MAP']
+project_root = os.environ['PROJECT_ROOT']
 
-for c in changes:
-    path = c.get('path', '').strip()
-    orig = c.get('original', '').replace('\r\n', '\n')
-    repl = c.get('replacement', '').replace('\r\n', '\n')
-    if not path or not orig: continue
-    
-    full = path if path.startswith('/') else os.path.join(os.environ['PROJECT_ROOT'], path)
-    if not os.path.exists(full): continue
-    
-    with open(full, 'r', encoding='utf-8') as f: content = f.read().replace('\r\n', '\n')
-    
-    match_found = False
-    if orig in content:
-        match_found = True
-    elif orig.strip() in content:
-        orig = orig.strip(); repl = repl.strip()
-        match_found = True
-        
-    if not match_found:
-        print(f"MATCH_FAILED:{path}")
-        continue
-        
-    # --- YENİ: Gölge Yedekleme Mantığı ---
+def backup_file(full, path):
     safe_name = path.replace('/', '_') + '.bak'
     bak_path = os.path.join(bak_dir, safe_name)
-    
-    # Henüz yedeği alınmamışsa dışarıya kopyala
     if not os.path.exists(bak_path):
         shutil.copy2(full, bak_path)
         with open(map_file, 'a') as map_f:
             map_f.write(f"{bak_path}|{full}\n")
-            
-    old_lines = len(content.splitlines())
-    new_content = content.replace(orig, repl, 1)
+
+for c in changes:
+    path = c.get('path', '').strip()
+    if not path: continue
+    full = path if path.startswith('/') else os.path.join(project_root, path)
+    if not os.path.exists(full): continue
+
+    # full_content: dosyanın tamamını yaz (büyük kod için JSON escape sorunu yok)
+    full_content = c.get('full_content', '')
+    if full_content:
+        backup_file(full, path)
+        old_lines = len(open(full).readlines())
+        with open(full, 'w', encoding='utf-8') as f: f.write(full_content)
+        new_lines = len(full_content.splitlines())
+        print(f"MODIFIED:{path}|{old_lines}|{new_lines}")
+        count += 1
+        continue
+
+    # original/replacement: patch modu
+    orig = c.get('original', '').replace('\r\n', '\n')
+    repl = c.get('replacement', '').replace('\r\n', '\n')
+    if not orig: continue
+
+    with open(full, 'r', encoding='utf-8') as f: file_content = f.read().replace('\r\n', '\n')
+
+    match_found = False
+    if orig in file_content:
+        match_found = True
+    elif orig.strip() in file_content:
+        orig = orig.strip(); repl = repl.strip()
+        match_found = True
+
+    if not match_found:
+        print(f"MATCH_FAILED:{path}")
+        continue
+
+    backup_file(full, path)
+    old_lines = len(file_content.splitlines())
+    new_content = file_content.replace(orig, repl, 1)
     new_lines = len(new_content.splitlines())
     
     with open(full, 'w', encoding='utf-8') as f: f.write(new_content)
@@ -731,6 +766,9 @@ ANDROID KURALLARI:
 - YENİ PROJE KURALI: factory.sh tarafından oluşturulan yeni projelerde ui/theme/ klasörü YOKTUR. Theme.kt dosyası oluşturma, sadece MaterialTheme kullan.
 - setContent bloğunu değiştirirken fonksiyon tanımları (fun ...) ASLA setContent bloğu içine yazma. Composable fonksiyonlar her zaman Activity sınıfının DIŞINDA tanımlanır.
 - Yeni Composable fonksiyon eklerken önce Activity sınıfının kapanış parantezini bul, onun DIŞINA yaz.
+- AndroidManifest.xml içindeki android:theme değerini ASLA değiştirme.
+- BÜYÜK KOD KURALI: Eğer bir dosyaya 50 satırdan fazla kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" alanını kullan. full_content dosyanın TAM içeriğini içerir.
+  Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity..."}
 PROMPT
     fi
     local patch_sp=$(cat "$task_sp_file")
