@@ -463,6 +463,21 @@ PYEOF
         echo -e "  ${GREEN}→${NC} $p (Satır: $old ${YELLOW}→${NC} $new)"
     done
     
+    # Auto-confirm: ws_bridge veya conf'tan kontrol et
+    local auto_confirm
+    auto_confirm=$(grep "^AUTO_CONFIRM=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo "0")
+    
+    if [[ "$auto_confirm" != "1" ]]; then
+        echo
+        read -r -p "$(echo -e "${YELLOW}Değişiklikleri uygula ve derle [Enter=Devam / İ=İptal]: ${NC}")" confirm
+        if [[ "$confirm" == "i" || "$confirm" == "İ" ]]; then
+            restore_agent_backups
+            clean_agent_backups
+            err "İşlem iptal edildi, orijinal koda dönüldü."
+            return 1
+        fi
+    fi
+
     ok "$count dosya güncellendi, build testine geçiliyor..."
 }
 
