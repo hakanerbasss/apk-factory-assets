@@ -236,37 +236,72 @@ parse_errors() {
     local build_out="$TMP_DIR/build_output.txt"
     local errors_file="$TMP_DIR/errors.txt"
     local files_file="$TMP_DIR/error_files.txt"
-    grep -E "^e: file://|error:|^ERROR|AAPT: error|Could not find|FAILED in" \
-        "$build_out" | head -n 20 > "$errors_file" 2>/dev/null || true
-    grep -oE '/[^ :]+\.kt' "$errors_file" | head -n 10 | sort -u > "$files_file" 2>/dev/null || true
+
+    # Geniş pattern — Kotlin, Java, XML, AAPT, Gradle, Manifest hataları
+    grep -E "^e: file://|^w: file://|error:|^ERROR|AAPT:|AAPT2|Could not find|Could not resolve|unresolved|FAILED|Exception|Manifest|AndroidManifest|resource|attribute"         "$build_out" | head -n 6 > "$errors_file" 2>/dev/null || true
+
+    # Hata veren dosya yollarını çıkar — uzantıdan bağımsız
+    # Önce tam yol formatı: /path/to/file.ext
+    grep -oE '/[^ :]+\.[a-zA-Z0-9]+' "$errors_file"         | grep -v "\.class$\|\.jar$\|\.apk$\|\.aab$"         | head -n 3 | sort -u > "$files_file" 2>/dev/null || true
+
+    # Bulunamazsa: paket yolundan dosya bul (Kotlin/Java için)
     if [[ ! -s "$files_file" ]]; then
-        grep -oE 'com/[a-z/]+/[A-Za-z]+\.kt' "$build_out" \
-        | while read -r rel; do find "$SRC_ROOT" -path "*$rel" 2>/dev/null | head -1; done \
-        | head -n 2 | sort -u > "$files_file"
+        grep -oE 'com/[a-zA-Z0-9_/]+\.[a-zA-Z]+' "$build_out"         | while read -r rel; do
+            find "$PROJECT_ROOT" -path "*$rel" 2>/dev/null | head -1
+        done | head -n 3 | sort -u > "$files_file"
     fi
+
+    # Hala boşsa: build çıktısının tamamından dosya adı ara
+    if [[ ! -s "$files_file" ]]; then
+        grep -oE '[A-Za-z][A-Za-z0-9_]+\.(kt|java|xml|gradle|kts|toml|json|properties)' "$build_out"         | while read -r fname; do
+            find "$PROJECT_ROOT" -name "$fname" -not -path "*/build/*" 2>/dev/null | head -1
+        done | head -n 3 | sort -u > "$files_file"
+    fi
+
     echo "$errors_file"
 }
 
 collect_source_files() {
     local error_files_list="$TMP_DIR/error_files.txt"
     local collected="$TMP_DIR/collected_sources.txt"
+    local max_chars
+    max_chars=$(grep "^MAX_CHARS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo 60000)
     > "$collected"
-    while IFS= read -r fpath; do
-        [[ -f "$fpath" ]] || continue
+
+    add_file() {
+        local fpath="$1"
+        [[ -f "$fpath" ]] || return
+        # Binary dosyaları atla (file komutu ile MIME kontrol)
+        file "$fpath" 2>/dev/null | grep -q "text/" || return
+        # 100KB üstünü atla
+        [[ $(stat -c%s "$fpath" 2>/dev/null || echo 0) -gt 102400 ]] && return
+        # Zaten eklendiyse atla
+        grep -qF "=== FILE: ${fpath#$PROJECT_ROOT/} ===" "$collected" 2>/dev/null && return
         echo "=== FILE: ${fpath#$PROJECT_ROOT/} ===" >> "$collected"
         cat "$fpath" >> "$collected"
         echo "" >> "$collected"
+    }
+
+    # 1. Hata veren dosyaları ekle (öncelik)
+    while IFS= read -r fpath; do
+        add_file "$fpath"
     done < "$error_files_list"
 
+    # 2. Bağlam dosyaları — her zaman ekle (build config)
+    for gf in         "$PROJECT_ROOT/app/build.gradle"         "$PROJECT_ROOT/app/build.gradle.kts"         "$PROJECT_ROOT/build.gradle"         "$PROJECT_ROOT/build.gradle.kts"         "$PROJECT_ROOT/settings.gradle"         "$PROJECT_ROOT/settings.gradle.kts"         "$PROJECT_ROOT/app/src/main/AndroidManifest.xml"; do
+        add_file "$gf"
+    done
+
+    # 3. Hiç dosya yoksa — projedeki tüm metin dosyalarını tara (fallback)
     if [[ ! -s "$collected" ]]; then
-        warn "Hatalı dosya net tespit edilemedi, yapılandırma dosyaları (build.gradle) inceleniyor..." >&2
-        for gf in "$PROJECT_ROOT/app/build.gradle" "$PROJECT_ROOT/app/build.gradle.kts" "$PROJECT_ROOT/build.gradle" "$PROJECT_ROOT/build.gradle.kts" "$PROJECT_ROOT/settings.gradle" "$PROJECT_ROOT/settings.gradle.kts"; do
-            [[ -f "$gf" ]] || continue
-            echo "=== FILE: ${gf#$PROJECT_ROOT/} ===" >> "$collected"
-            cat "$gf" >> "$collected"
-            echo "" >> "$collected"
+        warn "Hatalı dosya tespit edilemedi, proje taranıyor..." >&2
+        find "$PROJECT_ROOT"             -not -path "*/build/*"             -not -path "*/.gradle/*"             -not -path "*/.git/*"             -not -path "*/outputs/*"             -type f | while read -r fpath; do
+            add_file "$fpath"
+            # Char limitine ulaştıysa dur
+            [[ $(wc -c < "$collected" 2>/dev/null || echo 0) -gt $max_chars ]] && break
         done
     fi
+
     echo "$collected"
 }
 
@@ -283,7 +318,8 @@ call_ai() {
     local errors="$1" sources="$2"
     local error_text; error_text=$(cat "$errors")
     local source_text; source_text=$(cat "$sources")
-    local max_chars=200000
+    local max_chars
+    max_chars=$(grep "^MAX_CHARS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo 60000)
     [[ ${#source_text} -gt $max_chars ]] && source_text="${source_text:0:$max_chars}"
 
     local system_prompt
@@ -743,4 +779,5 @@ main() {
 }
 
 main "$@"
+
 
