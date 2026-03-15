@@ -379,6 +379,65 @@ async def handle(ws):
                     except Exception as e:
                         await ws.send(json.dumps({"type":"task_done","success":False,"text":f"❌ Silinemedi: {e}"}))
 
+                elif t == "rename_project":
+                    old_name = d.get("old_name","")
+                    new_name = d.get("new_name","").strip()
+                    if not new_name:
+                        await ws.send(json.dumps({"type":"error","text":"Yeni isim boş olamaz"})); continue
+                    old_dir = get_proj_dir(old_name)
+                    new_dir = os.path.join(HOME, new_name)
+                    try:
+                        # projeler.conf güncelle
+                        conf = f"{SISTEM_DIR}/projeler.conf"
+                        if os.path.exists(conf):
+                            lines = open(conf).readlines()
+                            new_lines = []
+                            for l in lines:
+                                if l.startswith(old_name + "|"):
+                                    parts = l.strip().split("|")
+                                    parts[0] = new_name
+                                    parts[1] = f"~/{new_name}"
+                                    new_lines.append("|".join(parts) + "\n")
+                                else:
+                                    new_lines.append(l)
+                            open(conf,'w').writelines(new_lines)
+                        # strings.xml güncelle
+                        strings_xml = os.path.join(old_dir, "app/src/main/res/values/strings.xml")
+                        if os.path.exists(strings_xml):
+                            content = open(strings_xml).read()
+                            content = content.replace(f">{old_name}<", f">{new_name}<")
+                            open(strings_xml,'w').write(content)
+                        # Klasörü yeniden adlandır
+                        if os.path.exists(old_dir):
+                            os.rename(old_dir, new_dir)
+                        await ws.send(json.dumps({"type":"task_done","success":True,"text":f"✅ {old_name} → {new_name}"}))
+                    except Exception as e:
+                        await ws.send(json.dumps({"type":"error","text":f"❌ Yeniden adlandırılamadı: {e}"}))
+
+                elif t == "save_logo":
+                    pname   = d.get("project","")
+                    b64data = d.get("data","")
+                    proj_dir = get_proj_dir(pname)
+                    try:
+                        import base64 as _b64
+                        from PIL import Image
+                        import io as _io
+                        img_bytes = _b64.b64decode(b64data)
+                        img = Image.open(_io.BytesIO(img_bytes)).convert("RGBA")
+                        sizes = {"mdpi":48,"hdpi":72,"xhdpi":96,"xxhdpi":144,"xxxhdpi":192}
+                        res_dir = os.path.join(proj_dir, "app/src/main/res")
+                        for dpi, px in sizes.items():
+                            out_dir = os.path.join(res_dir, f"mipmap-{dpi}")
+                            os.makedirs(out_dir, exist_ok=True)
+                            resized = img.resize((px, px), Image.LANCZOS)
+                            resized.save(os.path.join(out_dir, "ic_launcher.png"))
+                            resized.save(os.path.join(out_dir, "ic_launcher_round.png"))
+                        await ws.send(json.dumps({"type":"task_done","success":True,"text":"✅ Logo güncellendi"}))
+                    except ImportError:
+                        await ws.send(json.dumps({"type":"error","text":"❌ Pillow kurulu değil: pip install Pillow"}))
+                    except Exception as e:
+                        await ws.send(json.dumps({"type":"error","text":f"❌ Logo kaydedilemedi: {e}"}))
+
                 elif t == "autofix":
                     p = d.get("project",""); pd = get_proj_dir(p)
                     await ws.send(json.dumps({"type":"status","text":f"🤖 prj af: {p}"}))
