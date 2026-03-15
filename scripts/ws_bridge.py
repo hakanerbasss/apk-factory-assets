@@ -407,10 +407,15 @@ async def handle(ws):
                             content = open(strings_xml).read()
                             content = content.replace(f">{old_name}<", f">{new_name}<")
                             open(strings_xml,'w').write(content)
+                        # Build cache temizle
+                        build_dir = os.path.join(old_dir, "app/build")
+                        if os.path.exists(build_dir):
+                            import shutil as _su
+                            _su.rmtree(build_dir)
                         # Klasörü yeniden adlandır
                         if os.path.exists(old_dir):
                             os.rename(old_dir, new_dir)
-                        await ws.send(json.dumps({"type":"task_done","success":True,"text":f"✅ {old_name} → {new_name}"}))
+                        await ws.send(json.dumps({"type":"task_done","success":True,"text":f"✅ {old_name} → {new_name} (build cache temizlendi)"}))
                     except Exception as e:
                         await ws.send(json.dumps({"type":"error","text":f"❌ Yeniden adlandırılamadı: {e}"}))
 
@@ -432,7 +437,12 @@ async def handle(ws):
                             resized = img.resize((px, px), Image.LANCZOS)
                             resized.save(os.path.join(out_dir, "ic_launcher.png"))
                             resized.save(os.path.join(out_dir, "ic_launcher_round.png"))
-                        await ws.send(json.dumps({"type":"task_done","success":True,"text":"✅ Logo güncellendi"}))
+                        # Build cache temizle — logo değişikliği APK'ya yansısın
+                        build_dir = os.path.join(proj_dir, "app/build")
+                        if os.path.exists(build_dir):
+                            import shutil as _su2
+                            _su2.rmtree(build_dir)
+                        await ws.send(json.dumps({"type":"task_done","success":True,"text":"✅ Logo güncellendi (build cache temizlendi)"}))
                     except ImportError:
                         await ws.send(json.dumps({"type":"error","text":"❌ Pillow kurulu değil: pip install Pillow"}))
                     except Exception as e:
@@ -809,3 +819,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
