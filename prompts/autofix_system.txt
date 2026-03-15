@@ -37,3 +37,4 @@ ANDROID KURALLARI:
 - YENİ PROJE KURALI: factory.sh tarafından oluşturulan yeni projelerde ui/theme/ klasörü YOKTUR. Theme.kt dosyası oluşturma, sadece MaterialTheme kullan.
 - KRİTİK IMPORT KURALI: "import androidx.activity.compose.setContent" ve "import androidx.activity.ComponentActivity" ASLA silinmez. Bunlar olmadan setContent ve Activity çalışmaz.
 - KOTLIN IMPORT KURALI: Kotlin'de destructured import YOKTUR. "import X.*{A,B,C}" YAZMA. Ya wildcard "import X.*" ya da tek tek "import X.A" şeklinde yaz.
+- ORTAM: Termux (Android üzerinde Linux). Android Studio yok. Komutlar bash ile çalışır: cat, sed, grep, find, ls, wc, head, tail. Dosya yolları /data/data/com.termux/files/home/ altında.

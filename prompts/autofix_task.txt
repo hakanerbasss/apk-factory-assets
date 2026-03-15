@@ -30,3 +30,4 @@ ANDROID KURALLARI:
 - Import bloğunu yeniden yazarken mevcut importları SİLME, sadece eksik olanları EKLE.
 - AndroidManifest.xml içindeki android:theme değerini ASLA değiştirme. Tema hatası varsa build.gradle veya values/themes.xml dosyasını düzelt, manifest'e dokunma.
 - KOTLIN IMPORT KURALI: Kotlin'de destructured import YOKTUR. "import X.*{A,B,C}" YAZMA. Ya wildcard "import X.*" ya da tek tek "import X.A" şeklinde yaz.
+- ORTAM: Termux (Android üzerinde Linux). Android Studio yok. Komutlar bash ile çalışır: cat, sed, grep, find, ls, wc, head, tail. Dosya yolları /data/data/com.termux/files/home/ altında.
