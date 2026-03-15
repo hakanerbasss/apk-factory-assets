@@ -358,10 +358,21 @@ _call_gemini() {
     local sp="$1" um="$2" rf="$TMP_DIR/api_response.json"
     local gemini_base="https://generativelanguage.googleapis.com/v1beta/models"
     local url="${gemini_base}/${MODEL}:generateContent?key=${API_KEY}"
+    # Görev modunda (büyük kod) MAX_TOKENS en az 16000 olsun
+    local effective_tokens=${MAX_TOKENS}
+    [[ $effective_tokens -lt 16000 ]] && effective_tokens=16000
     local payload; payload=$(python3 -c "
 import json,sys
-print(json.dumps({'contents':[{'parts':[{'text':sys.argv[1]+'\n\n'+sys.argv[2]}]}],
-'generationConfig':{'maxOutputTokens':${MAX_TOKENS},'temperature':0.1,'responseMimeType':'application/json'}}))" "$sp" "$um")
+# systemInstruction ayrı gönder — Gemini bunu daha iyi anlıyor
+print(json.dumps({
+    'systemInstruction':{'parts':[{'text':sys.argv[1]}]},
+    'contents':[{'parts':[{'text':sys.argv[2]}]}],
+    'generationConfig':{
+        'maxOutputTokens':${effective_tokens},
+        'temperature':0.1,
+        'responseMimeType':'application/json'
+    }
+}))" "$sp" "$um")
     local hc; hc=$(curl -s -w "%{http_code}" -X POST "$url" \
         -H "Content-Type: application/json" -d "$payload" \
         -o "$rf" --connect-timeout 30 --max-time 600 2>/dev/null)
