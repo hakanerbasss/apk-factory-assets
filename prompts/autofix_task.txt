@@ -12,12 +12,10 @@ Görevi yerine getirmek için kodları incele ve "changes" (esnek patch) format�
     }
   ]
 }
-
 KURALLAR:
 - "original" alanı, dosyadaki hedef metinle harfi harfine aynı olmalı.
 - Dev bloklar yerine sadece değişecek kritik satırları seç.
 - JSON dışında hiçbir şey yazma.
-
 ANDROID KURALLARI:
 - targetSdk ve compileSdk her zaman 35 olmalı, 34 kullanma.
 - Paket adı com.wizaicorp.* formatında olmalı, com.fileexplorer veya com.example kullanma.
@@ -26,7 +24,5 @@ ANDROID KURALLARI:
 - NativeAdView: adView.mediaView MUTLAKA set et. MediaView en az 120x120dp olmalı. visibility=GONE YAPMA, alpha=0f kullan, reklam gelince alpha=1f yap.
 - LazyColumn veya LazyRow asla verticalScroll/horizontalScroll içine koyma.
 - Eğer dosyada setContent { Text("AI Kodluyor...") } görürsen, "original" olarak "setContent { Text(\"AI Kodluyor...\") }" satırını kullan ve "replacement" olarak oyunun TÜM yeni setContent bloğunu ve importlarını yaz. Paket adını değiştirmeye çalışma.
-- setContent bloğunu değiştirirken fonksiyon tanımları (fun ...) ASLA setContent bloğu içine yazma. Composable fonksiyonlar her zaman Activity sınıfının DIŞINDA tanımlanır.
-- Yeni Composable fonksiyon eklerken önce Activity sınıfının kapanış parantezini bul, onun DIŞINA yaz.
 - setContent bloğunu değiştirirken fonksiyon tanımları (fun ...) ASLA setContent bloğu içine yazma. Composable fonksiyonlar her zaman Activity sınıfının DIŞINDA tanımlanır.
 - Yeni Composable fonksiyon eklerken önce Activity sınıfının kapanış parantezini bul, onun DIŞINA yaz.
