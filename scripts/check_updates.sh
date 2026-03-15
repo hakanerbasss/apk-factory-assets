@@ -4,18 +4,17 @@ date
 GITHUB_RAW="https://raw.githubusercontent.com/hakanerbasss/apk-factory-assets/main"
 SISTEM_DIR="/storage/emulated/0/termux-otonom-sistem"
 APILER_DIR="$SISTEM_DIR/apiler"
-PROMPTS_DIR="$SISTEM_DIR/prompts"
-VER_FILE="$SISTEM_DIR/prompt_version.txt"
-SCRIPT_VER_FILE="$SISTEM_DIR/script_version.txt"
 WS_BRIDGE="/data/data/com.termux/files/home/apk-factory-ws/ws_bridge.py"
 
-remote=$(curl -sf --max-time 5 "$GITHUB_RAW/version.json" || echo '{}')
-remote_prompt=$(echo "$remote" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("prompt_version","0"))' 2>/dev/null)
-remote_script=$(echo "$remote" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("script_version","0"))' 2>/dev/null)
-local_prompt=$(cat "$VER_FILE" 2>/dev/null || echo "0")
-local_script=$(cat "$SCRIPT_VER_FILE" 2>/dev/null || echo "0")
+# ── Sadece ws_bridge güncellenir ────────────────────────────────────────────
+# Diğer her şey (scriptler, promptlar, setup) kurulumda bir kez indirilir,
+# sonraki güncellemelerde dokunulmaz. Kullanıcı değişiklikleri korunur.
+curl -sf --max-time 30 "$GITHUB_RAW/scripts/ws_bridge.py" -o "$WS_BRIDGE" \
+    && echo "ws_bridge güncellendi" \
+    && bash ~/restart_bridge.sh \
+    || echo "ws_bridge güncellenemedi"
 
-# API conf - her zaman güncelle (key korunarak)
+# ── API conf - key korunarak güncelle ────────────────────────────────────────
 mkdir -p "$APILER_DIR"
 for conf in deepseek gemini openai claude groq qwen; do
     tmp="$APILER_DIR/${conf}.tmp"
@@ -30,26 +29,7 @@ for conf in deepseek gemini openai claude groq qwen; do
     fi
 done
 
-# Scriptler - dosya yoksa indir, 🔄 butonunda her zaman indir
-FORCE="${1:-}"
-for f in autofix.sh prj.sh factory.sh check_updates.sh; do
-    if [ ! -f "$SISTEM_DIR/$f" ] || [ "$FORCE" = "force" ]; then
-        curl -sf --max-time 30 "$GITHUB_RAW/scripts/$f" -o "$SISTEM_DIR/$f" && chmod +x "$SISTEM_DIR/$f" && echo "$f güncellendi"
-    fi
-done
-if [ ! -f "$WS_BRIDGE" ] || [ "$FORCE" = "force" ]; then
-    curl -sf --max-time 30 "$GITHUB_RAW/scripts/ws_bridge.py" -o "$WS_BRIDGE" && echo "ws_bridge güncellendi" && bash ~/restart_bridge.sh
-fi
-
-# Promptlar - dosya yoksa indir, 🔄 butonunda her zaman indir
-mkdir -p "$PROMPTS_DIR"
-for pf in autofix_system.txt autofix_task.txt; do
-    if [ ! -f "$PROMPTS_DIR/$pf" ] || [ "$FORCE" = "force" ]; then
-        curl -sf --max-time 15 "$GITHUB_RAW/prompts/$pf" -o "$PROMPTS_DIR/$pf" && echo "$pf güncellendi"
-    fi
-done
-
-# Setup klasörü - yoksa indir
+# ── Setup klasörü - sadece yoksa indir ───────────────────────────────────────
 SETUP_DIR="$SISTEM_DIR/setup"
 if [ ! -f "$SETUP_DIR/gradlew" ]; then
     curl -sf --max-time 60 "$GITHUB_RAW/setup.zip" -o "$SISTEM_DIR/setup.zip" && \
