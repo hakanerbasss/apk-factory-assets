@@ -750,53 +750,38 @@ run_task() {
             fi
         done > "$tree_file"
 
-    echo -e "${YELLOW}🔍 Görev için ilgili dosyalar keşfediliyor...${NC}"
-    local sp="Sen uzman bir Android asistanısın. Sadece JSON formatında dosya yollarını döndürürsün."
-    local pkg=$(grep "applicationId" "$PROJECT_ROOT/app/build.gradle" 2>/dev/null | head -1 | grep -oE '"[^"]+"'  | head -1 | tr -d '"')
-    local um="PROJE DOSYALARI:\n$(cat "$tree_file")\n\nPROJE PAKET ADI: $pkg\n\nGÖREV: $user_task\n\nSadece bu görevi yapmak için okumam ve değiştirmem gereken dosyaların yollarını içeren bir JSON dizisi döndür. DOSYA YOLLARI MUTLAKA PROJE DOSYALARI LİSTESİNDEN SEÇİLMELİ, uydurma yol yazma.\nÖrnek: [\"app/src/main/java/com/.../MainActivity.kt\"]"
+    local max_chars
+    max_chars=$(grep "^MAX_CHARS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo 60000)
+    local pkg=$(grep "applicationId" "$PROJECT_ROOT/app/build.gradle" 2>/dev/null | head -1 | grep -oE '"[^"]+"' | head -1 | tr -d '"')
 
-    if ! _call_active_ai "$sp" "$um"; then
-        err "Keşif başarısız oldu."; return 1
-    fi
-
-    local target_files="$TMP_DIR/target_files.txt"
-    python3 -c "
-import json, sys, re
-t=open('$TMP_DIR/ai_content.txt').read()
-t=re.sub(r'^\`+json\s*','',t,flags=re.MULTILINE)
-t=re.sub(r'^\`+\s*$','',t,flags=re.MULTILINE)
-try:
-    arr = json.loads(t)
-    if isinstance(arr, dict) and 'files' in arr: arr = arr['files']
-    elif isinstance(arr, dict) and 'changes' in arr: arr = [c['path'] for c in arr.get('changes', [])]
-    for f in arr: print(f)
-except Exception as e:
-    pass
-" > "$target_files"
-
-    local file_count=$(wc -l < "$target_files" || echo 0)
-    if [[ "$file_count" -eq 0 ]]; then
-        err "Yapay zeka mantıklı bir dosya listesi üretemedi."
-        return 1
-    fi
-
-    ok "Hedef olarak $file_count dosya belirlendi:"
-    cat "$target_files" | while read -r f; do echo -e "  ${DIM}-${NC} $f"; done
-
+    # Tüm proje dosyalarını oku — AI her şeyi görsün, minimal patch yapsın
+    echo -e "${YELLOW}📂 Proje dosyaları okunuyor...${NC}"
     local collected="$TMP_DIR/collected_sources.txt"
     > "$collected"
-    while read -r f; do
-        if [[ -f "$PROJECT_ROOT/$f" ]]; then
-            echo "=== FILE: $f ===" >> "$collected"
-            # --- YENİ: Resim veya arşiv dosyasıysa okuma (JSON Çökmesini Önler) ---
-            if [[ "$f" =~ \.(png|jpg|jpeg|webp|gif|jar|keystore|aab|apk)$ ]]; then
-                echo "// BINARY DOSYA (RESİM/ARŞİV) - İÇERİK METİN OLARAK OKUNAMAZ" >> "$collected"
-            else
-                cat "$PROJECT_ROOT/$f" >> "$collected"
-            fi
-            echo "" >> "$collected"
-        fi
-    done < "$target_files"
+
+    # Dosya ağacını da ekle — AI yapıyı görsün
+    echo "=== PROJE YAPISI ===" >> "$collected"
+    cat "$tree_file" >> "$collected"
+    echo "" >> "$collected"
+    echo "=== PAKET ADI: $pkg ===" >> "$collected"
+    echo "" >> "$collected"
+
+    # Tüm metin dosyalarını ekle (binary ve build hariç)
+    while IFS= read -r f; do
+        [[ -f "$PROJECT_ROOT/$f" ]] || continue
+        # Binary dosyaları atla
+        file "$PROJECT_ROOT/$f" 2>/dev/null | grep -qiE "text|ASCII|UTF|script|source" || continue
+        # 100KB üstünü atla
+        [[ $(stat -c%s "$PROJECT_ROOT/$f" 2>/dev/null || echo 0) -gt 102400 ]] && continue
+        echo "=== FILE: $f ===" >> "$collected"
+        cat "$PROJECT_ROOT/$f" >> "$collected"
+        echo "" >> "$collected"
+        # Char limitine ulaştıysa dur
+        [[ $(wc -c < "$collected" 2>/dev/null || echo 0) -gt $max_chars ]] && break
+    done < "$tree_file"
+
+    local char_count; char_count=$(wc -c < "$collected" || echo 0)
+    ok "Proje okundu: $char_count karakter"
 
     echo -e "${YELLOW}⚙️ Yapay Zeka kod yazıyor (Patch üretiliyor)...${NC}"
     local task_sp_file="$PROMPTS_DIR/autofix_task.txt"
@@ -896,6 +881,7 @@ main() {
 }
 
 main "$@"
+
 
 
 
