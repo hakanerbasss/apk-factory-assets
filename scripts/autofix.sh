@@ -159,6 +159,11 @@ Sen bir Kotlin/Android uzmanısın. Sana build hataları ve kaynak dosyalar veri
 KRİTİK KURAL — BÜYÜK DOSYALAR: Eğer bir dosyaya 30+ satır kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" kullan. full_content = dosyanın TAM yeni içeriği.
 Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity : ComponentActivity() {...}"}
 
+AGENTIC KURAL — DOSYA OKUMA: Eğer bir hatayı düzeltmek için dosyanın belirli satırlarını görmek istersen, önce "commands" listesi döndür. Sistem komutu çalıştırır ve sonucu sana geri gönderir, sonra "changes" yazarsın.
+Örnek: {"commands": ["sed -n '160,180p' app/src/main/java/com/wizaicorp/proje/MainActivity.kt"]}
+Desteklenen komutlar: cat, sed -n, grep, find, ls, wc, stat, head, tail, file
+Komutları PROJECT_ROOT'a göreceli yaz.
+
 ÇIKTI FORMATI - SADECE JSON, BAŞKA HİÇBİR ŞEY YAZMA:
 {
   "explanation": "Hatayı buldum, x satırını y ile değiştiriyorum.",
@@ -324,6 +329,45 @@ _call_active_ai() {
     esac
 }
 
+# Agentic: AI'nın "commands" isteklerini çalıştır, çıktıyı geri ver
+run_ai_commands() {
+    local cmd_file="$TMP_DIR/ai_commands.txt"
+    local cmd_output="$TMP_DIR/cmd_output.txt"
+    > "$cmd_output"
+
+    python3 -c "
+import json, os, sys
+t = open('$TMP_DIR/ai_content.txt').read()
+# JSON temizle
+import re
+t = re.sub(r'^\`+json\s*','',t,flags=re.MULTILINE)
+t = re.sub(r'^\`+\s*\$','',t,flags=re.MULTILINE)
+t = t.strip()
+try:
+    d = json.loads(t)
+    cmds = d.get('commands', [])
+    for c in cmds: print(c)
+except: pass
+" > "$cmd_file" 2>/dev/null
+
+    local cmd_count; cmd_count=$(wc -l < "$cmd_file" || echo 0)
+    [[ $cmd_count -eq 0 ]] && return 1
+
+    log "🔍 AI $cmd_count keşif komutu çalıştırıyor..."
+    while IFS= read -r cmd; do
+        [[ -z "$cmd" ]] && continue
+        echo "=== KOMUT: $cmd ===" >> "$cmd_output"
+        # Güvenli komutlar: sadece okuma izni (cd, cat, sed, find, grep, ls, wc, stat)
+        if echo "$cmd" | grep -qE "^(cat|sed -n|grep|find|ls|wc|stat|head|tail|file) "; then
+            cd "$PROJECT_ROOT" && eval "$cmd" >> "$cmd_output" 2>&1 || true
+        else
+            echo "// Güvenlik: sadece okuma komutları çalıştırılır" >> "$cmd_output"
+        fi
+        echo "" >> "$cmd_output"
+    done < "$cmd_file"
+    return 0
+}
+
 call_ai() {
     local errors="$1" sources="$2"
     local error_text; error_text=$(cat "$errors")
@@ -336,12 +380,22 @@ call_ai() {
     local pf="$PROMPTS_DIR/autofix_system.txt"
     [[ ! -f "$pf" ]] && create_default_prompt
     system_prompt=$(cat "$pf")
-    local user_msg="BUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`\n\nKAYNAK DOSYALAR:\n${source_text}"
+
+    # TUR 1: Keşif — AI komut isteyebilir
+    local user_msg="BUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`\n\nMEVCUT KAYNAK DOSYALAR:\n${source_text}\n\nNot: Daha fazla dosya/satır görmek istersen \"commands\" listesi döndür. Örnek: {\"commands\":[\"sed -n \'160,180p\' app/src/main/java/com/.../MainActivity.kt\"]}\nHata düzeltmeye hazırsan direkt \"changes\" döndür."
 
     log "$NAME'e gönderiliyor... (${#source_text} karakter)"
     echo -e "${YELLOW}  ⏳ API yanıtı bekleniyor (Max 600sn)...${NC}"
-
     _call_active_ai "$system_prompt" "$user_msg"
+
+    # AI komut istediyse çalıştır ve TUR 2 yap
+    if run_ai_commands; then
+        local cmd_output; cmd_output=$(cat "$TMP_DIR/cmd_output.txt")
+        log "🔍 Keşif tamamlandı, AI düzeltme yazıyor..."
+        echo -e "${YELLOW}  ⏳ API yanıtı bekleniyor (Max 600sn)...${NC}"
+        local user_msg2="BUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`\n\nKEŞİF SONUÇLARI:\n${cmd_output}\n\nŞimdi \"changes\" formatında düzeltmeyi yaz."
+        _call_active_ai "$system_prompt" "$user_msg2"
+    fi
 }
 
 _call_openai() {
@@ -754,6 +808,11 @@ Sen bir Kotlin/Android uzmanısın. Sana kullanıcının GÖREVİ ve ilgili KAYN
 KRİTİK KURAL — BÜYÜK DOSYALAR: Eğer bir dosyaya 30+ satır kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" kullan. full_content = dosyanın TAM yeni içeriği.
 Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity : ComponentActivity() {...}"}
 
+AGENTIC KURAL — DOSYA OKUMA: Eğer bir hatayı düzeltmek için dosyanın belirli satırlarını görmek istersen, önce "commands" listesi döndür. Sistem komutu çalıştırır ve sonucu sana geri gönderir, sonra "changes" yazarsın.
+Örnek: {"commands": ["sed -n '160,180p' app/src/main/java/com/wizaicorp/proje/MainActivity.kt"]}
+Desteklenen komutlar: cat, sed -n, grep, find, ls, wc, stat, head, tail, file
+Komutları PROJECT_ROOT'a göreceli yaz.
+
 ÇIKTI FORMATI - SADECE JSON, BAŞKA HİÇBİR ŞEY YAZMA:
 {
   "explanation": "Görev için şu dosyada şu değişikliği yapıyorum...",
@@ -837,6 +896,7 @@ main() {
 }
 
 main "$@"
+
 
 
 
