@@ -452,14 +452,25 @@ async def handle(ws):
                 elif t == "backup":
                     p = d.get("project",""); pd = get_proj_dir(p)
                     ts = datetime.now().strftime("%Y%m%d-%H%M")
-                    out = f"{BACKUP_DIR}/{p}-{ts}-yedek.tar.gz"
+                    btype = d.get("backup_type", "normal")
                     os.makedirs(BACKUP_DIR, exist_ok=True)
-                    async def bk_done(rc, _o=out):
+                    if btype == "quick":
+                        out = f"{BACKUP_DIR}/{p}-{ts}-hizli.tar.gz"
+                        excludes = "--exclude='*/build' --exclude='*/.gradle' --exclude='*/outputs' --exclude='*.class'"
+                        label = "⚡ Hızlı"
+                    elif btype == "full":
+                        out = f"{BACKUP_DIR}/{p}-{ts}-tam.tar.gz"
+                        excludes = "--exclude='*/build/intermediates' --exclude='*/build/tmp'"
+                        label = "📦 Tam"
+                    else:
+                        out = f"{BACKUP_DIR}/{p}-{ts}-yedek.tar.gz"
+                        excludes = "--exclude='*/build' --exclude='*/.gradle'"
+                        label = "💾 Normal"
+                    async def bk_done(rc, _o=out, _l=label):
                         await ws.send(json.dumps({"type":"task_done","success":rc==0,
-                            "text":f"💾 {os.path.basename(_o)}" if rc==0 else "❌ Yedekleme başarısız"}))
+                            "text":f"{_l} yedek: {os.path.basename(_o)}" if rc==0 else "❌ Yedekleme başarısız"}))
                     await start(
-                        f"tar -czf {out} --exclude='*/build' --exclude='*/.gradle' "
-                        f"-C {os.path.dirname(pd)} {os.path.basename(pd)}",
+                        f"tar -czf {out} {excludes} -C {os.path.dirname(pd)} {os.path.basename(pd)}",
                         HOME, bk_done)
 
                 elif t == "restore_backup":
