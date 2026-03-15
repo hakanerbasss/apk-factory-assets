@@ -437,12 +437,12 @@ async def handle(ws):
                             resized = img.resize((px, px), Image.LANCZOS)
                             resized.save(os.path.join(out_dir, "ic_launcher.png"))
                             resized.save(os.path.join(out_dir, "ic_launcher_round.png"))
-                        # Build cache temizle — logo değişikliği APK'ya yansısın
-                        build_dir = os.path.join(proj_dir, "app/build")
-                        if os.path.exists(build_dir):
-                            import shutil as _su2
-                            _su2.rmtree(build_dir)
-                        await ws.send(json.dumps({"type":"task_done","success":True,"text":"✅ Logo güncellendi (build cache temizlendi)"}))
+                        # Build cache + gradle cache temizle
+                        import shutil as _su2
+                        for _cd in ["app/build", ".gradle"]:
+                            _d = os.path.join(proj_dir, _cd)
+                            if os.path.exists(_d): _su2.rmtree(_d)
+                        await ws.send(json.dumps({"type":"task_done","success":True,"text":"✅ Logo güncellendi (cache temizlendi, build alabilirsin)"}))
                     except ImportError:
                         await ws.send(json.dumps({"type":"error","text":"❌ Pillow kurulu değil: pip install Pillow"}))
                     except Exception as e:
@@ -819,4 +819,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
