@@ -336,13 +336,17 @@ run_ai_commands() {
     > "$cmd_output"
 
     python3 -c "
-import json, os, sys
+import json, os, sys, re
 t = open('$TMP_DIR/ai_content.txt').read()
-# JSON temizle
-import re
+# Backtick ve markdown temizle
+t = re.sub(r'\`\`\`json\s*', '', t, flags=re.MULTILINE)
+t = re.sub(r'\`\`\`\s*', '', t, flags=re.MULTILINE)
 t = re.sub(r'^\`+json\s*','',t,flags=re.MULTILINE)
-t = re.sub(r'^\`+\s*\$','',t,flags=re.MULTILINE)
+t = re.sub(r'^\`+\s*','',t,flags=re.MULTILINE)
 t = t.strip()
+# { ... } bloğunu bul
+s = t.find('{'); e = t.rfind('}')+1
+if s >= 0 and e > s: t = t[s:e]
 try:
     d = json.loads(t)
     cmds = d.get('commands', [])
