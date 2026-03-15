@@ -35,7 +35,7 @@ FACTORY_PROMPTS = [
 # ── Settings ──────────────────────────────────────────────────────────────────
 def read_settings():
     d = {"DEFAULT_PROVIDER":"Claude","DEFAULT_MODEL":"claude-haiku-4-5-20251001",
-         "MAX_LOOPS":"5","MAX_TOKENS":"8000","KEYSTORE_PASS":"android123"}
+         "MAX_LOOPS":"5","MAX_TOKENS":"8000","MAX_CHARS":"60000","KEYSTORE_PASS":"android123"}
     if not os.path.exists(SETTINGS_FILE): return d
     for line in open(SETTINGS_FILE):
         line = line.strip()
@@ -54,11 +54,12 @@ def save_settings(data):
     ls = []
     if os.path.exists(ac):
         with open(ac, 'r') as f:
-            ls = [l for l in f.readlines() if 'DEFAULT_PROVIDER=' not in l and 'MAX_LOOPS=' not in l and 'MAX_TOKENS=' not in l]
+            ls = [l for l in f.readlines() if 'DEFAULT_PROVIDER=' not in l and 'MAX_LOOPS=' not in l and 'MAX_TOKENS=' not in l and 'MAX_CHARS=' not in l]
     
     ls += [f'DEFAULT_PROVIDER="{data.get("DEFAULT_PROVIDER","Claude")}"\n',
            f'MAX_LOOPS={data.get("MAX_LOOPS","5")}\n',
-           f'MAX_TOKENS={data.get("MAX_TOKENS","8000")}\n']
+           f'MAX_TOKENS={data.get("MAX_TOKENS","8000")}\n',
+           f'MAX_CHARS={data.get("MAX_CHARS","60000")}\n']
     
     with open(ac, 'w') as f:
         f.writelines(ls)
