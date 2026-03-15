@@ -282,7 +282,7 @@ collect_source_files() {
         local fpath="$1"
         [[ -f "$fpath" ]] || return
         # Binary dosyaları atla (file komutu ile MIME kontrol)
-        file "$fpath" 2>/dev/null | grep -q "text/" || return
+        file "$fpath" 2>/dev/null | grep -qiE "text|ASCII|UTF|script|source" || return
         # 100KB üstünü atla
         [[ $(stat -c%s "$fpath" 2>/dev/null || echo 0) -gt 102400 ]] && return
         # Zaten eklendiyse atla
