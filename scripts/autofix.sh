@@ -261,6 +261,11 @@ parse_errors() {
         done | head -n 3 | sort -u > "$files_file"
     fi
 
+    # Manifest/resource hatası varsa AndroidManifest.xml'i ekle
+    if grep -qE "processDebugResources|AndroidManifest|package.*keyword|not a valid Java" "$errors_file" 2>/dev/null; then
+        local manifest="$PROJECT_ROOT/app/src/main/AndroidManifest.xml"
+        [[ -f "$manifest" ]] && echo "$manifest" >> "$files_file"
+    fi
     echo "$errors_file"
 }
 

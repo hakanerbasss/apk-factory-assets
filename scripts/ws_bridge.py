@@ -500,6 +500,13 @@ async def handle(ws):
                 elif t == "new_project":
                     n    = d.get("name","")
                     task = d.get("task","Merhaba Dünya yazan basit bir Android uygulaması")
+                    JAVA_KEYWORDS = {"do","if","in","is","as","by","fun","val","var","for",
+                                     "try","int","out","new","get","set","run","when","else",
+                                     "null","true","false","this","class","while","break",
+                                     "super","throw","catch","final","return","import","object"}
+                    if n.lower() in JAVA_KEYWORDS:
+                        await ws.send(json.dumps({"type":"error","text":f"❌ '{n}' Java/Kotlin için ayrılmış kelime — farklı isim gir!"}))
+                        continue
                     await ws.send(json.dumps({"type":"status","text":f"📦 Proje oluşturuluyor: {n}"}))
                     # factory.sh PTY'de çalışır; Proje Adı + AI Görevi read'lerini AUTO_ENTER
                     # ile değil, özel olarak cevaplıyoruz

@@ -28,3 +28,4 @@ ANDROID KURALLARI:
 - Eğer dosyada setContent { Text("AI Kodluyor...") } görürsen, "original" olarak "setContent { Text(\"AI Kodluyor...\") }" satırını kullan ve "replacement" olarak oyunun TÜM yeni setContent bloğunu ve importlarını yaz. Paket adını değiştirmeye çalışma.
 - KRİTİK IMPORT KURALI: "import androidx.activity.compose.setContent" ve "import androidx.activity.ComponentActivity" satırlarını ASLA silme. Bu importlar Activity için zorunludur. Import bloğunu yeniden yazarken bu iki satırın mutlaka korunduğunu kontrol et.
 - Import bloğunu yeniden yazarken mevcut importları SİLME, sadece eksik olanları EKLE.
+- AndroidManifest.xml içindeki android:theme değerini ASLA değiştirme. Tema hatası varsa build.gradle veya values/themes.xml dosyasını düzelt, manifest'e dokunma.
