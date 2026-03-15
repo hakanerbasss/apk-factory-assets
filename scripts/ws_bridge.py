@@ -483,6 +483,16 @@ async def handle(ws):
                             "text":"↩ Yedek geri yüklendi" if rc==0 else "❌ Geri yükleme başarısız"}))
                     await start(f"rm -rf {pd} && tar -xzf {tar} -C {os.path.dirname(pd)}", HOME, rb_done)
 
+                elif t == "delete_backup":
+                    name = d.get("name",""); tar = f"{BACKUP_DIR}/{name}"
+                    if not os.path.exists(tar):
+                        await ws.send(json.dumps({"type":"error","text":"Yedek bulunamadı"})); continue
+                    try:
+                        os.remove(tar)
+                        await ws.send(json.dumps({"type":"task_done","success":True,"text":f"🗑 {name} silindi"}))
+                    except Exception as e:
+                        await ws.send(json.dumps({"type":"error","text":f"Silinemedi: {e}"}))
+
                 elif t == "list_keystores":
                     ks = []
                     if os.path.exists(KEYSTORE_DIR):
