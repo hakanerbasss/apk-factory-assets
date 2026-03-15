@@ -345,6 +345,15 @@ async def handle(ws):
 
                 elif t == "set_auto_mode":
                     state["auto_mode"] = d.get("enabled", False)
+                    # autofix.conf'a yaz — autofix.sh okusun
+                    conf_dir = os.path.join(HOME, ".config")
+                    os.makedirs(conf_dir, exist_ok=True)
+                    conf_file = os.path.join(conf_dir, "autofix.conf")
+                    val = "1" if state["auto_mode"] else "0"
+                    lines = open(conf_file).readlines() if os.path.exists(conf_file) else []
+                    lines = [l for l in lines if not l.startswith("AUTO_CONFIRM=")]
+                    lines.append(f"AUTO_CONFIRM={val}\n")
+                    open(conf_file, "w").writelines(lines)
                     await ws.send(json.dumps({"type":"status",
                         "text": "⚡ Otomatik devam açık — tüm denemeler otomatik" if state["auto_mode"] else "⏸ Manuel mod"}))
 
