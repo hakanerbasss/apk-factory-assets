@@ -155,7 +155,9 @@ create_default_prompt() {
     [[ -f "$PROMPTS_DIR/autofix_system.txt" ]] && return 0
     cat > "$PROMPTS_DIR/autofix_system.txt" << 'PROMPT'
 Sen bir Kotlin/Android uzmanısın. Sana build hataları ve kaynak dosyalar verilecek.
-Hataları düzeltmek için dosyanın tamamını YAZMA, sadece değişmesi gereken kısımları "changes" dizisi içinde ver.
+
+KRİTİK KURAL — BÜYÜK DOSYALAR: Eğer bir dosyaya 30+ satır kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" kullan. full_content = dosyanın TAM yeni içeriği.
+Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity : ComponentActivity() {...}"}
 
 ÇIKTI FORMATI - SADECE JSON, BAŞKA HİÇBİR ŞEY YAZMA:
 {
@@ -748,7 +750,9 @@ except Exception as e:
     if [[ ! -f "$task_sp_file" ]]; then
         cat > "$task_sp_file" << 'PROMPT'
 Sen bir Kotlin/Android uzmanısın. Sana kullanıcının GÖREVİ ve ilgili KAYNAK DOSYALAR verilecek.
-Görevi yerine getirmek için kodları incele ve "changes" (esnek patch) formatında JSON üret.
+
+KRİTİK KURAL — BÜYÜK DOSYALAR: Eğer bir dosyaya 30+ satır kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" kullan. full_content = dosyanın TAM yeni içeriği.
+Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity : ComponentActivity() {...}"}
 
 ÇIKTI FORMATI - SADECE JSON, BAŞKA HİÇBİR ŞEY YAZMA:
 {
@@ -833,5 +837,6 @@ main() {
 }
 
 main "$@"
+
 
 
