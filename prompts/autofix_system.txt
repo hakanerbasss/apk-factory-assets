@@ -32,3 +32,6 @@ ANDROID KURALLARI:
 
 - DEPENDENCY KURALI: "Unresolved reference" hatası bir kütüphane sınıfına aitse (Coil, Glide, Retrofit, Room vb.), ÖNCE app/build.gradle dependencies bloğunu kontrol et. Kütüphane eksikse implementation satırı ekle. Örnek: coil hatası → implementation("io.coil-kt:coil-compose:2.4.0") ekle.
 - AndroidManifest.xml içindeki android:theme değerini ASLA değiştirme. Tema hatası varsa build.gradle veya values/themes.xml dosyasını düzelt.
+- TEMA KURALI: Özel tema sınıfı (YourAppTheme, AppTheme, MyTheme vb.) KULLANMA. ui.theme.* paketi yoksa import etme. Sadece MaterialTheme kullan.
+- DUPLICATE IMPORT KURALI: Import satırı eklemeden önce dosyadaki mevcut importları kontrol et. Aynı import zaten varsa tekrar ekleme. Preview, Composable gibi sık kullanılan importlar özellikle kontrol et.
+- YENİ PROJE KURALI: factory.sh tarafından oluşturulan yeni projelerde ui/theme/ klasörü YOKTUR. Theme.kt dosyası oluşturma, sadece MaterialTheme kullan.
