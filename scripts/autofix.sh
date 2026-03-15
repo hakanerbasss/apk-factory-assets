@@ -737,53 +737,36 @@ run_task() {
 
     local tree_file="$TMP_DIR/tree.txt"
     cd "$PROJECT_ROOT"
-    find . -maxdepth 4 -type f \
+    # Tüm dosya türlerini listele — binary değil, build hariç
+    find . -maxdepth 6 -type f \
         -not -path "*/.*" \
         -not -path "*/build/*" \
-        -not -path "*/bin/*" \
+        -not -path "*/.gradle/*" \
         -not -path "*/outputs/*" \
-        | while read -r file; do
-            if grep -Iq . "$file" 2>/dev/null; then
-                if [ $(stat -c%s "$file") -lt 102400 ]; then
-                    echo "$file"
-                fi
-            fi
-        done > "$tree_file"
+        -not -path "*/bin/*" \
+        | sort > "$tree_file"
 
+    local pkg=$(grep "applicationId" "$PROJECT_ROOT/app/build.gradle" 2>/dev/null | head -1 | grep -oE '"[^"]+"' | head -1 | tr -d '"')
     local max_chars
     max_chars=$(grep "^MAX_CHARS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo 60000)
-    local pkg=$(grep "applicationId" "$PROJECT_ROOT/app/build.gradle" 2>/dev/null | head -1 | grep -oE '"[^"]+"' | head -1 | tr -d '"')
 
-    # Tüm proje dosyalarını oku — AI her şeyi görsün, minimal patch yapsın
-    echo -e "${YELLOW}📂 Proje dosyaları okunuyor...${NC}"
+    # Adım 1: Sadece dosya ağacını gönder — içerik yok
     local collected="$TMP_DIR/collected_sources.txt"
     > "$collected"
-
-    # Dosya ağacını da ekle — AI yapıyı görsün
-    echo "=== PROJE YAPISI ===" >> "$collected"
-    cat "$tree_file" >> "$collected"
+    echo "=== PROJE DOSYA AĞACI ===" >> "$collected"
+    echo "Paket: $pkg" >> "$collected"
+    echo "Proje: $PROJECT_ROOT" >> "$collected"
     echo "" >> "$collected"
-    echo "=== PAKET ADI: $pkg ===" >> "$collected"
-    echo "" >> "$collected"
-
-    # Tüm metin dosyalarını ekle (binary ve build hariç)
+    # Her dosyanın adı + boyutu
     while IFS= read -r f; do
-        [[ -f "$PROJECT_ROOT/$f" ]] || continue
-        # Binary dosyaları atla
-        file "$PROJECT_ROOT/$f" 2>/dev/null | grep -qiE "text|ASCII|UTF|script|source" || continue
-        # 100KB üstünü atla
-        [[ $(stat -c%s "$PROJECT_ROOT/$f" 2>/dev/null || echo 0) -gt 102400 ]] && continue
-        echo "=== FILE: $f ===" >> "$collected"
-        cat "$PROJECT_ROOT/$f" >> "$collected"
-        echo "" >> "$collected"
-        # Char limitine ulaştıysa dur
-        [[ $(wc -c < "$collected" 2>/dev/null || echo 0) -gt $max_chars ]] && break
+        local fsize; fsize=$(stat -c%s "$PROJECT_ROOT/$f" 2>/dev/null || echo 0)
+        echo "$f ($fsize bytes)" >> "$collected"
     done < "$tree_file"
+    echo "" >> "$collected"
+    echo "Not: Dosya içeriklerini görmek için 'commands' ile iste." >> "$collected"
 
-    local char_count; char_count=$(wc -c < "$collected" || echo 0)
-    ok "Proje okundu: $char_count karakter"
-
-    echo -e "${YELLOW}⚙️ Yapay Zeka kod yazıyor (Patch üretiliyor)...${NC}"
+    ok "Dosya ağacı hazır: $(wc -l < "$tree_file") dosya"
+    echo -e "${YELLOW}⚙️ Yapay Zeka analiz ediyor...${NC}"
     local task_sp_file="$PROMPTS_DIR/autofix_task.txt"
     # Dosya yoksa varsayılan oluştur, varsa kullanıcı kurallarını koru
     if [[ ! -f "$task_sp_file" ]]; then
@@ -836,15 +819,32 @@ ANDROID KURALLARI:
 PROMPT
     fi
     local patch_sp=$(cat "$task_sp_file")
-    local patch_um="GÖREV: $user_task\n\nKAYNAK DOSYALAR:\n$(cat "$collected")"
+    local patch_um="GÖREV: $user_task\n\n$(cat "$collected")"
 
-    if ! _call_active_ai "$patch_sp" "$patch_um"; then
-         err "Kod üretilemedi."; return 1
-    fi
+    # Adım 2: AI commands isteyebilir — max 3 tur
+    local tour=0
+    while [[ $tour -lt 3 ]]; do
+        tour=$((tour+1))
+        if ! _call_active_ai "$patch_sp" "$patch_um"; then
+            err "Kod üretilemedi."; return 1
+        fi
 
-    if ! apply_fixes; then
-         err "Görev koda uygulanamadı."; return 1
-    fi
+        # commands var mı?
+        if run_ai_commands; then
+            local cmd_output; cmd_output=$(cat "$TMP_DIR/cmd_output.txt")
+            local cmd_chars=${#cmd_output}
+            log "📂 AI $cmd_chars karakter dosya içeriği aldı (tur $tour)"
+            # Komut çıktısını bir sonraki mesaja ekle
+            patch_um="GÖREV: $user_task\n\n$(cat "$collected")\n\nDOSYA İÇERİKLERİ (istediğin dosyalar):\n${cmd_output}\n\nŞimdi changes yaz."
+            continue
+        fi
+
+        # commands yok → patch var, uygula
+        if ! apply_fixes; then
+            err "Görev koda uygulanamadı."; return 1
+        fi
+        break
+    done
 
     echo -e "\n${BOLD}${BLUE}🚀 Görev koda entegre edildi, otomatik derleme (Build & Fix) devralınıyor...${NC}"
     run_autofix
@@ -881,6 +881,7 @@ main() {
 }
 
 main "$@"
+
 
 
 
