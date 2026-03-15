@@ -46,6 +46,7 @@ status "python websocket kuruluyor"
 log "Python + WebSocket kuruluyor..."
 pkg install -y python >> "$LOG_FILE" 2>&1
 pip install websockets --quiet >> "$LOG_FILE" 2>&1
+pip install Pillow --quiet >> "$LOG_FILE" 2>&1
 log "Python + WebSocket hazır"
 
 # ══════════════════════════════════════════════
@@ -192,3 +193,4 @@ fi
 # ══════════════════════════════════════════════
 log "✅ Kurulum tamamlandı!"
 done_status
+
