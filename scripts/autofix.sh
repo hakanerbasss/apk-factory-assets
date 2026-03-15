@@ -151,6 +151,8 @@ select_provider() {
 
 create_default_prompt() {
     mkdir -p "$PROMPTS_DIR"
+    # Dosya zaten varsa kullanıcı kurallarını koru, üzerine yazma
+    [[ -f "$PROMPTS_DIR/autofix_system.txt" ]] && return 0
     cat > "$PROMPTS_DIR/autofix_system.txt" << 'PROMPT'
 Sen bir Kotlin/Android uzmanısın. Sana build hataları ve kaynak dosyalar verilecek.
 Hataları düzeltmek için dosyanın tamamını YAZMA, sadece değişmesi gereken kısımları "changes" dizisi içinde ver.
@@ -180,6 +182,10 @@ ANDROID KURALLARI:
 - NativeAdView: adView.mediaView MUTLAKA set et. MediaView en az 120x120dp olmalı. visibility=GONE YAPMA, alpha=0f kullan, reklam gelince alpha=1f yap.
 - LazyColumn veya LazyRow asla verticalScroll/horizontalScroll içine koyma.
 - Eğer dosyada setContent { Text("AI Kodluyor...") } görürsen, "original" olarak "setContent { Text(\"AI Kodluyor...\") }" satırını kullan ve "replacement" olarak oyunun TÜM yeni setContent bloğunu ve importlarını yaz. Paket adını değiştirmeye çalışma.
+- KRİTİK IMPORT KURALI: "import androidx.activity.compose.setContent" ve "import androidx.activity.ComponentActivity" ASLA silinmez.
+- TEMA KURALI: Özel tema sınıfı (YourAppTheme, AppTheme, MyTheme vb.) KULLANMA. ui.theme.* paketi yoksa import etme. Sadece MaterialTheme kullan.
+- DUPLICATE IMPORT KURALI: Import satırı eklemeden önce dosyadaki mevcut importları kontrol et. Aynı import zaten varsa tekrar ekleme.
+- YENİ PROJE KURALI: factory.sh tarafından oluşturulan yeni projelerde ui/theme/ klasörü YOKTUR. Theme.kt dosyası oluşturma, sadece MaterialTheme kullan.
 PROMPT
 }
 
@@ -231,8 +237,8 @@ parse_errors() {
     local errors_file="$TMP_DIR/errors.txt"
     local files_file="$TMP_DIR/error_files.txt"
     grep -E "^e: file://|error:|^ERROR|AAPT: error|Could not find|FAILED in" \
-        "$build_out" | head -n 2 > "$errors_file" 2>/dev/null || true
-    grep -oE '/[^ :]+\.kt' "$errors_file" | head -n 2 | sort -u > "$files_file" 2>/dev/null || true
+        "$build_out" | head -n 20 > "$errors_file" 2>/dev/null || true
+    grep -oE '/[^ :]+\.kt' "$errors_file" | head -n 10 | sort -u > "$files_file" 2>/dev/null || true
     if [[ ! -s "$files_file" ]]; then
         grep -oE 'com/[a-z/]+/[A-Za-z]+\.kt' "$build_out" \
         | while read -r rel; do find "$SRC_ROOT" -path "*$rel" 2>/dev/null | head -1; done \
@@ -457,15 +463,6 @@ PYEOF
         echo -e "  ${GREEN}→${NC} $p (Satır: $old ${YELLOW}→${NC} $new)"
     done
     
-    echo
-    read -r -p "$(echo -e "${YELLOW}Değişiklikleri uygula ve derle [Enter=Devam / İ=İptal]: ${NC}")" confirm
-    if [[ "$confirm" == "i" || "$confirm" == "İ" ]]; then
-        restore_agent_backups
-        clean_agent_backups
-        err "İşlem iptal edildi, orijinal koda dönüldü."
-        return 1
-    fi
-    
     ok "$count dosya güncellendi, build testine geçiliyor..."
 }
 
@@ -645,7 +642,9 @@ except Exception as e:
 
     echo -e "${YELLOW}⚙️ Yapay Zeka kod yazıyor (Patch üretiliyor)...${NC}"
     local task_sp_file="$PROMPTS_DIR/autofix_task.txt"
-    cat > "$task_sp_file" << 'PROMPT'
+    # Dosya yoksa varsayılan oluştur, varsa kullanıcı kurallarını koru
+    if [[ ! -f "$task_sp_file" ]]; then
+        cat > "$task_sp_file" << 'PROMPT'
 Sen bir Kotlin/Android uzmanısın. Sana kullanıcının GÖREVİ ve ilgili KAYNAK DOSYALAR verilecek.
 Görevi yerine getirmek için kodları incele ve "changes" (esnek patch) formatında JSON üret.
 
@@ -674,8 +673,15 @@ ANDROID KURALLARI:
 - NativeAdView: adView.mediaView MUTLAKA set et. MediaView en az 120x120dp olmalı. visibility=GONE YAPMA, alpha=0f kullan, reklam gelince alpha=1f yap.
 - LazyColumn veya LazyRow asla verticalScroll/horizontalScroll içine koyma.
 - Eğer dosyada setContent { Text("AI Kodluyor...") } görürsen, "original" olarak "setContent { Text(\"AI Kodluyor...\") }" satırını kullan ve "replacement" olarak oyunun TÜM yeni setContent bloğunu ve importlarını yaz. Paket adını değiştirmeye çalışma.
+- KRİTİK IMPORT KURALI: "import androidx.activity.compose.setContent" ve "import androidx.activity.ComponentActivity" ASLA silinmez. Import bloğunu yeniden yazarken bu iki satırın mutlaka korunduğunu kontrol et.
+- Import bloğunu yeniden yazarken mevcut importları SİLME, sadece eksik olanları EKLE.
+- TEMA KURALI: Özel tema sınıfı (YourAppTheme, AppTheme, MyTheme vb.) KULLANMA. ui.theme.* paketi yoksa import etme. Sadece MaterialTheme kullan.
+- DUPLICATE IMPORT KURALI: Import satırı eklemeden önce dosyadaki mevcut importları kontrol et. Aynı import zaten varsa tekrar ekleme.
+- YENİ PROJE KURALI: factory.sh tarafından oluşturulan yeni projelerde ui/theme/ klasörü YOKTUR. Theme.kt dosyası oluşturma, sadece MaterialTheme kullan.
+- setContent bloğunu değiştirirken fonksiyon tanımları (fun ...) ASLA setContent bloğu içine yazma. Composable fonksiyonlar her zaman Activity sınıfının DIŞINDA tanımlanır.
+- Yeni Composable fonksiyon eklerken önce Activity sınıfının kapanış parantezini bul, onun DIŞINA yaz.
 PROMPT
-
+    fi
     local patch_sp=$(cat "$task_sp_file")
     local patch_um="GÖREV: $user_task\n\nKAYNAK DOSYALAR:\n$(cat "$collected")"
 
@@ -722,3 +728,4 @@ main() {
 }
 
 main "$@"
+
