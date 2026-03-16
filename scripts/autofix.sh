@@ -731,6 +731,13 @@ except Exception as e:
         return 1
     fi
 
+    # MainActivity.kt her zaman ekle
+    local main_kt=$(find "$PROJECT_ROOT/app/src/main" -name "MainActivity.kt" -o -name "MainActivity.java" 2>/dev/null | head -1)
+    if [[ -n "$main_kt" ]]; then
+        local rel="${main_kt#$PROJECT_ROOT/}"
+        grep -qF "$rel" "$target_files" || echo "$rel" >> "$target_files"
+    fi
+    file_count=$(wc -l < "$target_files" || echo 0)
     ok "Hedef olarak $file_count dosya belirlendi:"
     cat "$target_files" | while read -r f; do echo -e "  ${DIM}-${NC} $f"; done
 
