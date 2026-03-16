@@ -709,6 +709,27 @@ run_autofix() {
         log "Hata Logu Oku: $(wc -l < "$ef") satır"
         head -100 "$ef"; echo
 
+        # Aynı hata 2 kez üst üste gelince full_content moduna geç
+        local cur_err; cur_err=$(head -1 "$ef" | md5sum | cut -d' ' -f1)
+        if [[ "$cur_err" == "${LAST_ERR:-}" ]]; then
+            SAME_ERR_COUNT=$((${SAME_ERR_COUNT:-0}+1))
+        else
+            SAME_ERR_COUNT=0
+        fi
+        LAST_ERR="$cur_err"
+        if [[ ${SAME_ERR_COUNT:-0} -ge 2 ]]; then
+            warn "Aynı hata tekrar ediyor — dosyayı baştan yaz moduna geçiliyor..."
+            local hata_dosya; hata_dosya=$(head -1 "$TMP_DIR/error_files.txt" 2>/dev/null)
+            if [[ -n "$hata_dosya" && -f "$hata_dosya" ]]; then
+                local rewrite_msg="BU DOSYAYI BAŞTAN YAZ. Mevcut kod çalışmıyor. full_content ile sıfırdan temiz kod üret.\n\nHATA:\n$(cat "$ef")\n\nMEVCUT KOD:\n$(cat "$hata_dosya")"
+                local sys_p; sys_p=$(cat "$PROMPTS_DIR/autofix_system.txt" 2>/dev/null || echo "")
+                _call_active_ai "$sys_p" "$rewrite_msg"
+                apply_fixes
+                SAME_ERR_COUNT=0
+                continue
+            fi
+        fi
+
         local src; src=$(collect_source_files)
         
         if ! call_ai "$ef" "$src"; then
