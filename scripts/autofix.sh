@@ -159,6 +159,9 @@ Sen bir Kotlin/Android uzmanısın. Sana build hataları ve kaynak dosyalar veri
 KRİTİK KURAL — BÜYÜK DOSYALAR: Eğer bir dosyaya 30+ satır kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" kullan. full_content = dosyanın TAM yeni içeriği.
 Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity : ComponentActivity() {...}"}
 
+YENİ DOSYA OLUŞTURMA: Yeni bir .kt dosyası oluşturmak istersen full_content ile yeni dosya yolunu belirt. Sistem otomatik oluşturur.
+Örnek: {"path": "app/src/main/java/com/wizaicorp/proje/MusicService.kt", "full_content": "package com.wizaicorp.proje\n..."}
+
 ÇIKTI FORMATI - SADECE JSON, BAŞKA HİÇBİR ŞEY YAZMA:
 {
   "explanation": "Hatayı buldum, x satırını y ile değiştiriyorum.",
@@ -490,8 +493,18 @@ for c in changes:
     full = path if path.startswith('/') else os.path.join(project_root, path)
     if not os.path.exists(full):
         full2 = full.replace('/kotlin/', '/java/')
-        if os.path.exists(full2): full = full2
-        else: continue
+        if os.path.exists(full2):
+            full = full2
+        else:
+            # Dosya yok — full_content varsa yeni dosya oluştur
+            full_content_new = c.get('full_content', '')
+            if full_content_new:
+                os.makedirs(os.path.dirname(full), exist_ok=True)
+                with open(full, 'w', encoding='utf-8') as f: f.write(full_content_new)
+                new_lines = len(full_content_new.splitlines())
+                print(f"CREATED:{path}|0|{new_lines}")
+                count += 1
+            continue
 
     # full_content: dosyanın tamamını yaz (büyük kod için JSON escape sorunu yok)
     full_content = c.get('full_content', '')
@@ -555,6 +568,10 @@ PYEOF
     echo "$wr" | grep "^MODIFIED:" | while IFS='|' read -r prefix path old new; do
         local p="${path#$PROJECT_ROOT/}"
         echo -e "  ${GREEN}→${NC} $p (Satır: $old ${YELLOW}→${NC} $new)"
+    done
+    echo "$wr" | grep "^CREATED:" | while IFS='|' read -r prefix path old new; do
+        local p="${path#$PROJECT_ROOT/}"
+        echo -e "  ${GREEN}✨ YENİ:${NC} $p ($new satır)"
     done
     
     # Auto-confirm: ws_bridge veya conf'tan kontrol et
@@ -769,6 +786,9 @@ Sen bir Kotlin/Android uzmanısın. Sana kullanıcının GÖREVİ ve ilgili KAYN
 KRİTİK KURAL — BÜYÜK DOSYALAR: Eğer bir dosyaya 30+ satır kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" kullan. full_content = dosyanın TAM yeni içeriği.
 Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity : ComponentActivity() {...}"}
 
+YENİ DOSYA OLUŞTURMA: Yeni bir .kt dosyası oluşturmak istersen full_content ile yeni dosya yolunu belirt. Sistem otomatik oluşturur.
+Örnek: {"path": "app/src/main/java/com/wizaicorp/proje/MusicService.kt", "full_content": "package com.wizaicorp.proje\n..."}
+
 ÇIKTI FORMATI - SADECE JSON, BAŞKA HİÇBİR ŞEY YAZMA:
 {
   "explanation": "Görev için şu dosyada şu değişikliği yapıyorum...",
@@ -852,6 +872,7 @@ main() {
 }
 
 main "$@"
+
 
 
 
