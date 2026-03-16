@@ -160,6 +160,6 @@ echo "$P_NAME|~/$P_NAME|$KS_FILE|$KS_ALIAS|$KS_PASS|$P_PKG" >> "$CONF_FILE"
 echo -e "${G}✅ Altyapı hazır! Görev yapay zekaya devrediliyor...${NC}\n"
 
 # 6. AUTOFIX AI SİSTEMİNİ TETİKLE
-PROMPT_FULL="$AI_PROMPT. Lütfen Jetpack Compose kullanarak MainActivity.kt dosyasını baştan sona yaz ve UI state'leri doğru yönet."
+PROMPT_FULL="$AI_PROMPT. MainActivity.kt dosyasını baştan sona yaz. ÖNEMLİ: Eğer görev bir oyun veya animasyon içeriyorsa Compose Canvas API (drawRect, drawCircle, drawPath) kullan. Eğer normal uygulama ise Jetpack Compose UI widget'larını kullan. Hangi yöntemi kullandığını explanation'da belirt."
 bash "$SISTEM_DIR/autofix.sh" task "$PROMPT_FULL" "$P_DIR"
 
