@@ -146,7 +146,17 @@ select_provider() {
         sed -i "s|API_KEY=.*|API_KEY=\"$new_key\"|" "$PROVIDER_CONF"
         API_KEY="$new_key"; ok "Key kaydedildi"
     fi
-    ok "Aktif Provider: $NAME | Model: $MODEL"
+       # --- YENİ: OTOMATİK TOKEN YÜKSELTİCİ ---
+    # Büyük modeller seçildiyse kullanıcının düşük ayarını ez ve sınırları zorla
+    if [[ "$NAME" == "Claude" && $MAX_TOKENS -lt 8192 ]]; then
+        MAX_TOKENS=8192
+        warn "Token limiti Claude için otomatik olarak 8192'ye yükseltildi."
+    elif [[ "$NAME" == "Gemini" && $MAX_TOKENS -lt 16384 ]]; then
+        MAX_TOKENS=16384
+        warn "Token limiti Gemini için otomatik olarak 16384'e yükseltildi."
+    fi
+
+     ok "Aktif Provider: $NAME | Model: $MODEL"
 }
 
 create_default_prompt() {
@@ -245,34 +255,35 @@ parse_errors() {
     local errors_file="$TMP_DIR/errors.txt"
     local files_file="$TMP_DIR/error_files.txt"
 
-    # Geniş pattern — Kotlin, Java, XML, AAPT, Gradle, Manifest hataları
-    grep -E "^e: file://|^w: file://|error:|^ERROR|AAPT:|AAPT2|Could not find|Could not resolve|unresolved|FAILED|Exception|Manifest|AndroidManifest|resource|attribute"         "$build_out" | head -n 6 > "$errors_file" 2>/dev/null || true
+    # Sadece ilk 6'yı değil, ilk 20 satırı al ama BENZERSİZ (sort -u) olanları seç. 
+    # Uyarıları (w:) eliyoruz, sadece gerçek hatalara (e:, error, Exception) odaklanıyoruz.
+    grep -E "^e: file://|error:|^ERROR|AAPT:|AAPT2|Could not find|Could not resolve|unresolved|FAILED|Exception|Manifest" \
+        "$build_out" | head -n 20 | sort -u > "$errors_file" 2>/dev/null || true
 
-    # Hata veren dosya yollarını çıkar — uzantıdan bağımsız
-    # Önce tam yol formatı: /path/to/file.ext
-    grep -oE '/[^ :]+\.[a-zA-Z0-9]+' "$errors_file"         | grep -v "\.class$\|\.jar$\|\.apk$\|\.aab$"         | head -n 3 | sort -u > "$files_file" 2>/dev/null || true
+    # Hata veren dosya yollarını çıkar
+    grep -oE '/[^ :]+\.[a-zA-Z0-9]+' "$errors_file" \
+        | grep -v "\.class$\|\.jar$\|\.apk$\|\.aab$" \
+        | head -n 5 | sort -u > "$files_file" 2>/dev/null || true
 
-    # Bulunamazsa: paket yolundan dosya bul (Kotlin/Java için)
+    # Bulunamazsa: paket yolundan dosya bul
     if [[ ! -s "$files_file" ]]; then
-        grep -oE 'com/[a-zA-Z0-9_/]+\.[a-zA-Z]+' "$build_out"         | while read -r rel; do
+        grep -oE 'com/[a-zA-Z0-9_/]+\.[a-zA-Z]+' "$build_out" \
+        | while read -r rel; do
             find "$PROJECT_ROOT" -path "*$rel" 2>/dev/null | head -1
         done | head -n 3 | sort -u > "$files_file"
     fi
 
     # Hala boşsa: build çıktısının tamamından dosya adı ara
     if [[ ! -s "$files_file" ]]; then
-        grep -oE '[A-Za-z][A-Za-z0-9_]+\.(kt|java|xml|gradle|kts|toml|json|properties)' "$build_out"         | while read -r fname; do
+        grep -oE '[A-Za-z][A-Za-z0-9_]+\.(kt|java|xml|gradle|kts|toml|json|properties)' "$build_out" \
+        | while read -r fname; do
             find "$PROJECT_ROOT" -name "$fname" -not -path "*/build/*" 2>/dev/null | head -1
         done | head -n 3 | sort -u > "$files_file"
     fi
 
-    # Manifest/resource hatası varsa AndroidManifest.xml'i ekle
-    if grep -qE "processDebugResources|AndroidManifest|package.*keyword|not a valid Java" "$errors_file" 2>/dev/null; then
-        local manifest="$PROJECT_ROOT/app/src/main/AndroidManifest.xml"
-        [[ -f "$manifest" ]] && echo "$manifest" >> "$files_file"
-    fi
     echo "$errors_file"
 }
+
 
 collect_source_files() {
     local error_files_list="$TMP_DIR/error_files.txt"
@@ -299,6 +310,21 @@ collect_source_files() {
     while IFS= read -r fpath; do
         add_file "$fpath"
     done < "$error_files_list"
+
+    # --- YENİ: BAĞLILIKLARI (DEPENDENCIES) AKILLICA İÇERİ AL ---
+    # Hata veren dosyaların içindeki projeye ait "import" edilen sınıfları bul ve onları da gönder
+    local pkg_base=$(grep "applicationId" "$PROJECT_ROOT/app/build.gradle" 2>/dev/null | grep -oE '"[^"]+"' | tr -d '"' | head -1)
+    if [[ -n "$pkg_base" ]]; then
+        while IFS= read -r fpath; do
+            [[ ! -f "$fpath" ]] && continue
+            grep -E "^import $pkg_base" "$fpath" | while read -r imp_line; do
+                # import com.wizaicorp.app.data.Model -> data/Model.kt
+                local rel_path=$(echo "$imp_line" | awk '{print $2}' | tr '.' '/')
+                local dep_file=$(find "$PROJECT_ROOT/app/src/main/java" -path "*${rel_path}.kt" 2>/dev/null | head -1)
+                [[ -n "$dep_file" ]] && add_file "$dep_file"
+            done
+        done < "$error_files_list"
+    fi
 
     # 2. Bağlam dosyaları — her zaman ekle (build config)
     for gf in         "$PROJECT_ROOT/app/build.gradle"         "$PROJECT_ROOT/app/build.gradle.kts"         "$PROJECT_ROOT/build.gradle"         "$PROJECT_ROOT/build.gradle.kts"         "$PROJECT_ROOT/settings.gradle"         "$PROJECT_ROOT/settings.gradle.kts"         "$PROJECT_ROOT/app/src/main/AndroidManifest.xml"; do
@@ -360,6 +386,8 @@ print(json.dumps({'model':'${MODEL}','max_tokens':${MAX_TOKENS},'temperature':0.
     local c; c=$(jq -r '.choices[0].message.content' "$rf" 2>/dev/null)
     [[ -z "$c" || "$c" == "null" ]] && { err "Boş yanıt"; return 1; }
     echo "$c" > "$TMP_DIR/ai_content.txt"
+    cp "$TMP_DIR/ai_content.txt" "/sdcard/Download/last_ai_response.txt" # BU SATIRI EKLE
+
     echo "=== GEMINI RAW ===" >> /sdcard/Download/gemini_debug.log
     echo "$c" >> /sdcard/Download/gemini_debug.log
 }
@@ -390,6 +418,8 @@ print(json.dumps({
     local c; c=$(jq -r '.candidates[0].content.parts[0].text' "$rf" 2>/dev/null)
     [[ -z "$c" || "$c" == "null" ]] && { err "Boş yanıt"; return 1; }
     echo "$c" > "$TMP_DIR/ai_content.txt"
+    cp "$TMP_DIR/ai_content.txt" "/sdcard/Download/last_ai_response.txt" # BU SATIRI EKLE
+
     echo "=== GEMINI RAW ===" >> /sdcard/Download/gemini_debug.log
     echo "$c" >> /sdcard/Download/gemini_debug.log
 }
@@ -408,6 +438,8 @@ print(json.dumps({'model':'${MODEL}','max_tokens':${MAX_TOKENS},
     local c; c=$(jq -r '.content[0].text' "$rf" 2>/dev/null)
     [[ -z "$c" || "$c" == "null" ]] && { err "Boş yanıt"; return 1; }
     echo "$c" > "$TMP_DIR/ai_content.txt"
+    cp "$TMP_DIR/ai_content.txt" "/sdcard/Download/last_ai_response.txt" # BU SATIRI EKLE
+
     echo "=== GEMINI RAW ===" >> /sdcard/Download/gemini_debug.log
     echo "$c" >> /sdcard/Download/gemini_debug.log
 }
@@ -430,38 +462,59 @@ clean_agent_backups() {
 
 apply_fixes() {
     local clean_file="$TMP_DIR/clean_response.txt"
-    python3 /data/data/com.termux/files/home/clean_json.py "$TMP_DIR/ai_content.txt"
+    python3 /data/data/com.termux/files/home/clean_json.py "$TMP_DIR/ai_content.txt" 2>/dev/null || true
+    
+    # JSON temizleme ve kurtarma bloğu
     python3 -c "
 import re
-t=open('$TMP_DIR/ai_content.txt').read()
-t=re.sub(r'^\`+json\s*','',t,flags=re.MULTILINE)
-t=re.sub(r'^\`+\s*$','',t,flags=re.MULTILINE)
-open('$clean_file','w').write(t.strip())"
+try:
+    t=open('$TMP_DIR/ai_content.txt').read()
+    t=re.sub(r'^\`+json\s*','',t,flags=re.MULTILINE)
+    t=re.sub(r'^\`+\s*$','',t,flags=re.MULTILINE)
+    open('$clean_file','w').write(t.strip())
+except: pass"
 
     local py_script="$TMP_DIR/patch_apply.py"
     cat > "$py_script" << 'PYEOF'
-import json, os, shutil
+import json, os, shutil, re
 
 def try_parse_json(t):
-    """JSON parse et — bozuksa en uzun geçerli bloğu bul"""
-    # Önce direkt parse
     try: return json.loads(t)
     except: pass
-    # { ... } bloğunu bul
     s = t.find('{'); e = t.rfind('}')+1
     if s >= 0 and e > s:
         try: return json.loads(t[s:e])
         except: pass
-    # Truncated JSON — eksik kapanış parantezlerini tamamla
-    try:
-        depth = 0; last_valid = 0
-        for i, ch in enumerate(t):
-            if ch == '{': depth += 1
-            elif ch == '}': depth -= 1; last_valid = i
-        if last_valid > 0:
-            candidate = t[t.find('{'):last_valid+1]
-            return json.loads(candidate)
-    except: pass
+    return None
+
+def flexible_replace(content, orig, repl):
+    # 1. Birebir eşleşme denemesi
+    if orig in content:
+        return content.replace(orig, repl, 1)
+    
+    # 2. Boşlukları ve girintileri yok sayarak esnek arama (Fuzzy Match)
+    orig_lines = [l.strip() for l in orig.strip().splitlines() if l.strip()]
+    if not orig_lines: return None
+    
+    content_lines = content.splitlines()
+    for i in range(len(content_lines) - len(orig_lines) + 1):
+        match = True
+        k = 0
+        for j in range(len(orig_lines)):
+            # İçerikteki boş satırları atla
+            while i+k < len(content_lines) and not content_lines[i+k].strip():
+                k += 1
+            if i+k >= len(content_lines) or content_lines[i+k].strip() != orig_lines[j]:
+                match = False
+                break
+            k += 1
+            
+        if match:
+            # Hedef bloğu bulduk, yeni kodla değiştir
+            repl_lines = repl.splitlines()
+            new_lines = content_lines[:i] + repl_lines + content_lines[i+k:]
+            return '\n'.join(new_lines) + '\n'
+            
     return None
 
 with open(os.environ['CLEAN_FILE']) as f: t = f.read()
@@ -489,60 +542,48 @@ def backup_file(full, path):
 for c in changes:
     path = c.get('path', '').strip()
     if not path: continue
-    # kotlin/ yazılmış olabilir, java/ ile dene
+    
     full = path if path.startswith('/') else os.path.join(project_root, path)
     if not os.path.exists(full):
         full2 = full.replace('/kotlin/', '/java/')
-        if os.path.exists(full2):
-            full = full2
+        if os.path.exists(full2): full = full2
         else:
-            # Dosya yok — full_content varsa yeni dosya oluştur
             full_content_new = c.get('full_content', '')
             if full_content_new:
                 os.makedirs(os.path.dirname(full), exist_ok=True)
                 with open(full, 'w', encoding='utf-8') as f: f.write(full_content_new)
-                new_lines = len(full_content_new.splitlines())
-                print(f"CREATED:{path}|0|{new_lines}")
+                print(f"CREATED:{path}|0|{len(full_content_new.splitlines())}")
                 count += 1
             continue
 
-    # full_content: dosyanın tamamını yaz (büyük kod için JSON escape sorunu yok)
     full_content = c.get('full_content', '')
     if full_content:
         backup_file(full, path)
         old_lines = len(open(full).readlines())
         with open(full, 'w', encoding='utf-8') as f: f.write(full_content)
-        new_lines = len(full_content.splitlines())
-        print(f"MODIFIED:{path}|{old_lines}|{new_lines}")
+        print(f"MODIFIED:{path}|{old_lines}|{len(full_content.splitlines())}")
         count += 1
         continue
 
-    # original/replacement: patch modu
     orig = c.get('original', '').replace('\r\n', '\n')
     repl = c.get('replacement', '').replace('\r\n', '\n')
     if not orig: continue
 
     with open(full, 'r', encoding='utf-8') as f: file_content = f.read().replace('\r\n', '\n')
 
-    match_found = False
-    if orig in file_content:
-        match_found = True
-    elif orig.strip() in file_content:
-        orig = orig.strip(); repl = repl.strip()
-        match_found = True
-
-    if not match_found:
+    new_content = flexible_replace(file_content, orig, repl)
+    if new_content is None:
         print(f"MATCH_FAILED:{path}")
         continue
 
     backup_file(full, path)
     old_lines = len(file_content.splitlines())
-    new_content = file_content.replace(orig, repl, 1)
     new_lines = len(new_content.splitlines())
     
     with open(full, 'w', encoding='utf-8') as f: f.write(new_content)
     print(f"MODIFIED:{path}|{old_lines}|{new_lines}")
     count += 1
+
 print(f"COUNT:{count}")
 PYEOF
 
@@ -551,8 +592,13 @@ PYEOF
     export AGENT_YEDEK_DIR="$AGENT_YEDEK_DIR"
     export BACKUP_MAP="$BACKUP_MAP"
     
-    local wr; wr=$(python3 "$py_script")
-    echo "$wr" | grep -q "JSON_ERROR\|JSON_NOT_FOUND" && { err "Yapay zeka geçersiz format döndürdü."; return 1; }
+    local wr; wr=$(python3 "$py_script" 2>/dev/null)
+    
+    if echo "$wr" | grep -q "JSON_ERROR\|JSON_NOT_FOUND"; then
+        err "❌ AI kodu tamamlayamadan yarıda kesti (Token Limiti Doldu) veya JSON'u bozdu."
+        err "💡 ÇÖZÜM: Görevi bölerek verin veya büyük dosyalar yerine küçük yamalar isteyin."
+        return 1
+    fi
     
     local expl; expl=$(echo "$wr" | grep "^EXPLANATION:" | cut -d: -f2-)
     local count; count=$(echo "$wr" | grep "^COUNT:" | cut -d: -f2)
@@ -561,7 +607,7 @@ PYEOF
     echo -e "${YELLOW}Açıklama:${NC} $expl"
     
     if [[ "${count:-0}" -eq 0 ]]; then
-        err "Değişiklik yapılamadı (Kod eşleşmedi veya dosya bulunamadı)"
+        err "Kod dosyada bulunamadı (Match Failed). AI eski veya yanlış bir koda referans verdi."
         return 1
     fi
     
@@ -574,10 +620,7 @@ PYEOF
         echo -e "  ${GREEN}✨ YENİ:${NC} $p ($new satır)"
     done
     
-    # Auto-confirm: ws_bridge veya conf'tan kontrol et
-    local auto_confirm
-    auto_confirm=$(grep "^AUTO_CONFIRM=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo "0")
-    
+    local auto_confirm=$(grep "^AUTO_CONFIRM=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo "0")
     if [[ "$auto_confirm" != "1" ]]; then
         echo
         read -r -p "$(echo -e "${YELLOW}Değişiklikleri uygula ve derle [Enter=Devam / İ=İptal]: ${NC}")" confirm
@@ -591,6 +634,7 @@ PYEOF
 
     ok "$count dosya güncellendi, build testine geçiliyor..."
 }
+
 
 show_advanced_diff() {
     echo -e "\n${BOLD}${CYAN}🔍 YAPILAN DEĞİŞİKLİKLERİN KONTROLÜ:${NC}"

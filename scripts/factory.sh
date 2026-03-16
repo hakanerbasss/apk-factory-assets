@@ -50,7 +50,15 @@ if [ -z "$AI_PROMPT" ]; then echo -e "${R}Görev boş olamaz!${NC}"; exit 1; fi
 # 2. OTOMATİK DEĞİŞKENLER (Arka planda uydurulur)
 # Tireleri alt çizgiye çevirerek wizaicorp paket adını oluştur
 P_PKG="${PKG_OVERRIDE:-com.wizaicorp.$(echo $P_NAME | tr '-' '_' | sed 's/^[0-9]/app&/')}"
-KS_PASS=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 12)
+
+# --- YENİ: KEYSTORE ŞİFRESİNİ AYARLARDAN ÇEK ---
+SAVED_PASS=$(grep "^KEYSTORE_PASS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
+if [[ -n "$SAVED_PASS" ]]; then
+    KS_PASS="$SAVED_PASS"
+else
+    KS_PASS=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 12)
+fi
+# ------------------------------------------------
 KS_ALIAS=$(echo "$P_NAME" | tr -d '-' | sed 's/^[0-9]/app&/' | head -c 12)
 KS_FILE="${P_NAME}-release.keystore"
 
@@ -160,6 +168,4 @@ echo "$P_NAME|~/$P_NAME|$KS_FILE|$KS_ALIAS|$KS_PASS|$P_PKG" >> "$CONF_FILE"
 echo -e "${G}✅ Altyapı hazır! Görev yapay zekaya devrediliyor...${NC}\n"
 
 # 6. AUTOFIX AI SİSTEMİNİ TETİKLE
-PROMPT_FULL="$AI_PROMPT. MainActivity.kt dosyasını baştan sona yaz. ÖNEMLİ: Eğer görev bir oyun veya animasyon içeriyorsa Compose Canvas API (drawRect, drawCircle, drawPath) kullan. Eğer normal uygulama ise Jetpack Compose UI widget'larını kullan. Hangi yöntemi kullandığını explanation'da belirt."
-bash "$SISTEM_DIR/autofix.sh" task "$PROMPT_FULL" "$P_DIR"
-
+PROMPT_FULL="$AI_PROMPT. ÖNEMLİ: Tema için sadece MaterialTheme kullan, özel tema sınıfı oluşturma. Eğer görev oyun veya animasyon içeriyorsa Canvas API kullan, normal uygulama ise Jetpack Compose UI kullan."
