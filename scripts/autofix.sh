@@ -495,9 +495,14 @@ apply_fixes() {
     python3 -c "
 import re
 t=open('$TMP_DIR/ai_content.txt').read()
+t=re.sub(r'```json','',t)
+t=re.sub(r'```','',t)
 t=re.sub(r'^\`+json\s*','',t,flags=re.MULTILINE)
 t=re.sub(r'^\`+\s*$','',t,flags=re.MULTILINE)
-open('$clean_file','w').write(t.strip())"
+t=t.strip()
+s=t.find('{');e=t.rfind('}')+1
+if s>=0 and e>s:t=t[s:e]
+open('$clean_file','w').write(t)"
 
     local py_script="$TMP_DIR/patch_apply.py"
     cat > "$py_script" << 'PYEOF'
