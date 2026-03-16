@@ -727,8 +727,11 @@ except Exception as e:
 
     local file_count=$(wc -l < "$target_files" || echo 0)
     if [[ "$file_count" -eq 0 ]]; then
-        err "Yapay zeka mantıklı bir dosya listesi üretemedi."
-        return 1
+        warn "Keşif başarısız, MainActivity.kt varsayılan hedef alınıyor..."
+        local main_kt=$(find "$PROJECT_ROOT/app/src/main" -name "MainActivity.kt" -o -name "MainActivity.java" 2>/dev/null | head -1)
+        [[ -n "$main_kt" ]] && echo "${main_kt#$PROJECT_ROOT/}" >> "$target_files"
+        file_count=$(wc -l < "$target_files" || echo 0)
+        [[ "$file_count" -eq 0 ]] && { err "MainActivity bulunamadı."; return 1; }
     fi
 
     # MainActivity.kt her zaman ekle
