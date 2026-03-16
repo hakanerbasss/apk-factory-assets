@@ -452,6 +452,18 @@ async def handle(ws):
                         for _cd in ["app/build", ".gradle"]:
                             _d = os.path.join(proj_dir, _cd)
                             if os.path.exists(_d): _su2.rmtree(_d)
+                        # Manifest'te icon yoksa ekle
+                        manifest_path = os.path.join(proj_dir, "app/src/main/AndroidManifest.xml")
+                        if os.path.exists(manifest_path):
+                            with open(manifest_path) as mf:
+                                manifest = mf.read()
+                            if 'android:icon' not in manifest:
+                                manifest = manifest.replace(
+                                    '<application android:allowBackup="true"',
+                                    '<application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="true"'
+                                )
+                                with open(manifest_path, 'w') as mf:
+                                    mf.write(manifest)
                         await ws.send(json.dumps({"type":"task_done","success":True,"text":"✅ Logo güncellendi (cache temizlendi, build alabilirsin)"}))
                     except ImportError:
                         await ws.send(json.dumps({"type":"error","text":"❌ Pillow kurulu değil: pip install Pillow"}))
