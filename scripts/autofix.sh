@@ -430,6 +430,8 @@ apply_fixes() {
     python3 -c "
 import re
 t=open('$TMP_DIR/ai_content.txt').read()
+t=re.sub(r'```json\s*','',t)
+t=re.sub(r'```\s*','',t)
 t=re.sub(r'^\`+json\s*','',t,flags=re.MULTILINE)
 t=re.sub(r'^\`+\s*$','',t,flags=re.MULTILINE)
 open('$clean_file','w').write(t.strip())"
