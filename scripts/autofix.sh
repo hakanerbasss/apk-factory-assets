@@ -159,11 +159,6 @@ Sen bir Kotlin/Android uzmanısın. Sana build hataları ve kaynak dosyalar veri
 KRİTİK KURAL — BÜYÜK DOSYALAR: Eğer bir dosyaya 30+ satır kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" kullan. full_content = dosyanın TAM yeni içeriği.
 Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity : ComponentActivity() {...}"}
 
-AGENTIC KURAL — DOSYA OKUMA: Eğer bir hatayı düzeltmek için dosyanın belirli satırlarını görmek istersen, önce "commands" listesi döndür. Sistem komutu çalıştırır ve sonucu sana geri gönderir, sonra "changes" yazarsın.
-Örnek: {"commands": ["sed -n '160,180p' app/src/main/java/com/wizaicorp/proje/MainActivity.kt"]}
-Desteklenen komutlar: cat, sed -n, grep, find, ls, wc, stat, head, tail, file
-Komutları PROJECT_ROOT'a göreceli yaz.
-
 ÇIKTI FORMATI - SADECE JSON, BAŞKA HİÇBİR ŞEY YAZMA:
 {
   "explanation": "Hatayı buldum, x satırını y ile değiştiriyorum.",
@@ -329,49 +324,6 @@ _call_active_ai() {
     esac
 }
 
-# Agentic: AI'nın "commands" isteklerini çalıştır, çıktıyı geri ver
-run_ai_commands() {
-    local cmd_file="$TMP_DIR/ai_commands.txt"
-    local cmd_output="$TMP_DIR/cmd_output.txt"
-    > "$cmd_output"
-
-    python3 -c "
-import json, os, sys, re
-t = open('$TMP_DIR/ai_content.txt').read()
-# Backtick ve markdown temizle
-t = re.sub(r'\`\`\`json\s*', '', t, flags=re.MULTILINE)
-t = re.sub(r'\`\`\`\s*', '', t, flags=re.MULTILINE)
-t = re.sub(r'^\`+json\s*','',t,flags=re.MULTILINE)
-t = re.sub(r'^\`+\s*','',t,flags=re.MULTILINE)
-t = t.strip()
-# { ... } bloğunu bul
-s = t.find('{'); e = t.rfind('}')+1
-if s >= 0 and e > s: t = t[s:e]
-try:
-    d = json.loads(t)
-    cmds = d.get('commands', [])
-    for c in cmds: print(c)
-except: pass
-" > "$cmd_file" 2>/dev/null
-
-    local cmd_count; cmd_count=$(wc -l < "$cmd_file" || echo 0)
-    [[ $cmd_count -eq 0 ]] && return 1
-
-    log "🔍 AI $cmd_count keşif komutu çalıştırıyor..."
-    while IFS= read -r cmd; do
-        [[ -z "$cmd" ]] && continue
-        echo "=== KOMUT: $cmd ===" >> "$cmd_output"
-        # Güvenli komutlar: sadece okuma izni (cd, cat, sed, find, grep, ls, wc, stat)
-        if echo "$cmd" | grep -qE "^(cat|sed -n|grep|find|ls|wc|stat|head|tail|file) "; then
-            cd "$PROJECT_ROOT" && eval "$cmd" >> "$cmd_output" 2>&1 || true
-        else
-            echo "// Güvenlik: sadece okuma komutları çalıştırılır" >> "$cmd_output"
-        fi
-        echo "" >> "$cmd_output"
-    done < "$cmd_file"
-    return 0
-}
-
 call_ai() {
     local errors="$1" sources="$2"
     local error_text; error_text=$(cat "$errors")
@@ -384,29 +336,12 @@ call_ai() {
     local pf="$PROMPTS_DIR/autofix_system.txt"
     [[ ! -f "$pf" ]] && create_default_prompt
     system_prompt=$(cat "$pf")
-
     local user_msg="BUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`\n\nKAYNAK DOSYALAR:\n${source_text}"
 
     log "$NAME'e gönderiliyor... (${#source_text} karakter)"
     echo -e "${YELLOW}  ⏳ API yanıtı bekleniyor (Max 600sn)...${NC}"
 
-    # Agentic loop — max 3 tur, AI komut isteyebilir
-    local tour=0
-    while [[ $tour -lt 3 ]]; do
-        tour=$((tour+1))
-        _call_active_ai "$system_prompt" "$user_msg"
-
-        # AI commands istedi mi?
-        if run_ai_commands; then
-            local cmd_output; cmd_output=$(cat "$TMP_DIR/cmd_output.txt")
-            log "🔍 Keşif tur $tour tamamlandı ($(echo "$cmd_output" | wc -c) karakter)"
-            echo -e "${YELLOW}  ⏳ API yanıtı bekleniyor (Max 600sn)...${NC}"
-            user_msg="BUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`\n\nKAYNAK DOSYALAR:\n${source_text}\n\nKEŞİF SONUÇLARI (istediğin satırlar):\n${cmd_output}\n\nŞimdi \"changes\" formatında düzeltmeyi yaz."
-            continue
-        fi
-        # commands yok → changes var, döngüden çık
-        break
-    done
+    _call_active_ai "$system_prompt" "$user_msg"
 }
 
 _call_openai() {
@@ -495,14 +430,9 @@ apply_fixes() {
     python3 -c "
 import re
 t=open('$TMP_DIR/ai_content.txt').read()
-t=re.sub(r'```json','',t)
-t=re.sub(r'```','',t)
 t=re.sub(r'^\`+json\s*','',t,flags=re.MULTILINE)
 t=re.sub(r'^\`+\s*$','',t,flags=re.MULTILINE)
-t=t.strip()
-s=t.find('{');e=t.rfind('}')+1
-if s>=0 and e>s:t=t[s:e]
-open('$clean_file','w').write(t)"
+open('$clean_file','w').write(t.strip())"
 
     local py_script="$TMP_DIR/patch_apply.py"
     cat > "$py_script" << 'PYEOF'
@@ -721,27 +651,6 @@ run_autofix() {
         log "Hata Logu Oku: $(wc -l < "$ef") satır"
         head -100 "$ef"; echo
 
-        # Aynı hata 2 kez üst üste gelince full_content moduna geç
-        local cur_err; cur_err=$(head -1 "$ef" | md5sum | cut -d' ' -f1)
-        if [[ "$cur_err" == "${LAST_ERR:-}" ]]; then
-            SAME_ERR_COUNT=$((${SAME_ERR_COUNT:-0}+1))
-        else
-            SAME_ERR_COUNT=0
-        fi
-        LAST_ERR="$cur_err"
-        if [[ ${SAME_ERR_COUNT:-0} -ge 2 ]]; then
-            warn "Aynı hata tekrar ediyor — dosyayı baştan yaz moduna geçiliyor..."
-            local hata_dosya; hata_dosya=$(head -1 "$TMP_DIR/error_files.txt" 2>/dev/null)
-            if [[ -n "$hata_dosya" && -f "$hata_dosya" ]]; then
-                local rewrite_msg="BU DOSYAYI BAŞTAN YAZ. Mevcut kod çalışmıyor. full_content ile sıfırdan temiz kod üret.\n\nHATA:\n$(cat "$ef")\n\nMEVCUT KOD:\n$(cat "$hata_dosya")"
-                local sys_p; sys_p=$(cat "$PROMPTS_DIR/autofix_system.txt" 2>/dev/null || echo "")
-                _call_active_ai "$sys_p" "$rewrite_msg"
-                apply_fixes
-                SAME_ERR_COUNT=0
-                continue
-            fi
-        fi
-
         local src; src=$(collect_source_files)
         
         if ! call_ai "$ef" "$src"; then
@@ -774,43 +683,68 @@ run_task() {
 
     local tree_file="$TMP_DIR/tree.txt"
     cd "$PROJECT_ROOT"
-    # Tüm dosya türlerini listele — binary değil, build hariç
-    find . -maxdepth 6 -type f \
+    find . -maxdepth 4 -type f \
         -not -path "*/.*" \
         -not -path "*/build/*" \
-        -not -path "*/.gradle/*" \
-        -not -path "*/outputs/*" \
         -not -path "*/bin/*" \
-        | sort > "$tree_file"
+        -not -path "*/outputs/*" \
+        | while read -r file; do
+            if grep -Iq . "$file" 2>/dev/null; then
+                if [ $(stat -c%s "$file") -lt 102400 ]; then
+                    echo "$file"
+                fi
+            fi
+        done > "$tree_file"
 
-    local pkg=$(grep "applicationId" "$PROJECT_ROOT/app/build.gradle" 2>/dev/null | head -1 | grep -oE '"[^"]+"' | head -1 | tr -d '"')
-    local max_chars
-    max_chars=$(grep "^MAX_CHARS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo 60000)
+    echo -e "${YELLOW}🔍 Görev için ilgili dosyalar keşfediliyor...${NC}"
+    local sp="Sen uzman bir Android asistanısın. Sadece JSON formatında dosya yollarını döndürürsün."
+    local pkg=$(grep "applicationId" "$PROJECT_ROOT/app/build.gradle" 2>/dev/null | head -1 | grep -oE '"[^"]+"'  | head -1 | tr -d '"')
+    local um="PROJE DOSYALARI:\n$(cat "$tree_file")\n\nPROJE PAKET ADI: $pkg\n\nGÖREV: $user_task\n\nSadece bu görevi yapmak için okumam ve değiştirmem gereken dosyaların yollarını içeren bir JSON dizisi döndür. DOSYA YOLLARI MUTLAKA PROJE DOSYALARI LİSTESİNDEN SEÇİLMELİ, uydurma yol yazma.\nÖrnek: [\"app/src/main/java/com/.../MainActivity.kt\"]"
 
-    # Adım 1: Sadece dosya ağacını gönder — içerik yok
-    local collected="$TMP_DIR/collected_sources.txt"
-    > "$collected"
-    echo "=== PROJE DOSYA AĞACI ===" >> "$collected"
-    echo "Paket: $pkg" >> "$collected"
-    echo "Proje: $PROJECT_ROOT" >> "$collected"
-    echo "" >> "$collected"
-    # Her dosyanın adı + boyutu
-    while IFS= read -r f; do
-        local fsize; fsize=$(stat -c%s "$PROJECT_ROOT/$f" 2>/dev/null || echo 0)
-        echo "$f ($fsize bytes)" >> "$collected"
-    done < "$tree_file"
-    echo "" >> "$collected"
-    echo "Not: Dosya içeriklerini görmek için 'commands' ile iste." >> "$collected"
-    # MainActivity.kt her zaman ekle — AI boş şablonu görsün
-    local main_kt; main_kt=$(find "$PROJECT_ROOT/app/src/main/java" -name "MainActivity.kt" 2>/dev/null | head -1)
-    if [[ -n "$main_kt" ]]; then
-        echo "" >> "$collected"
-        echo "=== MEVCUT KOD: ${main_kt#$PROJECT_ROOT/} ===" >> "$collected"
-        cat "$main_kt" >> "$collected"
+    if ! _call_active_ai "$sp" "$um"; then
+        err "Keşif başarısız oldu."; return 1
     fi
 
-    ok "Dosya ağacı hazır: $(wc -l < "$tree_file") dosya"
-    echo -e "${YELLOW}⚙️ Yapay Zeka analiz ediyor...${NC}"
+    local target_files="$TMP_DIR/target_files.txt"
+    python3 -c "
+import json, sys, re
+t=open('$TMP_DIR/ai_content.txt').read()
+t=re.sub(r'^\`+json\s*','',t,flags=re.MULTILINE)
+t=re.sub(r'^\`+\s*$','',t,flags=re.MULTILINE)
+try:
+    arr = json.loads(t)
+    if isinstance(arr, dict) and 'files' in arr: arr = arr['files']
+    elif isinstance(arr, dict) and 'changes' in arr: arr = [c['path'] for c in arr.get('changes', [])]
+    for f in arr: print(f)
+except Exception as e:
+    pass
+" > "$target_files"
+
+    local file_count=$(wc -l < "$target_files" || echo 0)
+    if [[ "$file_count" -eq 0 ]]; then
+        err "Yapay zeka mantıklı bir dosya listesi üretemedi."
+        return 1
+    fi
+
+    ok "Hedef olarak $file_count dosya belirlendi:"
+    cat "$target_files" | while read -r f; do echo -e "  ${DIM}-${NC} $f"; done
+
+    local collected="$TMP_DIR/collected_sources.txt"
+    > "$collected"
+    while read -r f; do
+        if [[ -f "$PROJECT_ROOT/$f" ]]; then
+            echo "=== FILE: $f ===" >> "$collected"
+            # --- YENİ: Resim veya arşiv dosyasıysa okuma (JSON Çökmesini Önler) ---
+            if [[ "$f" =~ \.(png|jpg|jpeg|webp|gif|jar|keystore|aab|apk)$ ]]; then
+                echo "// BINARY DOSYA (RESİM/ARŞİV) - İÇERİK METİN OLARAK OKUNAMAZ" >> "$collected"
+            else
+                cat "$PROJECT_ROOT/$f" >> "$collected"
+            fi
+            echo "" >> "$collected"
+        fi
+    done < "$target_files"
+
+    echo -e "${YELLOW}⚙️ Yapay Zeka kod yazıyor (Patch üretiliyor)...${NC}"
     local task_sp_file="$PROMPTS_DIR/autofix_task.txt"
     # Dosya yoksa varsayılan oluştur, varsa kullanıcı kurallarını koru
     if [[ ! -f "$task_sp_file" ]]; then
@@ -819,11 +753,6 @@ Sen bir Kotlin/Android uzmanısın. Sana kullanıcının GÖREVİ ve ilgili KAYN
 
 KRİTİK KURAL — BÜYÜK DOSYALAR: Eğer bir dosyaya 30+ satır kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" kullan. full_content = dosyanın TAM yeni içeriği.
 Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity : ComponentActivity() {...}"}
-
-AGENTIC KURAL — DOSYA OKUMA: Eğer bir hatayı düzeltmek için dosyanın belirli satırlarını görmek istersen, önce "commands" listesi döndür. Sistem komutu çalıştırır ve sonucu sana geri gönderir, sonra "changes" yazarsın.
-Örnek: {"commands": ["sed -n '160,180p' app/src/main/java/com/wizaicorp/proje/MainActivity.kt"]}
-Desteklenen komutlar: cat, sed -n, grep, find, ls, wc, stat, head, tail, file
-Komutları PROJECT_ROOT'a göreceli yaz.
 
 ÇIKTI FORMATI - SADECE JSON, BAŞKA HİÇBİR ŞEY YAZMA:
 {
@@ -863,30 +792,15 @@ ANDROID KURALLARI:
 PROMPT
     fi
     local patch_sp=$(cat "$task_sp_file")
-    local patch_um="GÖREV: $user_task\n\n$(cat "$collected")"
+    local patch_um="GÖREV: $user_task\n\nKAYNAK DOSYALAR:\n$(cat "$collected")"
 
-    # Adım 2: İlk tur ZORUNLU commands, sonra changes
-    local tour=0
-    while [[ $tour -lt 3 ]]; do
-        tour=$((tour+1))
-        if ! _call_active_ai "$patch_sp" "$patch_um"; then
-            err "Kod üretilemedi."; return 1
-        fi
+    if ! _call_active_ai "$patch_sp" "$patch_um"; then
+         err "Kod üretilemedi."; return 1
+    fi
 
-        # commands var mı?
-        if run_ai_commands; then
-            local cmd_output; cmd_output=$(cat "$TMP_DIR/cmd_output.txt")
-            log "📂 AI $(echo "$cmd_output" | wc -c) karakter dosya içeriği aldı (tur $tour)"
-            patch_um="GÖREV: $user_task\n\nOKUNAN DOSYALAR:\n${cmd_output}\n\nŞimdi sadece değişiklik yapılacak yerleri \"changes\" ile yaz. Dosyaları tekrar okuma."
-            continue
-        fi
-
-        # commands yok → changes var
-        if apply_fixes; then
-            break
-        fi
-        err "Görev koda uygulanamadı."; return 1
-    done
+    if ! apply_fixes; then
+         err "Görev koda uygulanamadı."; return 1
+    fi
 
     echo -e "\n${BOLD}${BLUE}🚀 Görev koda entegre edildi, otomatik derleme (Build & Fix) devralınıyor...${NC}"
     run_autofix
@@ -923,10 +837,6 @@ main() {
 }
 
 main "$@"
-
-
-
-
 
 
 
