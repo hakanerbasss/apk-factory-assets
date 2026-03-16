@@ -500,6 +500,13 @@ async def handle(ws):
                 elif t == "new_project":
                     n    = d.get("name","")
                     task = d.get("task","Merhaba Dünya yazan basit bir Android uygulaması")
+                    # Oyun uyarısı
+                    GAME_KEYWORDS = ["oyun", "game", "flappy", "angry bird", "snake", "tetris",
+                                     "mario", "clash", "chess", "satranç", "pacman", "platformer",
+                                     "rpg", "fps", "shooter", "physics", "fizik motoru"]
+                    task_lower = task.lower()
+                    if any(kw in task_lower for kw in GAME_KEYWORDS):
+                        await ws.send(json.dumps({"type":"warning","text":"⚠️ Oyun geliştirme bu versiyon için optimize edilmemiş. Sonuç mükemmel olmayabilir. Devam edilecek..."}))
                     JAVA_KEYWORDS = {"do","if","in","is","as","by","fun","val","var","for","bin","lib","usr","tmp","etc",
                                      "try","int","out","new","get","set","run","when","else",
                                      "null","true","false","this","class","while","break",
