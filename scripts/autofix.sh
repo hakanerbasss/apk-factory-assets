@@ -385,21 +385,28 @@ call_ai() {
     [[ ! -f "$pf" ]] && create_default_prompt
     system_prompt=$(cat "$pf")
 
-    # TUR 1: Keşif — AI komut isteyebilir
-    local user_msg="BUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`\n\nMEVCUT KAYNAK DOSYALAR:\n${source_text}\n\nNot: Daha fazla dosya/satır görmek istersen \"commands\" listesi döndür. Örnek: {\"commands\":[\"sed -n \'160,180p\' app/src/main/java/com/.../MainActivity.kt\"]}\nHata düzeltmeye hazırsan direkt \"changes\" döndür."
+    local user_msg="BUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`\n\nKAYNAK DOSYALAR:\n${source_text}"
 
     log "$NAME'e gönderiliyor... (${#source_text} karakter)"
     echo -e "${YELLOW}  ⏳ API yanıtı bekleniyor (Max 600sn)...${NC}"
-    _call_active_ai "$system_prompt" "$user_msg"
 
-    # AI komut istediyse çalıştır ve TUR 2 yap
-    if run_ai_commands; then
-        local cmd_output; cmd_output=$(cat "$TMP_DIR/cmd_output.txt")
-        log "🔍 Keşif tamamlandı, AI düzeltme yazıyor..."
-        echo -e "${YELLOW}  ⏳ API yanıtı bekleniyor (Max 600sn)...${NC}"
-        local user_msg2="BUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`\n\nKEŞİF SONUÇLARI:\n${cmd_output}\n\nŞimdi \"changes\" formatında düzeltmeyi yaz."
-        _call_active_ai "$system_prompt" "$user_msg2"
-    fi
+    # Agentic loop — max 3 tur, AI komut isteyebilir
+    local tour=0
+    while [[ $tour -lt 3 ]]; do
+        tour=$((tour+1))
+        _call_active_ai "$system_prompt" "$user_msg"
+
+        # AI commands istedi mi?
+        if run_ai_commands; then
+            local cmd_output; cmd_output=$(cat "$TMP_DIR/cmd_output.txt")
+            log "🔍 Keşif tur $tour tamamlandı ($(echo "$cmd_output" | wc -c) karakter)"
+            echo -e "${YELLOW}  ⏳ API yanıtı bekleniyor (Max 600sn)...${NC}"
+            user_msg="BUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`\n\nKAYNAK DOSYALAR:\n${source_text}\n\nKEŞİF SONUÇLARI (istediğin satırlar):\n${cmd_output}\n\nŞimdi \"changes\" formatında düzeltmeyi yaz."
+            continue
+        fi
+        # commands yok → changes var, döngüden çık
+        break
+    done
 }
 
 _call_openai() {
@@ -906,6 +913,7 @@ main() {
 }
 
 main "$@"
+
 
 
 
