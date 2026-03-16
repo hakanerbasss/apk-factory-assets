@@ -370,7 +370,16 @@ async def handle(ws):
                             except: pass
 
                 elif t == "list_projects":
-                    await ws.send(json.dumps({"type":"projects","data":read_projeler()}))
+                    logos_dir = f"{SISTEM_DIR}/logos"
+                    os.makedirs(logos_dir, exist_ok=True)
+                    prs = read_projeler()
+                    for pr in prs:
+                        src = os.path.expanduser(f"~/{pr['name']}/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png")
+                        dst = f"{logos_dir}/{pr['name']}.png"
+                        if os.path.exists(src):
+                            import shutil
+                            shutil.copy2(src, dst)
+                    await ws.send(json.dumps({"type":"projects","data":prs}))
 
                 elif t == "delete_project":
                     pname = d.get("project","")
@@ -389,45 +398,76 @@ async def handle(ws):
                     except Exception as e:
                         await ws.send(json.dumps({"type":"task_done","success":False,"text":f"❌ Silinemedi: {e}"}))
 
-                elif t == "rename_project":
+                elif t == "clone_project":
                     old_name = d.get("old_name","")
                     new_name = d.get("new_name","").strip()
                     if not new_name:
                         await ws.send(json.dumps({"type":"error","text":"Yeni isim boş olamaz"})); continue
                     old_dir = get_proj_dir(old_name)
                     new_dir = os.path.join(HOME, new_name)
+                    
                     try:
-                        # projeler.conf güncelle
-                        conf = f"{SISTEM_DIR}/projeler.conf"
-                        if os.path.exists(conf):
-                            lines = open(conf).readlines()
-                            new_lines = []
-                            for l in lines:
-                                if l.startswith(old_name + "|"):
-                                    parts = l.strip().split("|")
-                                    parts[0] = new_name
-                                    parts[1] = f"~/{new_name}"
-                                    new_lines.append("|".join(parts) + "\n")
-                                else:
-                                    new_lines.append(l)
-                            open(conf,'w').writelines(new_lines)
-                        # strings.xml güncelle
-                        strings_xml = os.path.join(old_dir, "app/src/main/res/values/strings.xml")
-                        if os.path.exists(strings_xml):
-                            content = open(strings_xml).read()
-                            content = content.replace(f">{old_name}<", f">{new_name}<")
-                            open(strings_xml,'w').write(content)
-                        # Build cache temizle
-                        build_dir = os.path.join(old_dir, "app/build")
-                        if os.path.exists(build_dir):
-                            import shutil as _su
-                            _su.rmtree(build_dir)
-                        # Klasörü yeniden adlandır
-                        if os.path.exists(old_dir):
-                            os.rename(old_dir, new_dir)
-                        await ws.send(json.dumps({"type":"task_done","success":True,"text":f"✅ {old_name} → {new_name} (build cache temizlendi)"}))
+                        if not os.path.exists(old_dir):
+                            await ws.send(json.dumps({"type":"error","text":f"Kaynak proje bulunamadı: {old_name}"}))
+                            continue
+                        if os.path.exists(new_dir):
+                            await ws.send(json.dumps({"type":"error","text":f"Bu isimde bir proje zaten var: {new_name}"}))
+                            continue
+
+                        await ws.send(json.dumps({"type":"status","text":f"⏳ {new_name} klonlanıyor..."}))
+
+                        # 1. KLASÖRÜ KOPYALA
+                        import shutil
+                        shutil.copytree(old_dir, new_dir)
+
+                        # 2. SETTINGS.GRADLE İSMİNİ GÜNCELLE
+                        settings_path = os.path.join(new_dir, "settings.gradle")
+                        if os.path.exists(settings_path):
+                            with open(settings_path, "r", encoding="utf-8") as f:
+                                settings_content = f.read()
+                            settings_content = settings_content.replace(f'rootProject.name = "{old_name}"', f'rootProject.name = "{new_name}"')
+                            with open(settings_path, "w", encoding="utf-8") as f:
+                                f.write(settings_content)
+
+                        # 3. YENİ KEYSTORE ÜRET
+                        conf_path = f"{SISTEM_DIR}/projeler.conf"
+                        keystore_dir = f"{SISTEM_DIR}/keystores"
+                        import string
+                        import random
+                        
+                        ks_pass = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
+                        ks_alias = new_name.replace('-', '')[:12]
+                        if not ks_alias.isalpha():
+                            ks_alias = "app" + ks_alias
+                        ks_file = f"{new_name}-release.keystore"
+                        ks_full_path = os.path.join(keystore_dir, ks_file)
+
+                        old_pkg = ""
+                        if os.path.exists(conf_path):
+                            with open(conf_path, "r", encoding="utf-8") as f:
+                                lines = f.readlines()
+                            for line in lines:
+                                parts = line.strip().split('|')
+                                if parts[0] == old_name and len(parts) >= 6:
+                                    old_pkg = parts[5].strip()
+                                    break
+                        
+                        new_pkg = old_pkg if old_pkg else f"com.wizaicorp.{new_name.replace('-', '_')}"
+
+                        dname = f"CN={new_name}, OU=AI, O=AI, L=IST, S=IST, C=TR"
+                        os.system(f'keytool -genkeypair -keystore "{ks_full_path}" -alias "{ks_alias}" -keyalg RSA -keysize 2048 -validity 10000 -storepass "{ks_pass}" -keypass "{ks_pass}" -dname "{dname}" 2>/dev/null')
+
+                        # 4. PROJELER.CONF'A YENİ SATIR OLARAK EKLE
+                        if os.path.exists(conf_path):
+                            with open(conf_path, "a", encoding="utf-8") as f:
+                                f.write(f"{new_name}|~/{new_name}|{ks_file}|{ks_alias}|{ks_pass}|{new_pkg}\n")
+
+                        # İşlem bitti!
+                        await ws.send(json.dumps({"type":"task_done","success":True,"text":f"✅ {old_name} başarıyla klonlandı!"}))
+
                     except Exception as e:
-                        await ws.send(json.dumps({"type":"error","text":f"❌ Yeniden adlandırılamadı: {e}"}))
+                        await ws.send(json.dumps({"type":"error","text":f"Klonlama Hatası: {str(e)}"}))
+
 
                 elif t == "save_logo":
                     pname   = d.get("project","")
@@ -534,6 +574,14 @@ async def handle(ws):
                     pkg = d.get("pkg","")
                     if pkg: os.environ["PKG_OVERRIDE"] = pkg
                     else: os.environ.pop("PKG_OVERRIDE", None)
+                    # AYARLARDAN ŞİFREYİ ÇEK VE BASH BETİĞİNE GÖNDER
+                    user_settings = read_settings()
+                    ks_pass = user_settings.get("KEYSTORE_PASS", "").strip()
+                    if ks_pass:
+                        os.environ["KEYSTORE_PASS"] = ks_pass
+                    else:
+                        os.environ.pop("KEYSTORE_PASS", None)
+
                     state["_factory_name"] = n
                     state["_factory_task"] = full_task
                     state["_factory_task_default"] = full_task   # "→ " için yedek
@@ -554,28 +602,39 @@ async def handle(ws):
                         bk = [f for f in files if not pf or f.startswith(pf)]
                     await ws.send(json.dumps({"type":"backups","data":bk}))
 
+
                 elif t == "backup":
                     p = d.get("project",""); pd = get_proj_dir(p)
                     ts = datetime.now().strftime("%Y%m%d-%H%M")
                     btype = d.get("backup_type", "normal")
+                    
+                    # 1. UI'dan gelen notu al
+                    note = d.get("note", "yedek")
+                    
+                    # 2. Not "yedek" değilse isme "not(xxxx)-" formatında ekle
+                    note_str = "" if note == "yedek" else f"-not({note})"
+                    
                     os.makedirs(BACKUP_DIR, exist_ok=True)
                     if btype == "quick":
-                        out = f"{BACKUP_DIR}/{p}-{ts}-hizli.tar.gz"
+                        out = f"{BACKUP_DIR}/{p}{note_str}-{ts}-hizli.tar.gz"
                         excludes = "--exclude='*/build' --exclude='*/.gradle' --exclude='*/outputs' --exclude='*.class'"
                         label = "⚡ Hızlı"
                     elif btype == "full":
-                        out = f"{BACKUP_DIR}/{p}-{ts}-tam.tar.gz"
+                        out = f"{BACKUP_DIR}/{p}{note_str}-{ts}-tam.tar.gz"
                         excludes = "--exclude='*/build/intermediates' --exclude='*/build/tmp'"
                         label = "📦 Tam"
                     else:
-                        out = f"{BACKUP_DIR}/{p}-{ts}-yedek.tar.gz"
+                        out = f"{BACKUP_DIR}/{p}{note_str}-{ts}-yedek.tar.gz"
                         excludes = "--exclude='*/build' --exclude='*/.gradle'"
                         label = "💾 Normal"
+
+
+
                     async def bk_done(rc, _o=out, _l=label):
                         await ws.send(json.dumps({"type":"task_done","success":rc==0,
                             "text":f"{_l} yedek: {os.path.basename(_o)}" if rc==0 else "❌ Yedekleme başarısız"}))
                     await start(
-                        f"tar -czf {out} {excludes} -C {os.path.dirname(pd)} {os.path.basename(pd)}",
+                        f"tar -czf '{out}' {excludes} -C '{os.path.dirname(pd)}' '{os.path.basename(pd)}'",
                         HOME, bk_done)
 
                 elif t == "restore_backup":
