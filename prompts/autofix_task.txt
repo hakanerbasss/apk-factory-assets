@@ -29,3 +29,4 @@ ANDROID KURALLARI:
 - Özel tema sınıfı (YourAppTheme vb.) KULLANMA, sadece MaterialTheme kullan.
 - Kotlin'de destructured import YOKTUR. "import X.*{A,B,C}" yazma.
 - setContent bloğu içine fun tanımı yazma. Composable'lar Activity dışında olur.
+- UI KURALI: Her ekran Surface veya Box ile başlamalı, modifier Modifier.fillMaxSize() olmalı. Boş beyaz ekran olmaması için arka plan rengi mutlaka set edilmeli. Scaffold kullanıyorsan topBar veya content parametresi boş bırakma.
