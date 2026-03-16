@@ -860,7 +860,7 @@ PROMPT
     local patch_sp=$(cat "$task_sp_file")
     local patch_um="GÖREV: $user_task\n\n$(cat "$collected")"
 
-    # Adım 2: AI commands isteyebilir — max 3 tur
+    # Adım 2: İlk tur ZORUNLU commands, sonra changes
     local tour=0
     while [[ $tour -lt 3 ]]; do
         tour=$((tour+1))
@@ -871,18 +871,16 @@ PROMPT
         # commands var mı?
         if run_ai_commands; then
             local cmd_output; cmd_output=$(cat "$TMP_DIR/cmd_output.txt")
-            local cmd_chars=${#cmd_output}
-            log "📂 AI $cmd_chars karakter dosya içeriği aldı (tur $tour)"
-            # Komut çıktısını bir sonraki mesaja ekle
-            patch_um="GÖREV: $user_task\n\n$(cat "$collected")\n\nDOSYA İÇERİKLERİ (istediğin dosyalar):\n${cmd_output}\n\nŞimdi changes yaz."
+            log "📂 AI $(echo "$cmd_output" | wc -c) karakter dosya içeriği aldı (tur $tour)"
+            patch_um="GÖREV: $user_task\n\nOKUNAN DOSYALAR:\n${cmd_output}\n\nŞimdi sadece değişiklik yapılacak yerleri \"changes\" ile yaz. Dosyaları tekrar okuma."
             continue
         fi
 
-        # commands yok → patch var, uygula
-        if ! apply_fixes; then
-            err "Görev koda uygulanamadı."; return 1
+        # commands yok → changes var
+        if apply_fixes; then
+            break
         fi
-        break
+        err "Görev koda uygulanamadı."; return 1
     done
 
     echo -e "\n${BOLD}${BLUE}🚀 Görev koda entegre edildi, otomatik derleme (Build & Fix) devralınıyor...${NC}"
