@@ -485,8 +485,12 @@ def backup_file(full, path):
 for c in changes:
     path = c.get('path', '').strip()
     if not path: continue
+    # kotlin/ yazılmış olabilir, java/ ile dene
     full = path if path.startswith('/') else os.path.join(project_root, path)
-    if not os.path.exists(full): continue
+    if not os.path.exists(full):
+        full2 = full.replace('/kotlin/', '/java/')
+        if os.path.exists(full2): full = full2
+        else: continue
 
     # full_content: dosyanın tamamını yaz (büyük kod için JSON escape sorunu yok)
     full_content = c.get('full_content', '')
