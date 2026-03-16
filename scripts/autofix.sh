@@ -796,6 +796,13 @@ run_task() {
     done < "$tree_file"
     echo "" >> "$collected"
     echo "Not: Dosya içeriklerini görmek için 'commands' ile iste." >> "$collected"
+    # MainActivity.kt her zaman ekle — AI boş şablonu görsün
+    local main_kt; main_kt=$(find "$PROJECT_ROOT/app/src/main/java" -name "MainActivity.kt" 2>/dev/null | head -1)
+    if [[ -n "$main_kt" ]]; then
+        echo "" >> "$collected"
+        echo "=== MEVCUT KOD: ${main_kt#$PROJECT_ROOT/} ===" >> "$collected"
+        cat "$main_kt" >> "$collected"
+    fi
 
     ok "Dosya ağacı hazır: $(wc -l < "$tree_file") dosya"
     echo -e "${YELLOW}⚙️ Yapay Zeka analiz ediyor...${NC}"
