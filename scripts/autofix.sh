@@ -542,7 +542,8 @@ auto_cont = data.get('auto_continue', False)
 if auto_cont:
     cont_prompt = data.get('continue_prompt', 'Görevin kalanına devam et.')
     try:
-        proj_name = os.environ.get('P_NAME', os.path.basename(os.environ.get('PROJECT_ROOT','unknown')))
+        pkg_name = os.environ.get('P_PKG', '')
+        proj_name = pkg_name if pkg_name else os.environ.get('P_NAME', os.path.basename(os.environ.get('PROJECT_ROOT','unknown')))
         with open(os.path.join(os.environ['SISTEM_DIR'], f'next_task_{proj_name}.txt'), 'w', encoding='utf-8') as f:
             f.write(cont_prompt)
         print("AUTO_CONTINUE_FLAG:TRUE")

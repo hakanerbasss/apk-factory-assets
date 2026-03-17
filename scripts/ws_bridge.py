@@ -535,13 +535,23 @@ async def handle(ws):
                     task = d.get("task","").replace("'","'\\''")
                     pd   = get_proj_dir(p)
                     await ws.send(json.dumps({"type":"status","text":f"✨ prj e: {p}"}))
-                    async def tk_done(rc, _p=p, _pd=pd):
+                    # Paket adini bul (proje adi yerine, degismez)
+                    pkg = ""
+                    for pr in read_projeler():
+                        if pr["name"] == p:
+                            pkg = pr.get("package", p)
+                            break
+                    async def tk_done(rc, _p=p, _pd=pd, _pkg=pkg):
                         apk = copy_apk(_pd, _p) if rc == 0 else None
                         await ws.send(json.dumps({"type":"task_done","success":rc==0,
                             "text":"✅ Görev tamamlandı!" if rc==0 else "❌ Görev başarısız",
-                            "apk_path":apk or ""}))
-                        # next_task.txt varsa zinciri devam ettir
-                        next_task_file = f"{SISTEM_DIR}/next_task.txt"
+                            "apk_path":apk or "", "project":_p, "package":_pkg}))
+                        # Paket bazli next_task kontrolu
+                        next_task_file = f"{SISTEM_DIR}/next_task_{_pkg}.txt"
+                        if not os.path.exists(next_task_file):
+                            next_task_file = f"{SISTEM_DIR}/next_task_{_p}.txt"
+                        if not os.path.exists(next_task_file):
+                            next_task_file = f"{SISTEM_DIR}/next_task.txt"
                         if rc == 0 and os.path.exists(next_task_file):
                             try:
                                 next_task = open(next_task_file).read().strip()

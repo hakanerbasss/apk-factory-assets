@@ -440,6 +440,7 @@ if [ -n "$1" ]; then
             if [[ ! -f "$AUTOFIX_SCRIPT" ]]; then
                 echo "autofix.sh bulunamadı. Önce: bash /sdcard/Download/autofix.sh install"
             else
+                export P_PKG="$P_PKG"; export P_NAME="$P_NAME"
                 bash "$AUTOFIX_SCRIPT" run "$P_DIR"
             fi
             ;;
@@ -448,6 +449,7 @@ if [ -n "$1" ]; then
             if [[ -z "$2" ]]; then
                 echo -e "${R}❌ Görev belirtmedin! Örnek: prj e \"görev metni\"${NC}"
             else
+                export P_PKG="$P_PKG"; export P_NAME="$P_NAME"
                 bash "$AUTOFIX_SCRIPT" task "$2" "$P_DIR"
             fi
             ;;
@@ -482,6 +484,7 @@ while true; do
             if [[ ! -f "$AUTOFIX_SCRIPT" ]]; then
                 echo "autofix.sh bulunamadı. Önce: bash /sdcard/Download/autofix.sh install"
             else
+                export P_PKG="$P_PKG"; export P_NAME="$P_NAME"
                 bash "$AUTOFIX_SCRIPT" run "$P_DIR"
             fi
             ;;
