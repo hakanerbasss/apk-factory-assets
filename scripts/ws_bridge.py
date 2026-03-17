@@ -29,7 +29,6 @@ AUTO_ENTER = [
 FACTORY_PROMPTS = [
     ("Proje Adı",           "_factory_name"),   # "Proje Adı (örn: ..."
     ("Yapay Zekaya Görevi", "_factory_task"),   # "Yapay Zekaya Görevi Ver..."
-    ("→ ",                  "_factory_task"),   # satır sonu → prompt
 ]
 
 # ── Settings ──────────────────────────────────────────────────────────────────
