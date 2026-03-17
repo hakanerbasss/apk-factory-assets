@@ -542,7 +542,8 @@ auto_cont = data.get('auto_continue', False)
 if auto_cont:
     cont_prompt = data.get('continue_prompt', 'Görevin kalanına devam et.')
     try:
-        with open(os.path.join(os.environ['SISTEM_DIR'], 'next_task.txt'), 'w', encoding='utf-8') as f:
+        proj_name = os.environ.get('P_NAME', os.path.basename(os.environ.get('PROJECT_ROOT','unknown')))
+        with open(os.path.join(os.environ['SISTEM_DIR'], f'next_task_{proj_name}.txt'), 'w', encoding='utf-8') as f:
             f.write(cont_prompt)
         print("AUTO_CONTINUE_FLAG:TRUE")
     except: pass
@@ -738,7 +739,7 @@ run_autofix() {
             [[ -n "$apk" ]] && mkdir -p "/sdcard/Download/apk-cikti" && rm -f "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}"*.apk "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}"*.aab 2>/dev/null && cp "$apk" "/sdcard/Download/apk-cikti/$(basename "$apk")" 2>/dev/null && touch "/sdcard/Download/apk-cikti/$(basename "$apk")" && ok "APK → Download/apk-cikti"
 
             # --- OTONOM ZİNCİRLEME: SADECE BAŞARI DURUMUNDA TETİKLE ---
-            if [[ -f "$SISTEM_DIR/next_task.txt" ]]; then
+            if [[ -f "$SISTEM_DIR/next_task_${P_NAME:-$(basename $PROJECT_ROOT)}.txt" ]]; then
                 ok "📬 Posta kutusunda bekleyen görev var! Otonom devam ediliyor..."
                 clean_agent_backups
                 # Not: Dosyayı SİLMİYORUZ, ws_bridge.py okuyup silecek.

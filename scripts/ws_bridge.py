@@ -519,6 +519,17 @@ async def handle(ws):
                             "apk_path":apk or ""}))
                     await start(f"bash {PRJ_SH} af", pd, af_done)
 
+                elif t == "check_next_task":
+                    p = d.get("project","")
+                    ntf1 = f"{SISTEM_DIR}/next_task_{p}.txt"
+                    ntf2 = f"{SISTEM_DIR}/next_task.txt"
+                    ntf = ntf1 if os.path.exists(ntf1) else ntf2
+                    if os.path.exists(ntf):
+                        nt = open(ntf).read().strip(); os.remove(ntf)
+                        await ws.send(json.dumps({"type":"next_task","task":nt,"project":p}))
+                    else:
+                        await ws.send(json.dumps({"type":"next_task","task":"","project":p}))
+
                 elif t == "task":
                     p    = d.get("project","")
                     task = d.get("task","").replace("'","'\\''")
