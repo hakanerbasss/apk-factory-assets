@@ -56,7 +56,7 @@ SAVED_PASS=$(grep "^KEYSTORE_PASS=" ~/.config/autofix.conf 2>/dev/null | cut -d=
 if [[ -n "$SAVED_PASS" ]]; then
     KS_PASS="$SAVED_PASS"
 else
-    KS_PASS=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 12)
+    KS_PASS=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 12)
 fi
 # ------------------------------------------------
 KS_ALIAS=$(echo "$P_NAME" | tr -d '-' | sed 's/^[0-9]/app&/' | head -c 12)
