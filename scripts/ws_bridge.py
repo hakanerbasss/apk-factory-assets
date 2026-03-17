@@ -530,6 +530,23 @@ async def handle(ws):
                         await ws.send(json.dumps({"type":"task_done","success":rc==0,
                             "text":"✅ Görev tamamlandı!" if rc==0 else "❌ Görev başarısız",
                             "apk_path":apk or ""}))
+                        # next_task.txt varsa zinciri devam ettir
+                        next_task_file = f"{SISTEM_DIR}/next_task.txt"
+                        if rc == 0 and os.path.exists(next_task_file):
+                            try:
+                                next_task = open(next_task_file).read().strip()
+                                os.remove(next_task_file)
+                                if next_task:
+                                    await ws.send(json.dumps({"type":"status","text":f"📬 Zincir devam: {next_task[:50]}..."}))
+                                    escaped = next_task.replace("'", "'\''")
+                                    async def chain_done(rc2, _p=_p, _pd=_pd):
+                                        apk2 = copy_apk(_pd, _p) if rc2 == 0 else None
+                                        await ws.send(json.dumps({"type":"task_done","success":rc2==0,
+                                            "text":"✅ Zincir tamamlandı!" if rc2==0 else "❌ Zincir başarısız",
+                                            "apk_path":apk2 or ""}))
+                                    await start(f"bash {PRJ_SH} e '{escaped}'", _pd, chain_done)
+                            except Exception as ex:
+                                await ws.send(json.dumps({"type":"error","text":f"Zincir hatası: {ex}"}))
                     await start(f"bash {PRJ_SH} e '{task}'", pd, tk_done)
 
                 elif t == "build_debug":
