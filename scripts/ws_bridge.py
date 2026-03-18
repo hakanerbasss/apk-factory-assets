@@ -719,58 +719,9 @@ class App : Application() {{
                                 errors.append("⚠️ Uyumsuz format: MainActivity ComponentActivity veya AppCompatActivity kullanmıyor. Interstitial eklenemedi.")
                             elif "MobileAds" in kt or "loadInterstitialAd" in kt:
                                 result.append("ℹ️ MainActivity: Eski kod var, temizlendi")
-
-
+                                result.append("ℹ️ MainActivity: Eski kod var, temizlendi")
                             else:
-                                # Import ekle
-                                imports = """import com.google.android.gms.ads.MobileAds
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
-import com.google.android.gms.ads.FullScreenContentCallback
-"""
-                                kt = kt.replace("import android.os.Bundle", "import android.os.Bundle\n" + imports)
-
-                                # MobileAds init + interstitial kod
-                                admob_code = f"""
-    private var mInterstitialAd: InterstitialAd? = null
-
-    private fun loadInterstitialAd() {{
-        val adRequest = AdRequest.Builder().build()
-        InterstitialAd.load(this, "{unit_id}", adRequest, object : InterstitialAdLoadCallback() {{
-            override fun onAdLoaded(ad: InterstitialAd) {{ mInterstitialAd = ad }}
-            override fun onAdFailedToLoad(e: com.google.android.gms.ads.LoadAdError) {{ mInterstitialAd = null }}
-        }})
-    }}
-
-    private fun showInterstitialIfReady() {{
-        mInterstitialAd?.let {{ ad ->
-            ad.fullScreenContentCallback = object : FullScreenContentCallback() {{
-                override fun onAdDismissedFullScreenContent() {{ mInterstitialAd = null }}
-            }}
-            ad.show(this)
-        }}
-    }}
-"""
-                                # onCreate'e ekle
-                                if "super.onCreate" in kt:
-                                    kt = kt.replace(
-                                        "super.onCreate(savedInstanceState)",
-                                        "super.onCreate(savedInstanceState)\n        MobileAds.initialize(this) {}\n        loadInterstitialAd()\n        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ showInterstitialIfReady() }, 3000)"
-                                    )
-                                    # Class body sonuna ekle
-                                    # Class son satırını bul - dosyanın son satırı
-                                    lines = kt.splitlines()
-                                    # Son } olan satırı bul (class kapanışı)
-                                    insert_idx = len(lines) - 1
-                                    while insert_idx > 0 and lines[insert_idx].strip() != "}":
-                                        insert_idx -= 1
-                                    lines.insert(insert_idx, admob_code)
-                                    kt = "\n".join(lines)
-                                    with open(main_kt,"w") as _f: _f.write(kt)
-                                    result.append("✅ MainActivity: MobileAds + Interstitial eklendi")
-                                else:
-                                    errors.append("⚠️ MainActivity: super.onCreate bulunamadı - manuel ekleme gerekli")
+                                result.append("✅ MainActivity: AdMobManager kullanılıyor")
                         else:
                             errors.append("❌ MainActivity.kt bulunamadı")
 
@@ -1240,5 +1191,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 
