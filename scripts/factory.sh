@@ -37,7 +37,7 @@ echo -e "${BOLD}${B}╚═══════════════════
 
 # 1. GİRDİLERİ AL
 read -p "$(echo -e "${C}Proje Adı (örn: hesap-makinesi): ${NC}")" P_NAME
-P_NAME=$(echo "$P_NAME" | tr 'A-Z ' 'a-z-' | sed 's/[^a-z0-9-]//g')
+P_NAME=$(python3 -c "import re,sys; s=sys.argv[1].lower().replace(' ','-'); print(re.sub(r'[^a-z0-9-]','',s))" "$P_NAME")
 if [ -z "$P_NAME" ]; then echo -e "${R}Proje adı boş olamaz!${NC}"; exit 1; fi
 
 P_DIR="$HOME/$P_NAME"
@@ -64,7 +64,7 @@ else
     KS_PASS=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 12)
 fi
 # ------------------------------------------------
-KS_ALIAS=$(echo "$P_NAME" | tr -d '-' | sed 's/^[0-9]/app&/' | head -c 12)
+KS_ALIAS=$(python3 -c "import sys; s=sys.argv[1].replace('-',''); s=('app'+s) if s and s[0].isdigit() else s; print(s[:12])" "$P_NAME")
 KS_FILE="${P_NAME}-release.keystore"
 
 echo -e "\n${DIM}⚙️ Altyapı saniyeler içinde kuruluyor...${NC}"
