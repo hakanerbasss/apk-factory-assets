@@ -577,6 +577,7 @@ async def handle(ws):
                             break
                     async def tk_done(rc, _p=p, _pd=pd, _pkg=pkg):
                         apk = copy_apk(_pd, _p) if rc == 0 else None
+                        running["task"] = None
                         await ws.send(json.dumps({"type":"task_done","success":rc==0,
                             "text":"✅ Görev tamamlandı!" if rc==0 else "❌ Görev başarısız",
                             "apk_path":apk or "", "project":_p, "package":_pkg}))
