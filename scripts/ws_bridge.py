@@ -772,7 +772,7 @@ import com.google.android.gms.ads.FullScreenContentCallback
                         all_msgs = result + errors
                         success = len(errors) == 0
                         await ws.send(json.dumps({"type":"task_done","success":success,
-                            "text":"\n".join(all_msgs)}))
+                            "text":"\n".join(all_msgs),"project":p}))
 
                     except Exception as ex:
                         await ws.send(json.dumps({"type":"error","text":f"AdMob hata: {ex}"}))
