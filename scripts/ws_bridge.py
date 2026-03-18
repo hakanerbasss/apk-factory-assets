@@ -384,11 +384,24 @@ async def handle(ws):
                     pname = d.get("project","")
                     proj_dir = get_proj_dir(pname)
                     import shutil as _shutil
-                    # Conf'dan sil
+                    # Conf'dan sil ve keystore bul
                     conf = f"{SISTEM_DIR}/projeler.conf"
+                    ks_file = ""
                     if os.path.exists(conf):
-                        lines = [l for l in open(conf) if not l.startswith(pname + "|")]
+                        lines_all = open(conf).readlines()
+                        for l in lines_all:
+                            if l.startswith(pname + "|"):
+                                parts = l.strip().split("|")
+                                if len(parts) > 2: ks_file = parts[2]
+                        lines = [l for l in lines_all if not l.startswith(pname + "|")]
                         open(conf,'w').writelines(lines)
+                    # Keystore sil
+                    if ks_file:
+                        for ks_dir in [KEYSTORE_DIR, "/sdcard/Download"]:
+                            ks_path = os.path.join(ks_dir, ks_file)
+                            if os.path.exists(ks_path):
+                                try: os.remove(ks_path)
+                                except: pass
                     # Klasörü sil
                     try:
                         if os.path.exists(proj_dir):
