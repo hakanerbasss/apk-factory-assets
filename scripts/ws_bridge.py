@@ -464,7 +464,36 @@ async def handle(ws):
                                     old_pkg = parts[5].strip()
                                     break
                         
-                        new_pkg = old_pkg if old_pkg else f"com.wizaicorp.{new_name.replace('-', '_')}"
+                        # Yeni paket adı her zaman yeni isimden üretilir
+                        new_pkg = f"com.wizaicorp.{new_name.replace('-', '_')}"
+
+                        # Paket klasörünü yeniden düzenle
+                        old_pkg_path = old_pkg.replace(".", "/") if old_pkg else ""
+                        new_pkg_path = new_pkg.replace(".", "/")
+                        old_java = os.path.join(new_dir, "app/src/main/java", old_pkg_path)
+                        new_java = os.path.join(new_dir, "app/src/main/java", new_pkg_path)
+                        if old_pkg_path and old_pkg_path != new_pkg_path and os.path.exists(old_java):
+                            os.makedirs(os.path.dirname(new_java), exist_ok=True)
+                            import shutil as _sh
+                            _sh.copytree(old_java, new_java)
+                            _sh.rmtree(old_java)
+                            # KT dosyalarında paket adını güncelle
+                            import glob as _gl
+                            for kt in _gl.glob(os.path.join(new_java, "**/*.kt"), recursive=True):
+                                txt = open(kt).read()
+                                txt = txt.replace(f"package {old_pkg}", f"package {new_pkg}")
+                                txt = txt.replace(f"import {old_pkg}.", f"import {new_pkg}.")
+                                open(kt, 'w').write(txt)
+                            # build.gradle namespace güncelle
+                            bg = os.path.join(new_dir, "app/build.gradle")
+                            if os.path.exists(bg):
+                                txt = open(bg).read().replace(old_pkg, new_pkg)
+                                open(bg, 'w').write(txt)
+                            # Manifest güncelle
+                            mf = os.path.join(new_dir, "app/src/main/AndroidManifest.xml")
+                            if os.path.exists(mf):
+                                txt = open(mf).read().replace(old_pkg, new_pkg)
+                                open(mf, 'w').write(txt)
 
                         dname = f"CN={new_name}, OU=AI, O=AI, L=IST, S=IST, C=TR"
                         os.system(f'keytool -genkeypair -keystore "{ks_full_path}" -alias "{ks_alias}" -keyalg RSA -keysize 2048 -validity 10000 -storepass "{ks_pass}" -keypass "{ks_pass}" -dname "{dname}" 2>/dev/null')
