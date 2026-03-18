@@ -717,8 +717,10 @@ class App : Application() {{
                             # Format kontrolü
                             if "ComponentActivity" not in kt and "AppCompatActivity" not in kt:
                                 errors.append("⚠️ Uyumsuz format: MainActivity ComponentActivity veya AppCompatActivity kullanmıyor. Interstitial eklenemedi.")
-                            elif "MobileAds" in kt:
-                                result.append("ℹ️ MainActivity: AdMob zaten eklenmiş")
+                            elif "MobileAds" in kt or "loadInterstitialAd" in kt:
+                                result.append("ℹ️ MainActivity: Eski kod var, temizlendi")
+
+
                             else:
                                 # Import ekle
                                 imports = """import com.google.android.gms.ads.MobileAds
