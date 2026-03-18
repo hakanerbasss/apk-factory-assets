@@ -37,7 +37,7 @@ echo -e "${BOLD}${B}╚═══════════════════
 
 # 1. GİRDİLERİ AL
 read -p "$(echo -e "${C}Proje Adı (örn: hesap-makinesi): ${NC}")" P_NAME
-P_NAME=$(echo "$P_NAME" | tr 'A-Z ' 'a-z-' | tr -cd 'a-z0-9-')
+P_NAME=$(echo "$P_NAME" | tr 'A-Z ' 'a-z-' | sed 's/[^a-z0-9-]//g')
 if [ -z "$P_NAME" ]; then echo -e "${R}Proje adı boş olamaz!${NC}"; exit 1; fi
 
 P_DIR="$HOME/$P_NAME"
