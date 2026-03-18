@@ -532,6 +532,26 @@ async def handle(ws):
                             "apk_path":apk or ""}))
                     await start(f"bash {PRJ_SH} af", pd, af_done)
 
+                elif t == "check_chain_task":
+                    p = d.get("project","")
+                    pkg = ""
+                    for pr in read_projeler():
+                        if pr["name"] == p:
+                            pkg = pr.get("package", p)
+                            break
+                    chain_file = f"{SISTEM_DIR}/chain_task.txt"
+                    if os.path.exists(chain_file):
+                        task_content = open(chain_file).read().strip()
+                        await ws.send(json.dumps({"type":"chain_task","task":task_content,"project":p}))
+                    else:
+                        await ws.send(json.dumps({"type":"chain_task","task":"","project":p}))
+
+                elif t == "delete_chain_task":
+                    chain_file = f"{SISTEM_DIR}/chain_task.txt"
+                    if os.path.exists(chain_file):
+                        os.remove(chain_file)
+                    await ws.send(json.dumps({"type":"task_done","success":True,"text":"🗑 Bekleyen görev silindi"}))
+
                 elif t == "check_next_task":
                     p = d.get("project","")
                     ntf1 = f"{SISTEM_DIR}/next_task_{p}.txt"
