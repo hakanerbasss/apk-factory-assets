@@ -41,6 +41,11 @@ P_NAME=$(echo "$P_NAME" | tr 'A-Z ' 'a-z-' | sed 's/[^a-z0-9-]//g')
 if [ -z "$P_NAME" ]; then echo -e "${R}Proje adı boş olamaz!${NC}"; exit 1; fi
 
 P_DIR="$HOME/$P_NAME"
+if [[ -d "$P_DIR" ]]; then
+    echo -e "${R}❌ '$P_NAME' klasörü zaten var! Farklı isim deneyin.${NC}"
+    sed -i "/^${P_NAME}|/d" "$CONF_FILE" 2>/dev/null
+    exit 1
+fi
 if [ -d "$P_DIR" ]; then echo -e "${R}Bu isimde bir klasör zaten var!${NC}"; exit 1; fi
 
 echo ""
