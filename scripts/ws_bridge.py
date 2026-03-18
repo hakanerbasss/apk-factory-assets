@@ -556,7 +556,8 @@ async def handle(ws):
                     p = d.get("project","")
                     ntf1 = f"{SISTEM_DIR}/next_task_{p}.txt"
                     ntf2 = f"{SISTEM_DIR}/next_task.txt"
-                    ntf = ntf1 if os.path.exists(ntf1) else ntf2
+                    ntf3 = f"{SISTEM_DIR}/chain_task.txt"
+                    ntf = ntf1 if os.path.exists(ntf1) else (ntf2 if os.path.exists(ntf2) else ntf3)
                     if os.path.exists(ntf):
                         nt = open(ntf).read().strip(); os.remove(ntf)
                         await ws.send(json.dumps({"type":"next_task","task":nt,"project":p}))
