@@ -578,7 +578,9 @@ async def handle(ws):
                                             "text":"✅ Zincir tamamlandı!" if rc2==0 else "❌ Zincir başarısız",
                                             "apk_path":apk2 or ""}))
                                     running["task"] = None
-                                    await start(f"bash {PRJ_SH} e '{escaped}'", _pd, chain_done)
+                                    task_file = f"{SISTEM_DIR}/chain_task.txt"
+                                    open(task_file, 'w').write(next_task)
+                                    await start(f"bash {PRJ_SH} ef '{task_file}'", _pd, chain_done)
                             except Exception as ex:
                                 await ws.send(json.dumps({"type":"error","text":f"Zincir hatası: {ex}"}))
                     await start(f"bash {PRJ_SH} e '{task}'", pd, tk_done)

@@ -453,6 +453,14 @@ if [ -n "$1" ]; then
                 bash "$AUTOFIX_SCRIPT" task "$2" "$P_DIR"
             fi
             ;;
+        ef)
+            AUTOFIX_SCRIPT="/storage/emulated/0/termux-otonom-sistem/autofix.sh"
+            if [[ -f "$2" ]]; then
+                TASK_FROM_FILE=$(cat "$2")
+                export P_PKG="$P_PKG"; export P_NAME="$P_NAME"
+                bash "$AUTOFIX_SCRIPT" task "$TASK_FROM_FILE" "$P_DIR"
+            fi
+            ;;
         dd)  cmd_build_errors ;;
         b)   cmd_bundle ;;
         c)   cmd_code ;;
