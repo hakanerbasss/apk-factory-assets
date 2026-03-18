@@ -578,6 +578,108 @@ async def handle(ws):
                         kt_files = _glob.glob(os.path.join(proj_dir, "app/src/main/java/**/*.kt"), recursive=True)
                         main_kt = next((f for f in kt_files if "MainActivity" in f), None)
 
+                        # AdMobManager.kt oluştur
+                        admob_manager_kt = os.path.join(proj_dir, "app/src/main/java") 
+                        # Paket klasörünü bul
+                        kt_files2 = _glob.glob(os.path.join(proj_dir, "app/src/main/java/**/*.kt"), recursive=True)
+                        if kt_files2:
+                            pkg_dir = os.path.dirname(kt_files2[0])
+                            admob_kt_path = os.path.join(pkg_dir, "AdMobManager.kt")
+                            # Paketi bul
+                            pkg_line = next((l for l in open(kt_files2[0]).readlines() if l.startswith("package ")), "package com.example.app")
+                            pkg_name = pkg_line.strip().replace("package ","")
+                            
+                            admob_kt_content = f"""package {pkg_name}
+
+import android.app.Activity
+import android.app.Application
+import android.os.Bundle
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+
+class AdMobManager : Application.ActivityLifecycleCallbacks {{
+
+    private var mInterstitialAd: InterstitialAd? = null
+    private var isAdShown = false
+    private var isLoading = false
+
+    fun init(application: Application) {{
+        application.registerActivityLifecycleCallbacks(this)
+        loadAd(application)
+    }}
+
+    private fun loadAd(application: Application) {{
+        if (isLoading) return
+        isLoading = true
+        val adRequest = AdRequest.Builder().build()
+        InterstitialAd.load(application, "{unit_id}", adRequest,
+            object : InterstitialAdLoadCallback() {{
+                override fun onAdLoaded(ad: InterstitialAd) {{
+                    mInterstitialAd = ad; isLoading = false
+                }}
+                override fun onAdFailedToLoad(e: LoadAdError) {{
+                    mInterstitialAd = null; isLoading = false
+                }}
+            }})
+    }}
+
+    override fun onActivityResumed(activity: Activity) {{
+        if (mInterstitialAd != null && !isAdShown) {{
+            mInterstitialAd!!.show(activity)
+            isAdShown = true
+        }}
+    }}
+
+    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {{}}
+    override fun onActivityStarted(activity: Activity) {{}}
+    override fun onActivityPaused(activity: Activity) {{}}
+    override fun onActivityStopped(activity: Activity) {{}}
+    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {{}}
+    override fun onActivityDestroyed(activity: Activity) {{}}
+}}
+"""
+                            open(admob_kt_path, 'w').write(admob_kt_content)
+                            result.append("✅ AdMobManager.kt oluşturuldu")
+
+                            # App.kt oluştur veya güncelle
+                            app_kt_path = os.path.join(pkg_dir, "App.kt")
+                            if os.path.exists(app_kt_path):
+                                app_kt = open(app_kt_path).read()
+                                if "AdMobManager" not in app_kt:
+                                    app_kt = app_kt.replace(
+                                        "super.onCreate()",
+                                        "super.onCreate()\n        AdMobManager().init(this)"
+                                    )
+                                    open(app_kt_path, 'w').write(app_kt)
+                                    result.append("✅ App.kt güncellendi")
+                            else:
+                                app_kt_content = f"""package {pkg_name}
+
+import android.app.Application
+import com.google.android.gms.ads.MobileAds
+
+class App : Application() {{
+    override fun onCreate() {{
+        super.onCreate()
+        MobileAds.initialize(this) {{}}
+        AdMobManager().init(this)
+    }}
+}}
+"""
+                                open(app_kt_path, 'w').write(app_kt_content)
+                                result.append("✅ App.kt oluşturuldu")
+
+                            # Manifest'e android:name=".App" ekle
+                            if os.path.exists(manifest):
+                                m = open(manifest).read()
+                                if 'android:name=' not in m:
+                                    m = m.replace('<application android:allowBackup',
+                                                  '<application android:name=".App" android:allowBackup')
+                                    open(manifest, 'w').write(m)
+                                    result.append("✅ Manifest: App sınıfı eklendi")
+
                         if main_kt:
                             kt = open(main_kt).read()
                             # Format kontrolü
