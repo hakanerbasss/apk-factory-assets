@@ -532,6 +532,114 @@ async def handle(ws):
                             "apk_path":apk or ""}))
                     await start(f"bash {PRJ_SH} af", pd, af_done)
 
+                elif t == "add_admob":
+                    p       = d.get("project","")
+                    app_id  = d.get("app_id","ca-app-pub-3940256099942544~3347511713")
+                    unit_id = d.get("unit_id","ca-app-pub-3940256099942544/1033173712")
+                    proj_dir = get_proj_dir(p)
+                    result = []
+                    errors = []
+
+                    try:
+                        # 1. build.gradle - play-services-ads ekle
+                        gradle = os.path.join(proj_dir, "app/build.gradle")
+                        if os.path.exists(gradle):
+                            g = open(gradle).read()
+                            if "play-services-ads" not in g:
+                                g = g.replace("dependencies {", "dependencies {\n    implementation 'com.google.android.gms:play-services-ads:22.6.0'")
+                                open(gradle,'w').write(g)
+                                result.append("✅ build.gradle: play-services-ads eklendi")
+                            else:
+                                result.append("ℹ️ build.gradle: play-services-ads zaten var")
+                        else:
+                            errors.append("❌ build.gradle bulunamadı")
+
+                        # 2. AndroidManifest.xml - App ID meta-data ekle
+                        manifest = os.path.join(proj_dir, "app/src/main/AndroidManifest.xml")
+                        if os.path.exists(manifest):
+                            m = open(manifest).read()
+                            if "com.google.android.gms.ads.APPLICATION_ID" not in m:
+                                meta = f'\n        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="{app_id}"/>'
+                                m = m.replace("<application", "<uses-permission android:name=\"android.permission.INTERNET\" />\n    <application", 1) if "INTERNET" not in m else m
+                                m = m.replace("</application>", meta + "\n    </application>")
+                                open(manifest,'w').write(m)
+                                result.append("✅ AndroidManifest: App ID eklendi")
+                            else:
+                                # Güncelle
+                                import re as _re
+                                m = _re.sub(r'android:value="ca-app-pub-[^"]*"(\s*/?>)', f'android:value="{app_id}"\1', m)
+                                open(manifest,'w').write(m)
+                                result.append("ℹ️ AndroidManifest: App ID güncellendi")
+                        else:
+                            errors.append("❌ AndroidManifest bulunamadı")
+
+                        # 3. MainActivity.kt - interstitial kodu ekle
+                        import glob as _glob
+                        kt_files = _glob.glob(os.path.join(proj_dir, "app/src/main/java/**/*.kt"), recursive=True)
+                        main_kt = next((f for f in kt_files if "MainActivity" in f), None)
+
+                        if main_kt:
+                            kt = open(main_kt).read()
+                            # Format kontrolü
+                            if "ComponentActivity" not in kt and "AppCompatActivity" not in kt:
+                                errors.append("⚠️ Uyumsuz format: MainActivity ComponentActivity veya AppCompatActivity kullanmıyor. Interstitial eklenemedi.")
+                            elif "MobileAds" in kt:
+                                result.append("ℹ️ MainActivity: AdMob zaten eklenmiş")
+                            else:
+                                # Import ekle
+                                imports = """import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.gms.ads.FullScreenContentCallback
+"""
+                                kt = kt.replace("import android.os.Bundle", "import android.os.Bundle\n" + imports)
+
+                                # MobileAds init + interstitial kod
+                                admob_code = f"""
+    private var mInterstitialAd: InterstitialAd? = null
+
+    private fun loadInterstitialAd() {{
+        val adRequest = AdRequest.Builder().build()
+        InterstitialAd.load(this, "{unit_id}", adRequest, object : InterstitialAdLoadCallback() {{
+            override fun onAdLoaded(ad: InterstitialAd) {{ mInterstitialAd = ad }}
+            override fun onAdFailedToLoad(e: com.google.android.gms.ads.LoadAdError) {{ mInterstitialAd = null }}
+        }})
+    }}
+
+    private fun showInterstitialIfReady() {{
+        mInterstitialAd?.let {{ ad ->
+            ad.fullScreenContentCallback = object : FullScreenContentCallback() {{
+                override fun onAdDismissedFullScreenContent() {{ mInterstitialAd = null }}
+            }}
+            ad.show(this)
+        }}
+    }}
+"""
+                                # onCreate'e ekle
+                                if "super.onCreate" in kt:
+                                    kt = kt.replace(
+                                        "super.onCreate(savedInstanceState)",
+                                        "super.onCreate(savedInstanceState)\n        MobileAds.initialize(this) {}\n        loadInterstitialAd()"
+                                    )
+                                    # Class body sonuna ekle
+                                    last_brace = kt.rfind("}")
+                                    kt = kt[:last_brace] + admob_code + "\n}"
+                                    open(main_kt,'w').write(kt)
+                                    result.append("✅ MainActivity: MobileAds + Interstitial eklendi")
+                                else:
+                                    errors.append("⚠️ MainActivity: super.onCreate bulunamadı - manuel ekleme gerekli")
+                        else:
+                            errors.append("❌ MainActivity.kt bulunamadı")
+
+                        all_msgs = result + errors
+                        success = len(errors) == 0
+                        await ws.send(json.dumps({"type":"task_done","success":success,
+                            "text":"\n".join(all_msgs)}))
+
+                    except Exception as ex:
+                        await ws.send(json.dumps({"type":"error","text":f"AdMob hata: {ex}"}))
+
                 elif t == "check_chain_task":
                     p = d.get("project","")
                     pkg = ""
