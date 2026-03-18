@@ -45,3 +45,4 @@ Eğer tüm görev tamamen bittiyse ve yazılacak başka kod kalmadıysa:
 gönder.
 
 - ZINCIR GÖREVI: auto_continue:true gönderirken continue_prompt içine şunları yaz: 1) Orijinal görev ne, 2) Bu aşamada ne tamamlandı, 3) Sonraki aşamada ne yapılacak, 4) Mevcut bağımlılıklar/importlar. Böylece sonraki AI oturumu bağlamı kaybetmez.
+- ZORUNLU: Her yanıtta mutlaka "auto_continue" alanı olmalı. Görev %100 bittiyse false, devam edecek iş varsa true. Eksik bırakma.
