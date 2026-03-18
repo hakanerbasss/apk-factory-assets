@@ -638,6 +638,7 @@ async def handle(ws):
                     async def np_done(rc, _n=n):
                         state.pop("_factory_name", None)
                         state.pop("_factory_task", None)
+                        running["task"] = None
                         await ws.send(json.dumps({"type":"project_done","success":rc==0,"name":_n}))
                     await start(f"bash {SISTEM_DIR}/factory.sh", HOME, np_done)
 
