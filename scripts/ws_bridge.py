@@ -620,12 +620,14 @@ import com.google.android.gms.ads.FullScreenContentCallback
                                 if "super.onCreate" in kt:
                                     kt = kt.replace(
                                         "super.onCreate(savedInstanceState)",
-                                        "super.onCreate(savedInstanceState)\n        MobileAds.initialize(this) {}\n        loadInterstitialAd()"
+                                        "super.onCreate(savedInstanceState)\n        MobileAds.initialize(this) {}\n        loadInterstitialAd()\n        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ showInterstitialIfReady() }, 3000)"
                                     )
                                     # Class body sonuna ekle
-                                    last_brace = kt.rfind("}")
-                                    kt = kt[:last_brace] + admob_code + "\n}"
-                                    open(main_kt,'w').write(kt)
+                                    # Class'ın son kapanış parantezinden önce ekle
+                                    # MainActivity class'ının sonunu bul
+                                    class_end = kt.rfind("\n}")
+                                    kt = kt[:class_end] + admob_code + "\n}"
+                                    with open(main_kt,"w") as _f: _f.write(kt)
                                     result.append("✅ MainActivity: MobileAds + Interstitial eklendi")
                                 else:
                                     errors.append("⚠️ MainActivity: super.onCreate bulunamadı - manuel ekleme gerekli")
