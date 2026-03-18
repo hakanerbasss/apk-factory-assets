@@ -632,6 +632,7 @@ class AdMobManager : Application.ActivityLifecycleCallbacks {{
 
     private var mInterstitialAd: InterstitialAd? = null
     private var isAdShown = false
+    private var currentActivity: Activity? = null
     private var isLoading = false
 
     fun init(application: Application) {{
@@ -647,6 +648,7 @@ class AdMobManager : Application.ActivityLifecycleCallbacks {{
             object : InterstitialAdLoadCallback() {{
                 override fun onAdLoaded(ad: InterstitialAd) {{
                     mInterstitialAd = ad; isLoading = false
+                    currentActivity?.let {{ act -> if (!isAdShown) {{ ad.show(act); isAdShown = true; mInterstitialAd = null }} }}
                 }}
                 override fun onAdFailedToLoad(e: LoadAdError) {{
                     mInterstitialAd = null; isLoading = false
@@ -655,6 +657,7 @@ class AdMobManager : Application.ActivityLifecycleCallbacks {{
     }}
 
     override fun onActivityResumed(activity: Activity) {{
+        currentActivity = activity
         if (mInterstitialAd != null && !isAdShown) {{
             mInterstitialAd!!.show(activity)
             isAdShown = true
@@ -662,6 +665,7 @@ class AdMobManager : Application.ActivityLifecycleCallbacks {{
     }}
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {{}}
+    override fun onActivityPaused(activity: Activity) {{ currentActivity = null }}
     override fun onActivityStarted(activity: Activity) {{}}
     override fun onActivityPaused(activity: Activity) {{}}
     override fun onActivityStopped(activity: Activity) {{}}
