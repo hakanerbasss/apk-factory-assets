@@ -600,7 +600,7 @@ async def handle(ws):
                                             "text":"✅ Zincir tamamlandı!" if rc2==0 else "❌ Zincir başarısız",
                                             "apk_path":apk2 or ""}))
                                     running["task"] = None
-                                    task_file = f"{SISTEM_DIR}/chain_task.txt"
+                                    task_file = f"{SISTEM_DIR}/_running_chain.txt"
                                     open(task_file, 'w').write(next_task)
                                     await start(f"bash {PRJ_SH} ef '{task_file}'", _pd, chain_done)
                             except Exception as ex:
