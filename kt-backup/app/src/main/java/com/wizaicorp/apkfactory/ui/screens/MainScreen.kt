@@ -1189,7 +1189,26 @@ fun AutoFixTab(
                             try {
                                 val ts = java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.getDefault()).format(java.util.Date())
                                 val file = java.io.File("/sdcard/Download/apkfactory-log-$ts.txt")
-                                file.writeText(logs.joinToString("\n"))
+                                val onYazi = buildString {
+                                    appendLine("═══════════════════════════════════════════")
+                                    appendLine("📱 APK FACTORY — LOG RAPORU")
+                                    appendLine("═══════════════════════════════════════════")
+                                    appendLine("📅 Tarih    : $ts")
+                                    appendLine("📦 Proje    : ${selectedProject?.name ?: "-"}")
+                                    appendLine("🤖 Sistem   : APK Factory v11 (Termux + WebSocket)")
+                                    appendLine("───────────────────────────────────────────")
+                                    appendLine("🛠  ENVIRONMENT:")
+                                    appendLine("  • Bridge   : python ~/apk-factory-ws/ws_bridge.py")
+                                    appendLine("  • Restart  : pkill -f ws_bridge.py && python ~/apk-factory-ws/ws_bridge.py")
+                                    appendLine("  • Build    : cd ~/PROJECT && prj d")
+                                    appendLine("  * Task     : cd ~/PROJECT && prj e TASK")
+                                    appendLine("  • AutoFix  : cd ~/PROJECT && prj af")
+                                    appendLine("───────────────────────────────────────────")
+                                    appendLine("📋 LOG START:")
+                                    appendLine("═══════════════════════════════════════════")
+                                    appendLine()
+                                }
+                                file.writeText(onYazi + logs.joinToString("\n"))
                                 android.widget.Toast.makeText(ctx, "📄 Log kaydedildi: ${file.name}", android.widget.Toast.LENGTH_LONG).show()
                             } catch (e: Exception) {
                                 android.widget.Toast.makeText(ctx, "❌ ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
@@ -2675,12 +2694,23 @@ fun NewProjectDialog(onDismiss: () -> Unit, onCreate: (String, String, String) -
     var name by remember { mutableStateOf("") }
     var task by remember { mutableStateOf("") }
     var pkg  by remember { mutableStateOf("") }
+    val nameValid = name.matches(Regex("^[a-z0-9][a-z0-9-]*$"))
+    val nameError = when {
+        name.isEmpty() -> ""
+        name.any { it.isUpperCase() } -> "Uppercase not allowed — use lowercase"
+        name.any { it == ' ' } -> "Spaces not allowed — use hyphens: my-app"
+        name.any { !it.isLetterOrDigit() && it != '-' } -> "Special characters not allowed"
+        !name[0].isLetterOrDigit() -> "Must start with a letter or digit"
+        else -> ""
+    }
     AlertDialog(onDismissRequest = onDismiss, containerColor = CARD, shape = RoundedCornerShape(16.dp),
-        title = { Text("Yeni Proje", color = WHITE, fontWeight = FontWeight.Bold) },
+        title = { Text("New Project", color = WHITE, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it },
-                    label = { Text("Proje Adı  (örn: hesap-makinesi)", fontSize = 12.sp) }, singleLine = true,
+                OutlinedTextField(value = name, onValueChange = { name = it.lowercase().replace(" ", "-") },
+                    label = { Text("Project Name  (e.g. my-calculator)", fontSize = 12.sp) }, singleLine = true,
+                    isError = nameError.isNotEmpty(),
+                    supportingText = { if (nameError.isNotEmpty()) Text(nameError, color = RED, fontSize = 10.sp) },
                     modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ACCENT, unfocusedBorderColor = BORDER,
                         focusedTextColor = WHITE, unfocusedTextColor = WHITE, cursorColor = ACCENT,
@@ -2703,7 +2733,8 @@ fun NewProjectDialog(onDismiss: () -> Unit, onCreate: (String, String, String) -
             }
         },
         confirmButton = {
-            Button(onClick = { if (name.isNotBlank() && task.isNotBlank()) onCreate(name, task, pkg) },
+            Button(onClick = { if (nameValid && task.isNotBlank()) onCreate(name, task, pkg) },
+                    enabled = nameValid && task.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = ACCENT), shape = RoundedCornerShape(10.dp)) {
                 Text("Oluştur")
             }
