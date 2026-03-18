@@ -432,6 +432,15 @@ async def handle(ws):
                         import shutil
                         shutil.copytree(old_dir, new_dir)
 
+                        # 2a. MANIFEST LABEL GÜNCELLE
+                        manifest_path = os.path.join(new_dir, "app/src/main/AndroidManifest.xml")
+                        if os.path.exists(manifest_path):
+                            with open(manifest_path, "r") as f:
+                                manifest = f.read()
+                            manifest = manifest.replace(f'android:label="{old_name}"', f'android:label="{new_name}"')
+                            with open(manifest_path, "w") as f:
+                                f.write(manifest)
+
                         # 2. SETTINGS.GRADLE İSMİNİ GÜNCELLE
                         settings_path = os.path.join(new_dir, "settings.gradle")
                         if os.path.exists(settings_path):
