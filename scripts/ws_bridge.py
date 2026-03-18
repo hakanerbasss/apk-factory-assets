@@ -623,10 +623,14 @@ import com.google.android.gms.ads.FullScreenContentCallback
                                         "super.onCreate(savedInstanceState)\n        MobileAds.initialize(this) {}\n        loadInterstitialAd()\n        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ showInterstitialIfReady() }, 3000)"
                                     )
                                     # Class body sonuna ekle
-                                    # Class'ın son kapanış parantezinden önce ekle
-                                    # MainActivity class'ının sonunu bul
-                                    class_end = kt.rfind("\n}")
-                                    kt = kt[:class_end] + admob_code + "\n}"
+                                    # Class son satırını bul - dosyanın son satırı
+                                    lines = kt.splitlines()
+                                    # Son } olan satırı bul (class kapanışı)
+                                    insert_idx = len(lines) - 1
+                                    while insert_idx > 0 and lines[insert_idx].strip() != "}":
+                                        insert_idx -= 1
+                                    lines.insert(insert_idx, admob_code)
+                                    kt = "\n".join(lines)
                                     with open(main_kt,"w") as _f: _f.write(kt)
                                     result.append("✅ MainActivity: MobileAds + Interstitial eklendi")
                                 else:
