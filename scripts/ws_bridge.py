@@ -577,6 +577,7 @@ async def handle(ws):
                                         await ws.send(json.dumps({"type":"task_done","success":rc2==0,
                                             "text":"✅ Zincir tamamlandı!" if rc2==0 else "❌ Zincir başarısız",
                                             "apk_path":apk2 or ""}))
+                                    running["task"] = None
                                     await start(f"bash {PRJ_SH} e '{escaped}'", _pd, chain_done)
                             except Exception as ex:
                                 await ws.send(json.dumps({"type":"error","text":f"Zincir hatası: {ex}"}))
