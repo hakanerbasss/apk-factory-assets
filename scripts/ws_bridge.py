@@ -301,8 +301,8 @@ async def handle(ws):
 
     async def start(cmd, cwd, done_cb):
         if running["task"] and not running["task"].done():
-            await ws.send(json.dumps({"type":"error","text":"Zaten bir işlem çalışıyor"}))
-            return
+            running["task"].cancel()
+            await asyncio.sleep(0.3)
         running["task"] = asyncio.create_task(pty_run(cmd, cwd, ws, state, done_cb))
 
     try:
