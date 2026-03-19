@@ -622,237 +622,100 @@ clean_agent_backups() {
 }
 
 apply_fixes() {
-    local clean_file="$TMP_DIR/clean_response.txt"
-    python3 /data/data/com.termux/files/home/clean_json.py "$TMP_DIR/ai_content.txt" 2>/dev/null || true
-    
-    # JSON temizleme ve kurtarma bloğu
-    python3 -c "
-import re
-try:
-    t=open('$TMP_DIR/ai_content.txt').read()
-    t=re.sub(r'^\`+json\s*','',t,flags=re.MULTILINE)
-    t=re.sub(r'^\`+\s*$','',t,flags=re.MULTILINE)
-    open('$clean_file','w').write(t.strip())
-except: pass"
+    local py_script="$TMP_DIR/markdown_parser.py"
 
-    local py_script="$TMP_DIR/patch_apply.py"
+    # Markdown parser'ı oluştur
     cat > "$py_script" << 'PYEOF'
-import json, os, shutil, re
+import re, os, shutil, sys
 
-def try_parse_json(t):
-    try: return json.loads(t)
-    except: pass
-    s = t.find('{'); e = t.rfind('}')+1
-    if s >= 0 and e > s:
-        try: return json.loads(t[s:e])
-        except: pass
-    return None
+def parse_markdown_files(text):
+    results = []
+    pattern = re.compile(
+        r'(?:Dosya|File)\s*:\s*([^\n]+)\n'
+        r'[ \t]*\n?'
+        r'[ \t]*```[^\n]*\n'
+        r'(.*?)'
+        r'(?:^[ \t]*```[ \t]*$|\Z)',
+        re.MULTILINE | re.DOTALL
+    )
+    for m in pattern.finditer(text):
+        path = m.group(1).strip()
+        code = m.group(2).rstrip('\n')
+        results.append((path, code))
+    return results
 
-def flexible_replace(content, orig, repl):
-    # 1. Birebir eşleşme denemesi
-    if orig in content:
-        return content.replace(orig, repl, 1)
-    
-    # 2. Boşlukları ve girintileri yok sayarak esnek arama (Fuzzy Match)
-    orig_lines = [l.strip() for l in orig.strip().splitlines() if l.strip()]
-    if not orig_lines: return None
-    
-    content_lines = content.splitlines()
-    for i in range(len(content_lines) - len(orig_lines) + 1):
-        match = True
-        k = 0
-        for j in range(len(orig_lines)):
-            # İçerikteki boş satırları atla
-            while i+k < len(content_lines) and not content_lines[i+k].strip():
-                k += 1
-            if i+k >= len(content_lines) or content_lines[i+k].strip() != orig_lines[j]:
-                match = False
-                break
-            k += 1
-            
-        if match:
-            # Hedef bloğu bulduk, yeni kodla değiştir
-            repl_lines = repl.splitlines()
-            new_lines = content_lines[:i] + repl_lines + content_lines[i+k:]
-            return '\n'.join(new_lines) + '\n'
-            
-    return None
-
-with open(os.environ['CLEAN_FILE']) as f: t = f.read()
-data = try_parse_json(t)
-if data is None:
-    print("JSON_ERROR"); exit(1)
-
-explanation = data.get('explanation', 'Açıklama belirtilmedi.')
-print(f"EXPLANATION:{explanation}")
-
-
-
-
-
-
-
-
-
-
-
-# --- AKILLI POSTA KUTUSU (ÜZERİNE YAZMA KURALI) ---
-# AI eğer auto_continue:true gönderirse kutuyu günceller. 
-# Göndermezse (hata çözüyorsa) eski mesaja dokunmaz.
-auto_cont = data.get('auto_continue', False)
-if auto_cont:
-    cont_prompt = data.get('continue_prompt', 'Görevin kalanına devam et.')
-    try:
-        pkg_name = os.environ.get('P_PKG', '')
-        proj_name = pkg_name if pkg_name else os.environ.get('P_NAME', os.path.basename(os.environ.get('PROJECT_ROOT','unknown')))
-        with open(os.path.join(os.environ['SISTEM_DIR'], f'next_task_{proj_name}.txt'), 'w', encoding='utf-8') as f:
-            f.write(cont_prompt)
-        print("AUTO_CONTINUE_FLAG:TRUE")
-        # Posta içeriğini log'a yaz
-        short = cont_prompt[:200].replace("\n", " ")
-        print(f"POSTA_ICERIGI:{short}")
-    except: pass
-# ------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-changes = data.get('changes', [])
-count = 0
-bak_dir = os.environ['AGENT_YEDEK_DIR']
-map_file = os.environ['BACKUP_MAP']
-project_root = os.environ['PROJECT_ROOT']
-
-def backup_file(full, path):
-    safe_name = path.replace('/', '_') + '.bak'
-    bak_path = os.path.join(bak_dir, safe_name)
-    if not os.path.exists(bak_path):
-        shutil.copy2(full, bak_path)
-        with open(map_file, 'a') as map_f:
-            map_f.write(f"{bak_path}|{full}\n")
-
-for c in changes:
-    path = c.get('path', '').strip()
-    if not path: continue
-    
-    full = path if path.startswith('/') else os.path.join(project_root, path)
-    if not os.path.exists(full):
-        full2 = full.replace('/kotlin/', '/java/')
-        if os.path.exists(full2): full = full2
+def apply_markdown_fixes(content_file, project_root, backup_map_file):
+    text = open(content_file, encoding='utf-8', errors='replace').read()
+    files = parse_markdown_files(text)
+    if not files:
+        print("PARSE_ERROR: Markdown formatinda dosya bulunamadi")
+        return False
+    backup_map = {}
+    for rel_path, new_content in files:
+        rel_path = rel_path.lstrip('/')
+        abs_path = os.path.join(project_root, rel_path)
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+        if os.path.exists(abs_path):
+            bak = abs_path + '.bak_agent'
+            shutil.copy2(abs_path, bak)
+            backup_map[abs_path] = bak
+            old_lines = len(open(abs_path).readlines())
+            open(abs_path, 'w', encoding='utf-8').write(new_content + '\n')
+            print(f"MODIFIED:{rel_path}|{old_lines}|{len(new_content.splitlines())}")
         else:
-            full_content_new = c.get('full_content', '')
-            if full_content_new:
-                os.makedirs(os.path.dirname(full), exist_ok=True)
-                with open(full, 'w', encoding='utf-8') as f: f.write(full_content_new)
-                print(f"CREATED:{path}|0|{len(full_content_new.splitlines())}")
-                count += 1
-            continue
+            open(abs_path, 'w', encoding='utf-8').write(new_content + '\n')
+            print(f"CREATED:{rel_path}|0|{len(new_content.splitlines())}")
+    if backup_map_file and backup_map:
+        with open(backup_map_file, 'w') as f:
+            for orig, bak in backup_map.items():
+                f.write(f"{orig}|{bak}\n")
+    return True
 
-    full_content = c.get('full_content', '')
-    if full_content:
-        backup_file(full, path)
-        old_lines = len(open(full).readlines())
-        with open(full, 'w', encoding='utf-8') as f: f.write(full_content)
-        print(f"MODIFIED:{path}|{old_lines}|{len(full_content.splitlines())}")
-        count += 1
-        continue
+def parse_auto_continue(text):
+    """Yanitın sonundan auto_continue ve continue_prompt okur"""
+    import re
+    ac = re.search(r'auto_continue\s*:\s*(true|false)', text, re.IGNORECASE)
+    cp = re.search(r'continue_prompt\s*:\s*(.+?)(?=\n(?:auto_continue|Dosya:|File:)|$)', text, re.IGNORECASE | re.DOTALL)
+    auto_cont = ac.group(1).lower() == 'true' if ac else False
+    cont_prompt = cp.group(1).strip() if cp else 'Goreve devam et.'
+    return auto_cont, cont_prompt
 
-    orig = c.get('original', '').replace('\r\n', '\n')
-    repl = c.get('replacement', '').replace('\r\n', '\n')
-    if not orig: continue
+content_file = sys.argv[1]
+project_root = sys.argv[2]
+backup_map_file = sys.argv[3] if len(sys.argv) > 3 else ''
+next_task_file = sys.argv[4] if len(sys.argv) > 4 else ''
 
-    with open(full, 'r', encoding='utf-8') as f: file_content = f.read().replace('\r\n', '\n')
+text = open(content_file, encoding='utf-8', errors='replace').read()
+auto_cont, cont_prompt = parse_auto_continue(text)
 
-    new_content = flexible_replace(file_content, orig, repl)
-    if new_content is None:
-        print(f"MATCH_FAILED:{path}")
-        continue
+ok = apply_markdown_fixes(content_file, project_root, backup_map_file)
 
-    backup_file(full, path)
-    old_lines = len(file_content.splitlines())
-    new_lines = len(new_content.splitlines())
-    
-    with open(full, 'w', encoding='utf-8') as f: f.write(new_content)
-    print(f"MODIFIED:{path}|{old_lines}|{new_lines}")
-    count += 1
+if auto_cont and next_task_file:
+    open(next_task_file, 'w').write(cont_prompt)
+    print("AUTO_CONTINUE_FLAG:TRUE")
+    print(f"POSTA_ICERIGI:{cont_prompt[:200]}")
 
-print(f"COUNT:{count}")
+sys.exit(0 if ok else 1)
 PYEOF
 
-    export CLEAN_FILE="$clean_file"
-    export PROJECT_ROOT="$PROJECT_ROOT"
-    export AGENT_YEDEK_DIR="$AGENT_YEDEK_DIR"
-    export BACKUP_MAP="$BACKUP_MAP"
-    export SISTEM_DIR="$SISTEM_DIR" # Bu satırı ekle    
+    local next_task_file="$SISTEM_DIR/next_task_${P_PKG:-$(basename $PROJECT_ROOT)}.txt"
+    python3 "$py_script" "$TMP_DIR/ai_content.txt" "$PROJECT_ROOT" "$BACKUP_MAP" "$next_task_file"
+    local rc=$?
 
-    local wr; wr=$(python3 "$py_script" 2>/dev/null)
-    
-    if echo "$wr" | grep -q "JSON_ERROR\|JSON_NOT_FOUND"; then
-        err "❌ AI kodu tamamlayamadan yarıda kesti (Token Limiti Doldu) veya JSON'u bozdu."
-        err "💡 ÇÖZÜM: Görevi bölerek verin veya büyük dosyalar yerine küçük yamalar isteyin."
+    if [[ $rc -ne 0 ]]; then
+        err "Markdown parser başarısız — dosya güncellenemedi"
         return 1
     fi
-    
-    local expl; expl=$(echo "$wr" | grep "^EXPLANATION:" | cut -d: -f2-)
-    local count; count=$(echo "$wr" | grep "^COUNT:" | cut -d: -f2)
-    
-    echo -e "\n${BOLD}${CYAN}🤖 YAPAY ZEKA RAPORU${NC}"
-    echo -e "${YELLOW}Açıklama:${NC} $expl"
-    
-    if [[ "${count:-0}" -eq 0 ]]; then
-        err "Kod dosyada bulunamadı (Match Failed). AI eski veya yanlış bir koda referans verdi."
-        return 1
+
+    # Değişiklik sayısını hesapla
+    local count=0
+    if [[ -f "$BACKUP_MAP" ]]; then
+        count=$(wc -l < "$BACKUP_MAP" 2>/dev/null || echo 0)
     fi
-    
-    echo "$wr" | grep "^MODIFIED:" | while IFS='|' read -r prefix path old new; do
-        local p="${path#$PROJECT_ROOT/}"
-        echo -e "  ${GREEN}→${NC} $p (Satır: $old ${YELLOW}→${NC} $new)"
-    done
-    echo "$wr" | grep "^CREATED:" | while IFS='|' read -r prefix path old new; do
-        local p="${path#$PROJECT_ROOT/}"
-        echo -e "  ${GREEN}✨ YENİ:${NC} $p ($new satır)"
-    done
-    
-
-
-
-    # 1. Mevcut satır (ayarı okur)
-    local auto_confirm=$(grep "^AUTO_CONFIRM=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo "0")
-    
-    # 2. GÜNCELLENEN SATIR: Şartı genişletiyoruz
-    # Posta flag açıldıysa içeriği log'a yaz
-    if echo "$wr" | grep -q "AUTO_CONTINUE_FLAG:TRUE"; then
-        local posta_icerik; posta_icerik=$(echo "$wr" | grep "^POSTA_ICERIGI:" | cut -d: -f2-)
-        if [[ -n "$posta_icerik" ]]; then
-            echo -e "\n${CYAN}📬 POSTA KUTUSU GÜNCELLENDI:${NC}"
-            echo -e "${DIM}${posta_icerik}${NC}\n"
-        fi
-    fi
-
-    if [[ "$auto_confirm" != "1" && ! "$wr" == *"AUTO_CONTINUE_FLAG:TRUE"* ]]; then
-        echo
-        read -r -p "$(echo -e "${YELLOW}Değişiklikleri uygula ve derle [Enter=Devam / İ=İptal]: ${NC}")" confirm
-        
-        # 3. İptal mantığı (dokunmuyoruz, olduğu gibi kalıyor)
-        if [[ "$confirm" == "i" || "$confirm" == "İ" ]]; then
-            restore_agent_backups
-            clean_agent_backups
-            err "İşlem iptal edildi, orijinal koda dönüldü."
-            return 1
-        fi
-    fi
-
-    # 4. İşleme devam (fonksiyonun sonu)
     ok "$count dosya güncellendi, build testine geçiliyor..."
+    return 0
 }
+
 
 
 
@@ -883,7 +746,7 @@ PYEOF
     if [[ -f "$BACKUP_MAP" ]]; then
         while IFS='|' read -r bak asil; do
             echo -e "${YELLOW}Dosya:${NC} ${asil#$PROJECT_ROOT/}"
-            python3 "$diff_script" "$bak" "$asil" | head -n 30
+            python3 "$diff_script" "$asil" "$bak" | head -n 30
             echo "----------------------------------------"
         done < "$BACKUP_MAP"
     fi

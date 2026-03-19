@@ -170,8 +170,6 @@ async def pty_run(cmd, cwd, ws, state, on_done):
             try:
                 if text.startswith("USER_ACTION_REQUIRED:"):
                     action = text[len("USER_ACTION_REQUIRED:"):]
-                    await ws.send(json.dumps({"type":"user_action","text":action}))
-                    await ws.send(json.dumps({"type":"log","text":f"⚠️ KULLANICI AKSİYONU:\n{action}"}))
                     await ws.send(json.dumps({"type":"log","text":f"⚠️ KULLANICI AKSİYONU:\n{action}"}))
                 else:
                     await ws.send(json.dumps({"type":"log","text":text}))
