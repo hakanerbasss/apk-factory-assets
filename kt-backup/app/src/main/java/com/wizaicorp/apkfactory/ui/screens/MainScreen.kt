@@ -584,6 +584,10 @@ fun ProjectsTab(
     var targetLogoProject by remember { mutableStateOf<ProjectInfo?>(null) }
     var admobTargetProject by remember { mutableStateOf<ProjectInfo?>(null) }
     var logoStatus by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredProjects = projects
+        .filter { it.name.contains(searchQuery, ignoreCase = true) }
+        .sortedByDescending { it.name }
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -648,9 +652,36 @@ fun ProjectsTab(
                 }
             }
         } else {
+            // Arama + Refresh
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = searchQuery, onValueChange = { searchQuery = it },
+                    placeholder = { Text("Proje ara...", fontSize = 12.sp) },
+                    modifier = Modifier.weight(1f), singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ACCENT, unfocusedBorderColor = BORDER,
+                        focusedTextColor = WHITE, unfocusedTextColor = WHITE,
+                        focusedContainerColor = CARD, unfocusedContainerColor = CARD),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = GREY, modifier = Modifier.size(16.dp)) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty())
+                            IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.Close, null, tint = GREY, modifier = Modifier.size(14.dp))
+                            }
+                    }
+                )
+                IconButton(onClick = { WsManager.listProjects() },
+                    modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Default.Refresh, null, tint = ACCENT, modifier = Modifier.size(20.dp))
+                }
+            }
             LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(projects) { p ->
+                items(filteredProjects) { p ->
                     Card(modifier = Modifier.fillMaxWidth().clickable { onSelect(p) },
                         colors = CardDefaults.cardColors(
                             containerColor = if (p == selectedProject) ACCENT.copy(alpha = 0.08f) else CARD),
