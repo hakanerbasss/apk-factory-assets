@@ -433,12 +433,14 @@ Bu verileri analiz et:
     local advice=""
     # Payload dosyaya yaz (özel karakter sorunu önleme)
     local senior_payload_file="$TMP_DIR/senior_payload.json"
+    # Görünmez karakterleri () temizle
+    senior_model=$(echo "$senior_model" | tr -d '' | xargs)
     if [[ "$senior_name" == "Claude" ]]; then
         python3 -c "
 import json,sys
-sp=open(sys.argv[1]).read(); um=open(sys.argv[2]).read()
-print(json.dumps({'model':sys.argv[3],'max_tokens':2000,'temperature':0.1,
-'system':sp,'messages':[{'role':'user','content':um}]}))"             <(echo "$senior_prompt") <(echo "$senior_user") "$senior_model" > "$senior_payload_file" 2>/dev/null
+print(json.dumps({'model':sys.argv[1],'max_tokens':2000,'temperature':0.1,
+'system':sys.argv[2],'messages':[{'role':'user','content':sys.argv[3]}]}))" \
+            "$senior_model" "$senior_prompt" "$senior_user" > "$senior_payload_file" 2>/dev/null
         local hc; hc=$(curl -s -w "%{http_code}" -X POST "$senior_url"             -H "Content-Type: application/json"             -H "x-api-key: $senior_key"             -H "anthropic-version: 2023-06-01"             -d "@$senior_payload_file" -o "$TMP_DIR/senior_response.json"             --connect-timeout 30 --max-time 120 2>/dev/null)
         [[ "$hc" == "200" ]] && advice=$(jq -r '.content[0].text' "$TMP_DIR/senior_response.json" 2>/dev/null)
     else
