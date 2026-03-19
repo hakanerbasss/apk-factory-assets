@@ -388,19 +388,35 @@ call_senior_ai() {
 
     local senior_prompt="Sen kıdemli bir Android/Kotlin kod inceleyicisisin. Görütüm: Junior AI aynı build hatasını defalarca çözemedi. Kod YAZMA. Sadece Junior AI'a ne yapması gerektiğini 3-5 maddede, kısa ve net olarak açıkla. Türkçe yaz."
 
+    # Geçmiş AI yanıtlarını topla (son 3 yanıt)
+    local history_text=""
+    if [[ -f "/sdcard/Download/last_ai_response.txt" ]]; then
+        history_text=$(tail -c 5000 /sdcard/Download/last_ai_response.txt 2>/dev/null)
+    fi
+
+    # Aktif prompt dosyasını oku
+    local active_prompt_content=""
+    [[ -f "$PROMPTS_DIR/autofix_task.txt" ]] && active_prompt_content=$(cat "$PROMPTS_DIR/autofix_task.txt")
+
     local senior_user="ORIJINAL KULLANICI İSTEĞİ:
 ${original_task}
 
+JUNIOR AI'IN KULLANDIĞI PROMPT (autofix_task.txt):
+${active_prompt_content:0:2000}
+
 JUNIOR AI'IN BOZUK KODU:
-${source_text:0:30000}
+${source_text:0:25000}
 
 BUILD HATALARI:
 ${error_text}
 
+JUNIOR AI'IN SON YANITI (döngüye girmiş olabilir):
+${history_text:0:5000}
+
 POSTA KUTUSUNDA BEKLEYEN SONRAKI GÖREV:
 ${next_task_content:-Yok}
 
-Bu 4 veriyi analiz et ve Junior AI'a 3-5 maddede net talimat ver. Sadece TAVSİYE yaz, kod yazma."
+Bu 5 veriyi analiz et. Junior AI döngüye girmiş mi? Neden aynı hatayı tekrarlıyor? 3-5 maddede net talimat ver. Sadece TAVSİYE yaz, kod yazma."
 
     local senior_resp="$TMP_DIR/senior_advice.txt"
 
@@ -791,6 +807,7 @@ PYEOF
 }
 
 run_autofix() {
+    local TASK_DESCRIPTION="${1:-}"
     title "AutoFix Döngüsü — $NAME"
     log "Proje: $PROJECT_ROOT | Model: $MODEL"
     echo
@@ -857,9 +874,39 @@ run_autofix() {
 
         local src; src=$(collect_source_files)
         
+        # Senior AI devreye girme noktası (MAX_LOOPS/2)
+        local senior_threshold=$(( MAX_LOOPS / 2 ))
+        local senior_prov; senior_prov=$(grep "^SENIOR_PROVIDER=" ~/.config/autofix.conf 2>/dev/null | cut -d'"' -f2)
+        local senior_model; senior_model=$(grep "^SENIOR_MODEL=" ~/.config/autofix.conf 2>/dev/null | cut -d'"' -f2)
+
+        if [[ $loop -eq $senior_threshold && -n "$senior_prov" ]]; then
+            warn "🎓 $loop. denemede Senior AI devreye giriyor: $senior_prov / $senior_model"
+            if call_senior_ai "$ef" "$src" "${TASK_DESCRIPTION:-}"; then
+                # Senior tavsiyesini bir sonraki call_ai'a ekle
+                local advice_file="$TMP_DIR/senior_advice.txt"
+                if [[ -f "$advice_file" ]]; then
+                    local orig_task_prompt="$PROMPTS_DIR/autofix_task.txt"
+                    local tmp_task="$TMP_DIR/task_with_senior.txt"
+                    echo "=== SENIOR AI TAVSİYESİ ===" > "$tmp_task"
+                    cat "$advice_file" >> "$tmp_task"
+                    echo "=========================" >> "$tmp_task"
+                    echo "" >> "$tmp_task"
+                    cat "$orig_task_prompt" >> "$tmp_task"
+                    # Geçici olarak task prompt'u değiştir
+                    cp "$orig_task_prompt" "$TMP_DIR/autofix_task_backup.txt"
+                    cp "$tmp_task" "$orig_task_prompt"
+                    ok "Senior tavsiyesi task prompt'una eklendi"
+                fi
+            fi
+        fi
+
         if ! call_ai "$ef" "$src"; then
+            # Geçici prompt varsa geri yükle
+            [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt"
             err "API hatası — $((MAX_LOOPS - loop)) deneme kaldı"; sleep 3; continue
         fi
+        # Geçici prompt varsa geri yükle
+        [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
         if ! apply_fixes; then
             err "Düzeltme başarısız — $((MAX_LOOPS - loop)) deneme kaldı"; sleep 2; continue
         fi
@@ -1020,7 +1067,7 @@ PROMPT
     fi
 
     echo -e "\n${BOLD}${BLUE}🚀 Görev koda entegre edildi, otomatik derleme (Build & Fix) devralınıyor...${NC}"
-    run_autofix
+    run_autofix "$user_task"
 }
 
 main() {
