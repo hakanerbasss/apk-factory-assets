@@ -429,24 +429,41 @@ Bu verileri analiz et:
 
     local senior_resp="$TMP_DIR/senior_advice.txt"
 
-    # OpenAI formatında gönder (çoğu provider destekler)
-    local payload; payload=$(python3 -c "
+    # Provider tipine göre çağır
+    local advice=""
+    if [[ "$senior_name" == "Claude" ]]; then
+        local payload; payload=$(python3 -c "
+import json,sys
+print(json.dumps({'model':'${senior_model}','max_tokens':2000,'temperature':0.1,
+'system':sys.argv[1],
+'messages':[{'role':'user','content':sys.argv[2]}]}))" "$senior_prompt" "$senior_user" 2>/dev/null)
+        local hc; hc=$(curl -s -w "%{http_code}" -X POST "$senior_url" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $senior_key" \
+            -H "anthropic-version: 2023-06-01" \
+            -d "$payload" -o "$TMP_DIR/senior_response.json" \
+            --connect-timeout 30 --max-time 120 2>/dev/null)
+        [[ "$hc" == "200" ]] && advice=$(jq -r '.content[0].text' "$TMP_DIR/senior_response.json" 2>/dev/null)
+    else
+        local payload; payload=$(python3 -c "
 import json,sys
 print(json.dumps({'model':'${senior_model}','max_tokens':2000,'temperature':0.1,
 'messages':[{'role':'system','content':sys.argv[1]},{'role':'user','content':sys.argv[2]}]}))" "$senior_prompt" "$senior_user" 2>/dev/null)
+        local hc; hc=$(curl -s -w "%{http_code}" -X POST "$senior_url" \
+            -H "Content-Type: application/json" -H "Authorization: Bearer $senior_key" \
+            -d "$payload" -o "$TMP_DIR/senior_response.json" \
+            --connect-timeout 30 --max-time 120 2>/dev/null)
+        [[ "$hc" == "200" ]] && advice=$(jq -r '.choices[0].message.content' "$TMP_DIR/senior_response.json" 2>/dev/null)
+    fi
 
-    local hc; hc=$(curl -s -w "%{http_code}" -X POST "$senior_url"         -H "Content-Type: application/json" -H "Authorization: Bearer $senior_key"         -d "$payload" -o "$TMP_DIR/senior_response.json"         --connect-timeout 30 --max-time 120 2>/dev/null)
-
-    if [[ "$hc" == "200" ]]; then
-        local advice; advice=$(jq -r '.choices[0].message.content' "$TMP_DIR/senior_response.json" 2>/dev/null)
-        if [[ -n "$advice" && "$advice" != "null" ]]; then
-            echo "$advice" > "$senior_resp"
-            ok "🎓 Senior tavsiyesi alındı ($senior_name)"
-            echo -e "${CYAN}━━━ SENIOR TAVSİYESİ ━━━${NC}"
-            echo "$advice"
-            echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            return 0
-        fi
+    if [[ -n "$advice" && "$advice" != "null" ]]; then
+        local advice_save="$advice"
+        echo "$advice_save" > "$senior_resp"
+        ok "🎓 Senior tavsiyesi alındı ($senior_name)"
+        echo -e "${CYAN}━━━ SENIOR TAVSİYESİ ━━━${NC}"
+        echo "$advice_save"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        return 0
     fi
     warn "Senior AI yanıt veremedi (HTTP $hc), devam ediliyor."
     return 1
