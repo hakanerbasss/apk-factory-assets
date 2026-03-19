@@ -1041,6 +1041,7 @@ class App : Application() {{
                 elif t == "get_providers":
                     providers = []
                     if os.path.exists(APILER_DIR):
+                        local_provs = []
                         for cf in sorted(os.listdir(APILER_DIR)):
                             if cf.endswith('.conf'):
                                 data = {}
@@ -1048,19 +1049,84 @@ class App : Application() {{
                                     line = line.strip()
                                     if '=' in line:
                                         k, v = line.split('=', 1)
-                                        data[k] = v.strip('"')
-                                model_infos = {}
+                                        data[k] = v.strip('"').strip("'")
+                                local_provs.append((cf, data))
+                        
+                        def fetch_models(name, key, fallback):
+                            if not key: return fallback
+                            import urllib.request, json, ssl
+                            try:
+                                req = None
+                                n = name.lower()
+                                if n == "openai": req = urllib.request.Request("https://api.openai.com/v1/models", headers={"Authorization": f"Bearer {key}"})
+                                elif n == "deepseek": req = urllib.request.Request("https://api.deepseek.com/models", headers={"Authorization": f"Bearer {key}", "Accept": "application/json"})
+                                elif n == "groq": req = urllib.request.Request("https://api.groq.com/openai/v1/models", headers={"Authorization": f"Bearer {key}"})
+                                elif n == "gemini": req = urllib.request.Request(f"https://generativelanguage.googleapis.com/v1beta/models?key={key}")
+                                elif n == "claude": req = urllib.request.Request("https://api.anthropic.com/v1/models", headers={"x-api-key": key, "anthropic-version": "2023-06-01"})
+                                if not req: return fallback
+                                
+                                ctx = ssl.create_default_context()
+                                ctx.check_hostname = False
+                                ctx.verify_mode = ssl.CERT_NONE
+                                
+                                with urllib.request.urlopen(req, timeout=5, context=ctx) as res:
+                                    rj = json.loads(res.read().decode())
+                                    if n == "gemini":
+                                        m_list = [m["name"].replace("models/", "") for m in rj.get("models",[]) if "generateContent" in m.get("supportedGenerationMethods",[])]
+                                        # NİHAİ KATI LİSTE: image, tts, robotics, computer-use eklendi!
+                                        m_list = [m for m in m_list if "gemini" in m.lower() and not any(bad in m.lower() for bad in ["vision", "imagen", "image", "embedding", "aqa", "learnlm", "bison", "experimental", "tts", "robotics", "computer-use", "customtools"])]
+                                    else:
+                                        m_list = [m["id"] for m in rj.get("data",[])]
+                                        if n == "openai": 
+                                            m_list = [m for m in m_list if ("gpt" in m.lower() or "o1" in m.lower() or "o3" in m.lower()) and not any(bad in m.lower() for bad in ["audio", "realtime", "vision", "instruct", "dall-e", "tts", "whisper", "babbage", "davinci"])]
+                                        elif n == "claude": 
+                                            m_list = [m for m in m_list if "claude" in m.lower()]
+                                        elif n == "groq": 
+                                            m_list = [m for m in m_list if not any(bad in m.lower() for bad in ["whisper", "llava"])]
+                                        elif n == "deepseek": 
+                                            m_list = [m for m in m_list if "chat" in m.lower() or "reasoner" in m.lower() or "coder" in m.lower()]
+                                    
+                                    m_list = sorted(list(set(m_list)), reverse=True)
+                                    return m_list if m_list else fallback
+                            except Exception as e:
+                                return [f"API_HATA: {str(e)}"] + fallback
+
+                        async def build_prov(cf, data):
+                            try:
+                                raw_name = cf.replace(".conf", "")
+                                if raw_name.lower() == "openai": raw_name = "OpenAI"
+                                elif raw_name.lower() == "groq": raw_name = "Groq"
+                                elif raw_name.lower() == "gemini": raw_name = "Gemini"
+                                elif raw_name.lower() == "claude": raw_name = "Claude"
+                                elif raw_name.lower() == "deepseek": raw_name = "DeepSeek"
+                                
+                                name = data.get("NAME", raw_name)
+                                key = data.get("API_KEY", "").strip()
+                                
+                                fallback_str = data.get("MODELS", "")
+                                fallback = [x.strip() for x in fallback_str.split(",")] if fallback_str else []
+                                
+                                live_models = await asyncio.to_thread(fetch_models, name, key, fallback)
+                                
+                                minfos = {}
                                 for item in data.get("MODEL_INFOS", "").split("|"):
                                     if ":" in item:
                                         mid, mdesc = item.split(":", 1)
-                                        model_infos[mid.strip()] = mdesc.strip()
-                                providers.append({
-                                    "name": data.get("NAME", cf.replace(".conf","")),
+                                        minfos[mid.strip()] = mdesc.strip()
+                                return {
+                                    "name": name,
                                     "model": data.get("MODEL", ""),
-                                    "models": data.get("MODELS", "").split(",") if data.get("MODELS") else [],
-                                    "model_infos": model_infos,
-                                    "hasKey": bool(data.get("API_KEY", "").strip())
-                                })
+                                    "models": live_models,
+                                    "model_infos": minfos,
+                                    "hasKey": bool(key)
+                                }
+                            except Exception as ex:
+                                return {"name": raw_name, "models": [f"BLOK_HATA: {str(ex)}"], "hasKey": False}
+                        
+                        tasks = [build_prov(cf, d) for cf, d in local_provs]
+                        if tasks:
+                            providers = await asyncio.gather(*tasks)
+
                     await ws.send(json.dumps({"type":"providers","data":providers}))
 
                 elif t == "get_settings":
