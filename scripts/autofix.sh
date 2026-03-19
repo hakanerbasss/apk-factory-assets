@@ -370,7 +370,7 @@ call_senior_ai() {
     local senior_conf="" senior_name="" senior_url="" senior_key="" senior_model=""
 
     if [[ -n "$senior_prov_name" ]]; then
-        local prov_lower; prov_lower=$(echo "$senior_prov_name" | tr A-Z a-z)
+        local prov_lower; prov_lower=$(python3 -c "print(open('/dev/stdin').read().strip().lower())" <<< "$senior_prov_name")
         local cf="$APILER_DIR/${prov_lower}.conf"
         if [[ -f "$cf" ]]; then
             senior_conf="$cf"
@@ -628,9 +628,9 @@ def parse_markdown_files(text):
     pattern = re.compile(
         r'(?:Dosya|File)\s*:\s*([^\n]+)\n'
         r'[ \t]*\n?'
-        r'[ \t]*```[^\n]*\n'
+        r'(?:[ \t]*```[^\n]*\n)?' 
         r'(.*?)'
-        r'(?:^[ \t]*```[ \t]*$|\Z)',
+        r'(?:^[ \t]*```[ \t]*$|(?=(?:Dosya|File)\s*:)|\Z)',
         re.MULTILINE | re.DOTALL
     )
     for m in pattern.finditer(text):
