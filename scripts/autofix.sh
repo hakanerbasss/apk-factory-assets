@@ -469,6 +469,42 @@ print(json.dumps({'model':'${senior_model}','max_tokens':2000,'temperature':0.1,
     return 1
 }
 
+
+# ─── BUILD SONRASI KULLANICI AKSİYON KONTROLÜ ───────────────────────────────
+check_user_actions() {
+    local src; src=$(collect_source_files)
+    local src_text; src_text=$(cat "$src")
+    [[ ${#src_text} -gt 30000 ]] && src_text="${src_text:0:30000}"
+
+    local check_prompt="Sen bir Android/Kotlin kod analistsin. Verilen kaynak kodunu incele ve kullanıcının manuel olarak yapması gereken işlemler var mı tespit et. Sadece gerçekten gerekli olan şeyleri listele. Yoksa hiçbir şey yazma. Kısa ve net ol. Örnekler: google-services.json eksikse Firebase SHA-1 talimatı, AdMob ID placeholder varsa, API key placeholder varsa, özel izin veya sertifika gerekiyorsa. Tespit ettiklerini madde madde yaz. Hiçbir şey yoksa sadece 'YOK' yaz."
+
+    local payload; payload=$(python3 -c "
+import json,sys
+print(json.dumps({'model':'${MODEL}','max_tokens':500,'temperature':0.1,
+'system':sys.argv[1],
+'messages':[{'role':'user','content':sys.argv[2]}]}))" "$check_prompt" "$src_text" 2>/dev/null)
+
+    local result=""
+    if [[ "$NAME" == "Claude" ]]; then
+        local hc; hc=$(curl -s -w "%{http_code}" -X POST "$API_URL"             -H "Content-Type: application/json"             -H "x-api-key: $API_KEY"             -H "anthropic-version: 2023-06-01"             -d "$payload" -o "$TMP_DIR/action_check.json"             --connect-timeout 30 --max-time 60 2>/dev/null)
+        [[ "$hc" == "200" ]] && result=$(jq -r '.content[0].text' "$TMP_DIR/action_check.json" 2>/dev/null)
+    else
+        local payload2; payload2=$(python3 -c "
+import json,sys
+print(json.dumps({'model':'${MODEL}','max_tokens':500,'temperature':0.1,
+'messages':[{'role':'system','content':sys.argv[1]},{'role':'user','content':sys.argv[2]}]}))" "$check_prompt" "$src_text" 2>/dev/null)
+        local hc; hc=$(curl -s -w "%{http_code}" -X POST "$API_URL"             -H "Content-Type: application/json" -H "Authorization: Bearer $API_KEY"             -d "$payload2" -o "$TMP_DIR/action_check.json"             --connect-timeout 30 --max-time 60 2>/dev/null)
+        [[ "$hc" == "200" ]] && result=$(jq -r '.choices[0].message.content' "$TMP_DIR/action_check.json" 2>/dev/null)
+    fi
+
+    if [[ -n "$result" && "$result" != "null" && "$result" != "YOK" ]]; then
+        echo -e "
+${YELLOW}⚠️  KULLANICI AKSİYONU GEREKİYOR:${NC}"
+        echo -e "${YELLOW}${result}${NC}
+"
+    fi
+}
+
 call_ai() {
     local errors="$1" sources="$2"
     local error_text; error_text=$(cat "$errors")
@@ -864,6 +900,7 @@ run_autofix() {
             show_advanced_diff
             local elapsed=$((SECONDS - start))
             ok "BUILD BAŞARILI! 🎉  (${elapsed}s)"
+            check_user_actions
             
             local apk; apk=$(find "$PROJECT_ROOT/app/build/outputs/apk" -name "*.apk" 2>/dev/null | head -1)
             [[ -n "$apk" ]] && mkdir -p "/sdcard/Download/apk-cikti" && rm -f "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}"*.apk "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}"*.aab 2>/dev/null && cp "$apk" "/sdcard/Download/apk-cikti/$(basename "$apk")" 2>/dev/null && touch "/sdcard/Download/apk-cikti/$(basename "$apk")" && ok "APK → Download/apk-cikti"
