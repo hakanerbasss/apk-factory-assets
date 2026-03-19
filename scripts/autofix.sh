@@ -663,6 +663,9 @@ if auto_cont:
         with open(os.path.join(os.environ['SISTEM_DIR'], f'next_task_{proj_name}.txt'), 'w', encoding='utf-8') as f:
             f.write(cont_prompt)
         print("AUTO_CONTINUE_FLAG:TRUE")
+        # Posta içeriğini log'a yaz
+        short = cont_prompt[:200].replace("\n", " ")
+        print(f"POSTA_ICERIGI:{short}")
     except: pass
 # ------------------------------------------------
 
@@ -780,6 +783,15 @@ PYEOF
     local auto_confirm=$(grep "^AUTO_CONFIRM=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo "0")
     
     # 2. GÜNCELLENEN SATIR: Şartı genişletiyoruz
+    # Posta flag açıldıysa içeriği log'a yaz
+    if echo "$wr" | grep -q "AUTO_CONTINUE_FLAG:TRUE"; then
+        local posta_icerik; posta_icerik=$(echo "$wr" | grep "^POSTA_ICERIGI:" | cut -d: -f2-)
+        if [[ -n "$posta_icerik" ]]; then
+            echo -e "\n${CYAN}📬 POSTA KUTUSU GÜNCELLENDI:${NC}"
+            echo -e "${DIM}${posta_icerik}${NC}\n"
+        fi
+    fi
+
     if [[ "$auto_confirm" != "1" && ! "$wr" == *"AUTO_CONTINUE_FLAG:TRUE"* ]]; then
         echo
         read -r -p "$(echo -e "${YELLOW}Değişiklikleri uygula ve derle [Enter=Devam / İ=İptal]: ${NC}")" confirm
