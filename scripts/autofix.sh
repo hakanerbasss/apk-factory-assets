@@ -353,6 +353,80 @@ _call_active_ai() {
     esac
 }
 
+
+# ─── SENIOR (GÖZLEMCI) AI ───────────────────────────────────────────────────
+call_senior_ai() {
+    local errors="$1" sources="$2"
+    local error_text; error_text=$(cat "$errors")
+    local source_text; source_text=$(cat "$sources")
+    local original_task="${3:-}"
+    local next_task_content=""
+    local ntf="$SISTEM_DIR/chain_task.txt"
+    [[ -f "$ntf" ]] && next_task_content=$(cat "$ntf")
+
+    # Aktif provider dışında başka provider seç
+    local senior_conf="" senior_name="" senior_url="" senior_key="" senior_model=""
+    for conf in "$APILER_DIR"/*.conf; do
+        [[ -f "$conf" ]] || continue
+        local n; n=$(grep "^NAME=" "$conf" | cut -d'"' -f2)
+        local k; k=$(grep "^API_KEY=" "$conf" | cut -d'"' -f2)
+        [[ "$n" == "$NAME" || -z "$k" ]] && continue
+        senior_conf="$conf"
+        senior_name="$n"
+        senior_url=$(grep "^API_URL=" "$conf" | cut -d'"' -f2)
+        senior_key=$(grep "^API_KEY=" "$conf" | cut -d'"' -f2)
+        senior_model=$(grep "^MODEL=" "$conf" | cut -d'"' -f2)
+        break
+    done
+
+    if [[ -z "$senior_conf" ]]; then
+        warn "Gözlemci AI için başka provider bulunamadı, atlanıyor."
+        return 1
+    fi
+
+    log "🎓 SENIOR GÖZLEMCİ devreye giriyor: $senior_name"
+
+    local senior_prompt="Sen kıdemli bir Android/Kotlin kod inceleyicisisin. Görütüm: Junior AI aynı build hatasını defalarca çözemedi. Kod YAZMA. Sadece Junior AI'a ne yapması gerektiğini 3-5 maddede, kısa ve net olarak açıkla. Türkçe yaz."
+
+    local senior_user="ORIJINAL KULLANICI İSTEĞİ:
+${original_task}
+
+JUNIOR AI'IN BOZUK KODU:
+${source_text:0:30000}
+
+BUILD HATALARI:
+${error_text}
+
+POSTA KUTUSUNDA BEKLEYEN SONRAKI GÖREV:
+${next_task_content:-Yok}
+
+Bu 4 veriyi analiz et ve Junior AI'a 3-5 maddede net talimat ver. Sadece TAVSİYE yaz, kod yazma."
+
+    local senior_resp="$TMP_DIR/senior_advice.txt"
+
+    # OpenAI formatında gönder (çoğu provider destekler)
+    local payload; payload=$(python3 -c "
+import json,sys
+print(json.dumps({'model':'${senior_model}','max_tokens':2000,'temperature':0.1,
+'messages':[{'role':'system','content':sys.argv[1]},{'role':'user','content':sys.argv[2]}]}))" "$senior_prompt" "$senior_user" 2>/dev/null)
+
+    local hc; hc=$(curl -s -w "%{http_code}" -X POST "$senior_url"         -H "Content-Type: application/json" -H "Authorization: Bearer $senior_key"         -d "$payload" -o "$TMP_DIR/senior_response.json"         --connect-timeout 30 --max-time 120 2>/dev/null)
+
+    if [[ "$hc" == "200" ]]; then
+        local advice; advice=$(jq -r '.choices[0].message.content' "$TMP_DIR/senior_response.json" 2>/dev/null)
+        if [[ -n "$advice" && "$advice" != "null" ]]; then
+            echo "$advice" > "$senior_resp"
+            ok "🎓 Senior tavsiyesi alındı ($senior_name)"
+            echo -e "${CYAN}━━━ SENIOR TAVSİYESİ ━━━${NC}"
+            echo "$advice"
+            echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            return 0
+        fi
+    fi
+    warn "Senior AI yanıt veremedi (HTTP $hc), devam ediliyor."
+    return 1
+}
+
 call_ai() {
     local errors="$1" sources="$2"
     local error_text; error_text=$(cat "$errors")

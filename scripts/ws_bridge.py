@@ -53,12 +53,14 @@ def save_settings(data):
     ls = []
     if os.path.exists(ac):
         with open(ac, 'r') as f:
-            ls = [l for l in f.readlines() if 'DEFAULT_PROVIDER=' not in l and 'MAX_LOOPS=' not in l and 'MAX_TOKENS=' not in l and 'MAX_CHARS=' not in l]
+            ls = [l for l in f.readlines() if 'DEFAULT_PROVIDER=' not in l and 'MAX_LOOPS=' not in l and 'MAX_TOKENS=' not in l and 'MAX_CHARS=' not in l and 'SENIOR_PROVIDER=' not in l and 'SENIOR_MODEL=' not in l]
     
     ls += [f'DEFAULT_PROVIDER="{data.get("DEFAULT_PROVIDER","Claude")}"\n',
            f'MAX_LOOPS={data.get("MAX_LOOPS","5")}\n',
            f'MAX_TOKENS={data.get("MAX_TOKENS","8000")}\n',
-           f'MAX_CHARS={data.get("MAX_CHARS","60000")}\n']
+           f'MAX_CHARS={data.get("MAX_CHARS","60000")}\n',
+           f'SENIOR_PROVIDER="{data.get("SENIOR_PROVIDER","")}"\n',
+           f'SENIOR_MODEL="{data.get("SENIOR_MODEL","")}"\n']
     
     with open(ac, 'w') as f:
         f.writelines(ls)
