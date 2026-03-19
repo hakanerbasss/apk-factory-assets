@@ -574,6 +574,19 @@ async def handle(ws):
                     p       = d.get("project","")
                     app_id  = d.get("app_id","ca-app-pub-3940256099942544~3347511713")
                     unit_id = d.get("unit_id","ca-app-pub-3940256099942544/1033173712")
+                    script  = f"{SISTEM_DIR}/admob_ekle.sh"
+                    cmd     = f"bash '{script}' '{p}' '{app_id}' '{unit_id}'"
+                    await ws.send(json.dumps({"type":"status","text":f"💰 AdMob enjekte ediliyor: {p}"}))
+                    async def admob_done(rc):
+                        await ws.send(json.dumps({"type":"task_done","success":rc==0,
+                            "text":"✅ AdMob eklendi! Build alabilirsin." if rc==0 else "❌ AdMob eklenemedi",
+                            "project":p}))
+                    await start(cmd, get_proj_dir(p), admob_done)
+
+                elif t == "add_admob_old":  # devre disi
+                    p       = d.get("project","")
+                    app_id  = d.get("app_id","ca-app-pub-3940256099942544~3347511713")
+                    unit_id = d.get("unit_id","ca-app-pub-3940256099942544/1033173712")
                     proj_dir = get_proj_dir(p)
                     result = []
                     errors = []
