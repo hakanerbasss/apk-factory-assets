@@ -575,6 +575,16 @@ async def handle(ws):
                     app_id  = d.get("app_id","ca-app-pub-3940256099942544~3347511713")
                     unit_id = d.get("unit_id","ca-app-pub-3940256099942544/1033173712")
                     script  = f"{SISTEM_DIR}/admob_ekle.sh"
+                    # Script yoksa GitHub'dan indir
+                    if not os.path.exists(script):
+                        import urllib.request
+                        try:
+                            urllib.request.urlretrieve(f"{GITHUB_RAW}/scripts/admob_ekle.sh", script)
+                            os.chmod(script, 0o755)
+                            await ws.send(json.dumps({"type":"status","text":"📥 admob_ekle.sh indirildi"}))
+                        except Exception as ex:
+                            await ws.send(json.dumps({"type":"error","text":f"❌ Script indirilemedi: {ex}"}))
+                            continue
                     cmd     = f"bash '{script}' '{p}' '{app_id}' '{unit_id}'"
                     await ws.send(json.dumps({"type":"status","text":f"💰 AdMob enjekte ediliyor: {p}"}))
                     async def admob_done(rc):
