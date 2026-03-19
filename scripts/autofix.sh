@@ -506,6 +506,7 @@ print(json.dumps({'model':'${MODEL}','max_tokens':500,'temperature':0.1,
 ${YELLOW}⚠️  KULLANICI AKSİYONU GEREKİYOR:${NC}"
         echo -e "${YELLOW}${result}${NC}
 "
+        echo "USER_ACTION_REQUIRED:${result}"
     fi
 }
 
