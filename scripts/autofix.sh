@@ -403,6 +403,9 @@ call_senior_ai() {
     local senior_user="ORIJINAL KULLANICI İSTEĞİ:
 ${original_task}
 
+ÇALIŞMA MODU: ${4:-bilinmiyor} (prj af=hata düzeltme, prj e=yeni görev)
+MEVCUT DENEME: ${5:-?} / $MAX_LOOPS
+
 JUNIOR AI'IN KULLANDIĞI PROMPT (autofix_task.txt):
 ${active_prompt_content:0:2000}
 
@@ -418,7 +421,11 @@ ${history_text:0:5000}
 POSTA KUTUSUNDA BEKLEYEN SONRAKI GÖREV:
 ${next_task_content:-Yok}
 
-Bu 5 veriyi analiz et. Junior AI döngüye girmiş mi? Neden aynı hatayı tekrarlıyor? 3-5 maddede net talimat ver. Sadece TAVSİYE yaz, kod yazma."
+Bu verileri analiz et:
+- Junior AI döngüye girmiş mi? Kaçıncı denemede?
+- Mod ne? (af=mevcut kodu düzelt, e=yeni özellik ekle, mevcut kodu bozma)
+- Neden aynı hatayı tekrarlıyor?
+3-5 maddede net talimat ver. Sadece TAVSİYE yaz, KOD YAZMA."
 
     local senior_resp="$TMP_DIR/senior_advice.txt"
 
@@ -883,7 +890,7 @@ run_autofix() {
 
         if [[ $loop -eq $senior_threshold && -n "$senior_prov" ]]; then
             warn "🎓 $loop. denemede Senior AI devreye giriyor: $senior_prov / $senior_model"
-            if call_senior_ai "$ef" "$src" "${TASK_DESCRIPTION:-}"; then
+            if call_senior_ai "$ef" "$src" "${TASK_DESCRIPTION:-}" "af" "$loop"; then
                 # Senior tavsiyesini bir sonraki call_ai'a ekle
                 local advice_file="$TMP_DIR/senior_advice.txt"
                 if [[ -f "$advice_file" ]]; then
