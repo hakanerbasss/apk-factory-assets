@@ -626,7 +626,7 @@ import re, os, shutil, sys
 def parse_markdown_files(text):
     results = []
     pattern = re.compile(
-        r'(?:Dosya|File)\s*:\s*([^\n]+)\n'
+        r'(?:Dosya|File|=== FILE)\s*[:\s]*\s*([^\n=]+?)\s*(?:===)?\n'
         r'[ \t]*\n?'
         r'(?:[ \t]*```[^\n]*\n)?' 
         r'(.*?)'
