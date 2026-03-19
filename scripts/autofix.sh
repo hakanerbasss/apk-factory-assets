@@ -902,6 +902,7 @@ run_autofix() {
         
         # Senior AI devreye girme noktası (MAX_LOOPS/2)
         local senior_threshold=$(( MAX_LOOPS / 2 ))
+        [[ $senior_threshold -lt 2 ]] && senior_threshold=2
         local senior_prov; senior_prov=$(grep "^SENIOR_PROVIDER=" ~/.config/autofix.conf 2>/dev/null | cut -d'"' -f2)
         local senior_model; senior_model=$(grep "^SENIOR_MODEL=" ~/.config/autofix.conf 2>/dev/null | cut -d'"' -f2)
 
