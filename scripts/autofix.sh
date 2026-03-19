@@ -472,9 +472,12 @@ print(json.dumps({'model':'${senior_model}','max_tokens':2000,'temperature':0.1,
 
 # ─── BUILD SONRASI KULLANICI AKSİYON KONTROLÜ ───────────────────────────────
 check_user_actions() {
-    local src; src=$(collect_source_files)
-    local src_text; src_text=$(cat "$src")
-    [[ ${#src_text} -gt 30000 ]] && src_text="${src_text:0:30000}"
+    # Kaynak dosyaları direkt topla (TMP_DIR bağımsız)
+    local src_text=""
+    while IFS= read -r -d '' f; do
+        src_text+="\n=== $f ===\n$(head -c 5000 "$f")\n"
+        [[ ${#src_text} -gt 30000 ]] && break
+    done < <(find "$PROJECT_ROOT/app/src/main/java" -name "*.kt" -print0 2>/dev/null)
 
     local check_prompt="Sen bir Android/Kotlin kod analistsin. Verilen kaynak kodunu incele ve kullanıcının manuel olarak yapması gereken işlemler var mı tespit et. Sadece gerçekten gerekli olan şeyleri listele. Yoksa hiçbir şey yazma. Kısa ve net ol. Örnekler: google-services.json eksikse Firebase SHA-1 talimatı, AdMob ID placeholder varsa, API key placeholder varsa, özel izin veya sertifika gerekiyorsa. Tespit ettiklerini madde madde yaz. Hiçbir şey yoksa sadece 'YOK' yaz."
 
