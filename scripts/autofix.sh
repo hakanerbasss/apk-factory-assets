@@ -364,20 +364,22 @@ call_senior_ai() {
     local ntf="$SISTEM_DIR/chain_task.txt"
     [[ -f "$ntf" ]] && next_task_content=$(cat "$ntf")
 
-    # Aktif provider dışında başka provider seç
+    # Ayarlardan Senior provider ve model oku
+    local senior_prov_name; senior_prov_name=$(grep "^SENIOR_PROVIDER=" ~/.config/autofix.conf 2>/dev/null | cut -d'"' -f2)
+    local senior_model_name; senior_model_name=$(grep "^SENIOR_MODEL=" ~/.config/autofix.conf 2>/dev/null | cut -d'"' -f2)
     local senior_conf="" senior_name="" senior_url="" senior_key="" senior_model=""
-    for conf in "$APILER_DIR"/*.conf; do
-        [[ -f "$conf" ]] || continue
-        local n; n=$(grep "^NAME=" "$conf" | cut -d'"' -f2)
-        local k; k=$(grep "^API_KEY=" "$conf" | cut -d'"' -f2)
-        [[ "$n" == "$NAME" || -z "$k" ]] && continue
-        senior_conf="$conf"
-        senior_name="$n"
-        senior_url=$(grep "^API_URL=" "$conf" | cut -d'"' -f2)
-        senior_key=$(grep "^API_KEY=" "$conf" | cut -d'"' -f2)
-        senior_model=$(grep "^MODEL=" "$conf" | cut -d'"' -f2)
-        break
-    done
+
+    if [[ -n "$senior_prov_name" ]]; then
+        local prov_lower; prov_lower=$(echo "$senior_prov_name" | tr A-Z a-z)
+        local cf="$APILER_DIR/${prov_lower}.conf"
+        if [[ -f "$cf" ]]; then
+            senior_conf="$cf"
+            senior_name="$senior_prov_name"
+            senior_url=$(grep "^API_URL=" "$cf" | cut -d'"' -f2)
+            senior_key=$(grep "^API_KEY=" "$cf" | cut -d'"' -f2)
+            senior_model="${senior_model_name:-$(grep "^MODEL=" "$cf" | cut -d'"' -f2)}"
+        fi
+    fi
 
     if [[ -z "$senior_conf" ]]; then
         warn "Gözlemci AI için başka provider bulunamadı, atlanıyor."
