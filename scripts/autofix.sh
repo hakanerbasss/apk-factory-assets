@@ -490,6 +490,19 @@ print(json.dumps({'model':'${MODEL}','max_tokens':500,'temperature':0.1,
     local result=""
     mkdir -p "$TMP_DIR" 2>/dev/null
     if [[ "$NAME" == "Claude" ]]; then
+        local claude_payload; claude_payload=$(python3 -c "
+import json,sys
+print(json.dumps({'model':'${MODEL}','max_tokens':500,'temperature':0.1,
+'system':sys.argv[1],
+'messages':[{'role':'user','content':sys.argv[2]}]}))" "$check_prompt" "$src_text" 2>/dev/null)
+        local chc; chc=$(curl -s -w "%{http_code}" -X POST "$API_URL" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d "$claude_payload" -o "$TMP_DIR/action_check.json" \
+            --connect-timeout 30 --max-time 60 2>/dev/null)
+        [[ "$chc" == "200" ]] && result=$(jq -r '.content[0].text' "$TMP_DIR/action_check.json" 2>/dev/null)
+    elif [[ "$NAME" == "Claude" ]]; then
         local hc; hc=$(curl -s -w "%{http_code}" -X POST "$API_URL"             -H "Content-Type: application/json"             -H "x-api-key: $API_KEY"             -H "anthropic-version: 2023-06-01"             -d "$payload" -o "$TMP_DIR/action_check.json"             --connect-timeout 30 --max-time 60 2>/dev/null)
         [[ "$hc" == "200" ]] && result=$(jq -r '.content[0].text' "$TMP_DIR/action_check.json" 2>/dev/null)
     else
@@ -498,7 +511,11 @@ import json,sys
 print(json.dumps({'model':'${MODEL}','max_tokens':500,'temperature':0.1,
 'messages':[{'role':'system','content':sys.argv[1]},{'role':'user','content':sys.argv[2]}]}))" "$check_prompt" "$src_text" 2>/dev/null)
         local hc; hc=$(curl -s -w "%{http_code}" -X POST "$API_URL"             -H "Content-Type: application/json" -H "Authorization: Bearer $API_KEY"             -d "$payload2" -o "$TMP_DIR/action_check.json"             --connect-timeout 30 --max-time 60 2>/dev/null)
-        [[ "$hc" == "200" ]] && result=$(jq -r '.choices[0].message.content' "$TMP_DIR/action_check.json" 2>/dev/null)
+        if [[ "$hc" == "200" ]]; then
+            result=$(jq -r '.choices[0].message.content' "$TMP_DIR/action_check.json" 2>/dev/null)
+            # DeepSeek reasoning model - content bossa reasoning_content dene
+            [[ -z "$result" || "$result" == "null" ]] && result=$(jq -r '.choices[0].message.reasoning_content' "$TMP_DIR/action_check.json" 2>/dev/null)
+        fi
     fi
 
     if [[ -n "$result" && "$result" != "null" && "$result" != "YOK" ]]; then
