@@ -431,28 +431,23 @@ Bu verileri analiz et:
 
     # Provider tipine göre çağır
     local advice=""
+    # Payload dosyaya yaz (özel karakter sorunu önleme)
+    local senior_payload_file="$TMP_DIR/senior_payload.json"
     if [[ "$senior_name" == "Claude" ]]; then
-        local payload; payload=$(python3 -c "
+        python3 -c "
 import json,sys
-print(json.dumps({'model':'${senior_model}','max_tokens':2000,'temperature':0.1,
-'system':sys.argv[1],
-'messages':[{'role':'user','content':sys.argv[2]}]}))" "$senior_prompt" "$senior_user" 2>/dev/null)
-        local hc; hc=$(curl -s -w "%{http_code}" -X POST "$senior_url" \
-            -H "Content-Type: application/json" \
-            -H "x-api-key: $senior_key" \
-            -H "anthropic-version: 2023-06-01" \
-            -d "$payload" -o "$TMP_DIR/senior_response.json" \
-            --connect-timeout 30 --max-time 120 2>/dev/null)
+sp=open(sys.argv[1]).read(); um=open(sys.argv[2]).read()
+print(json.dumps({'model':sys.argv[3],'max_tokens':2000,'temperature':0.1,
+'system':sp,'messages':[{'role':'user','content':um}]}))"             <(echo "$senior_prompt") <(echo "$senior_user") "$senior_model" > "$senior_payload_file" 2>/dev/null
+        local hc; hc=$(curl -s -w "%{http_code}" -X POST "$senior_url"             -H "Content-Type: application/json"             -H "x-api-key: $senior_key"             -H "anthropic-version: 2023-06-01"             -d "@$senior_payload_file" -o "$TMP_DIR/senior_response.json"             --connect-timeout 30 --max-time 120 2>/dev/null)
         [[ "$hc" == "200" ]] && advice=$(jq -r '.content[0].text' "$TMP_DIR/senior_response.json" 2>/dev/null)
     else
-        local payload; payload=$(python3 -c "
+        python3 -c "
 import json,sys
-print(json.dumps({'model':'${senior_model}','max_tokens':2000,'temperature':0.1,
-'messages':[{'role':'system','content':sys.argv[1]},{'role':'user','content':sys.argv[2]}]}))" "$senior_prompt" "$senior_user" 2>/dev/null)
-        local hc; hc=$(curl -s -w "%{http_code}" -X POST "$senior_url" \
-            -H "Content-Type: application/json" -H "Authorization: Bearer $senior_key" \
-            -d "$payload" -o "$TMP_DIR/senior_response.json" \
-            --connect-timeout 30 --max-time 120 2>/dev/null)
+sp=open(sys.argv[1]).read(); um=open(sys.argv[2]).read()
+print(json.dumps({'model':sys.argv[3],'max_tokens':2000,'temperature':0.1,
+'messages':[{'role':'system','content':sp},{'role':'user','content':um}]}))"             <(echo "$senior_prompt") <(echo "$senior_user") "$senior_model" > "$senior_payload_file" 2>/dev/null
+        local hc; hc=$(curl -s -w "%{http_code}" -X POST "$senior_url"             -H "Content-Type: application/json" -H "Authorization: Bearer $senior_key"             -d "@$senior_payload_file" -o "$TMP_DIR/senior_response.json"             --connect-timeout 30 --max-time 120 2>/dev/null)
         [[ "$hc" == "200" ]] && advice=$(jq -r '.choices[0].message.content' "$TMP_DIR/senior_response.json" 2>/dev/null)
     fi
 

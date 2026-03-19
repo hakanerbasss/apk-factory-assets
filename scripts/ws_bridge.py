@@ -168,7 +168,10 @@ async def pty_run(cmd, cwd, ws, state, on_done):
         if text and text != last_line:
             last_line = text
             try:
-                if text.startswith("USER_ACTION_REQUIRED:"):
+                if text.startswith("POSTA_ICERIGI:"):
+                    posta = text[len("POSTA_ICERIGI:"):]
+                    await ws.send(json.dumps({"type":"log","text":f"📬 Posta: {posta[:100]}..."}))
+                elif text.startswith("USER_ACTION_REQUIRED:"):
                     action = text[len("USER_ACTION_REQUIRED:"):]
                     await ws.send(json.dumps({"type":"log","text":f"⚠️ KULLANICI AKSİYONU:\n{action}"}))
                 else:
