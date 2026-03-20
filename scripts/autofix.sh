@@ -518,6 +518,17 @@ call_ai() {
     [[ ! -f "$pf" ]] && create_default_prompt
     system_prompt=$(cat "$pf")
 
+    # Global dersler (tum projelerden birikmis)
+    local global_lessons="$SISTEM_DIR/global_lessons.md"
+    if [[ -f "$global_lessons" ]]; then
+        local glessons; glessons=$(tail -c 3000 "$global_lessons")
+        system_prompt="${system_prompt}
+
+=== GLOBAL ANDROID/KOTLIN DERSLERI (TUM PROJELERDEN) ===
+${glessons}
+=== GLOBAL DERSLER SONU ==="
+    fi
+
     # Proje derslerini ekle
     local lessons_file="$PROJECT_ROOT/lessons.md"
     if [[ -f "$lessons_file" ]]; then
@@ -695,10 +706,17 @@ auto_cont, cont_prompt, lesson_text = parse_auto_continue(text)
 # Ders varsa lessons.md'ye ekle
 if lesson_text:
     import datetime
-    lessons_file = os.path.join(project_root, 'lessons.md')
     ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+    # Proje dersi
+    lessons_file = os.path.join(project_root, 'lessons.md')
     with open(lessons_file, 'a', encoding='utf-8') as lf:
         lf.write(f'\n- [{ts}] {lesson_text}\n')
+    # Global ders
+    sistem_dir = os.environ.get('SISTEM_DIR', '/storage/emulated/0/termux-otonom-sistem')
+    global_file = os.path.join(sistem_dir, 'global_lessons.md')
+    proj_name = os.path.basename(project_root)
+    with open(global_file, 'a', encoding='utf-8') as gf:
+        gf.write(f'\n- [{ts}] [{proj_name}] {lesson_text}\n')
     print(f"LESSON_SAVED:{lesson_text[:80]}")
 
 ok = apply_markdown_fixes(content_file, project_root, backup_map_file)
