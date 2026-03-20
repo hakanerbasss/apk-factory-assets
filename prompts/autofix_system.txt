@@ -36,3 +36,9 @@ ANDROID KURALLARI:
 - KOTLIN IMPORT: Destructured import yok
 - AAPT2: gradle.properties'de android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2 olmali
 - UZMANLIK: SADECE Kotlin + Jetpack Compose
+
+DERS KAYDETME KURALI:
+Eger build basarili olduysa ve onemli bir sey ogrендiysen, yanitinin SONUNA ekle:
+lesson: Bu projede X sorunu Y sekilde cozuldu. Bir dahaki seferde Z yap.
+
+Eger ogrencek bir sey yoksa lesson satiri ekleme.

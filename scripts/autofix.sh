@@ -517,6 +517,17 @@ call_ai() {
     local pf="$PROMPTS_DIR/autofix_system.txt"
     [[ ! -f "$pf" ]] && create_default_prompt
     system_prompt=$(cat "$pf")
+
+    # Proje derslerini ekle
+    local lessons_file="$PROJECT_ROOT/lessons.md"
+    if [[ -f "$lessons_file" ]]; then
+        local lessons; lessons=$(cat "$lessons_file")
+        system_prompt="${system_prompt}
+
+=== BU PROJEDEN ÖNCEKI DERSLER (AYNI HATALARI TEKRARLAMA) ===
+${lessons}
+=== DERSLER SONU ==="
+    fi
     local user_msg="BUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`\n\nKAYNAK DOSYALAR:\n${source_text}"
 
     log "$NAME'e gönderiliyor... (${#source_text} karakter)"
@@ -667,9 +678,11 @@ def parse_auto_continue(text):
     import re
     ac = re.search(r'auto_continue\s*:\s*(true|false)', text, re.IGNORECASE)
     cp = re.search(r'continue_prompt\s*:\s*(.+?)(?=\n(?:auto_continue|Dosya:|File:)|$)', text, re.IGNORECASE | re.DOTALL)
+    lesson = re.search(r'lesson\s*:\s*(.+?)(?=\n(?:auto_continue|Dosya:|File:)|$)', text, re.IGNORECASE | re.DOTALL)
     auto_cont = ac.group(1).lower() == 'true' if ac else False
     cont_prompt = cp.group(1).strip() if cp else 'Goreve devam et.'
-    return auto_cont, cont_prompt
+    lesson_text = lesson.group(1).strip() if lesson else None
+    return auto_cont, cont_prompt, lesson_text
 
 content_file = sys.argv[1]
 project_root = sys.argv[2]
@@ -677,7 +690,16 @@ backup_map_file = sys.argv[3] if len(sys.argv) > 3 else ''
 next_task_file = sys.argv[4] if len(sys.argv) > 4 else ''
 
 text = open(content_file, encoding='utf-8', errors='replace').read()
-auto_cont, cont_prompt = parse_auto_continue(text)
+auto_cont, cont_prompt, lesson_text = parse_auto_continue(text)
+
+# Ders varsa lessons.md'ye ekle
+if lesson_text:
+    import datetime
+    lessons_file = os.path.join(project_root, 'lessons.md')
+    ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+    with open(lessons_file, 'a', encoding='utf-8') as lf:
+        lf.write(f'\n- [{ts}] {lesson_text}\n')
+    print(f"LESSON_SAVED:{lesson_text[:80]}")
 
 ok = apply_markdown_fixes(content_file, project_root, backup_map_file)
 
