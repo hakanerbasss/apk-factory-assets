@@ -35,3 +35,9 @@ ANDROID KURALLARI:
 - DEPENDENCY KURALI: Unresolved reference varsa build.gradle'a implementation ekle
 - DUPLICATE IMPORT: Ayni import varsa tekrar ekleme
 - YENI PROJE: ui/theme/ klasoru YOKTUR, Theme.kt olusturma
+
+KRITIK TASARIM KORUMA KURALI:
+- MEVCUT TASARIMI DEGISTIRME - renkler, layout, animasyonlar oldugu gibi kalsın
+- Sadece istenen degisikligi minimal olarak uygula
+- Geri kalan koda DOKUNMA
+- Yeni ozellik eklerken mevcut ozellikleri silme

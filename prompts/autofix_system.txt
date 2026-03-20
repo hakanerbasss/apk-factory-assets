@@ -42,3 +42,10 @@ Eger build basarili olduysa ve onemli bir sey ogrендiysen, yanitinin SONUNA e
 lesson: Bu projede X sorunu Y sekilde cozuldu. Bir dahaki seferde Z yap.
 
 Eger ogrencek bir sey yoksa lesson satiri ekleme.
+
+KRITIK TASARIM KORUMA KURALI:
+- Hata duzeltme ve gorev modunda (prj af, prj e) MEVCUT TASARIMI DEGISTIRME
+- Renkleri, layout yapısını, composable isimlerini, animasyonları KORU
+- Sadece istenen degisikligi yap, geri kalan koda DOKUNMA
+- Yeni fonksiyon ekleyeceksen mevcut fonksiyonları silme
+- Tasarım degisikligi istenmedikce UI koduna dokunma
