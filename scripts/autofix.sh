@@ -433,8 +433,6 @@ Bu verileri analiz et:
     local advice=""
     # Payload dosyaya yaz (özel karakter sorunu önleme)
     local senior_payload_file="$TMP_DIR/senior_payload.json"
-    # Görünmez karakterleri () temizle
-    senior_model=$(echo "$senior_model" | tr -d '' | xargs)
     if [[ "$senior_name" == "Claude" ]]; then
         python3 -c "
 import json,sys
@@ -503,10 +501,6 @@ print(json.dumps({'model':'${MODEL}','max_tokens':500,'temperature':0.1,
     fi
 
     if [[ -n "$result" && "$result" != "null" && "$result" != "YOK" ]]; then
-        echo -e "
-${YELLOW}⚠️  KULLANICI AKSİYONU GEREKİYOR:${NC}"
-        echo -e "${YELLOW}${result}${NC}
-"
         echo "USER_ACTION_REQUIRED:${result}"
     fi
 }
@@ -765,14 +759,15 @@ run_autofix() {
         run_build
         local result; result=$(cat "$TMP_DIR/build_result.txt" 2>/dev/null || echo "FAILED")
 
-                if [[ "$result" == "SUCCESS" ]]; then
+
+            if [[ "$result" == "SUCCESS" ]]; then
             show_advanced_diff
             local elapsed=$((SECONDS - start))
             ok "BUILD BAŞARILI! 🎉  (${elapsed}s)"
             check_user_actions
             
             local apk; apk=$(find "$PROJECT_ROOT/app/build/outputs/apk" -name "*.apk" 2>/dev/null | head -1)
-            [[ -n "$apk" ]] && mkdir -p "/sdcard/Download/apk-cikti" && rm -f "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}"*.apk "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}"*.aab 2>/dev/null && cp "$apk" "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}.apk" 2>/dev/null && touch "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}.apk" && ok "APK → Download/apk-cikti"
+            [[ -n "$apk" ]] && ok "APK → Build tamamlandi"
 
             # --- OTONOM ZİNCİRLEME: SADECE BAŞARI DURUMUNDA TETİKLE ---
             if [[ -f "$SISTEM_DIR/next_task_${P_NAME:-$(basename $PROJECT_ROOT)}.txt" ]]; then
@@ -783,7 +778,8 @@ run_autofix() {
             fi
             # -------------------------------------------------------
 
-            read -r -p "$(echo -e "\n${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B=Yedeğe Dön]: ${NC}")" res
+            read -r -p "$(echo -e "
+${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B=Yedeğe Dön]: ${NC}")" res
             if [[ "$res" == "b" || "$res" == "B" ]]; then
                 restore_agent_backups
                 clean_agent_backups
@@ -794,7 +790,6 @@ run_autofix() {
             fi
             exit 0
         fi
-
 
         err "Build başarısız"
 
