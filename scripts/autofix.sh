@@ -501,6 +501,10 @@ print(json.dumps({'model':'${MODEL}','max_tokens':500,'temperature':0.1,
     fi
 
     if [[ -n "$result" && "$result" != "null" && "$result" != "YOK" ]]; then
+        echo "USER_ACTION_REQUIRED:${result}"
+    fi
+}
+
 call_ai() {
     local errors="$1" sources="$2"
     local error_text; error_text=$(cat "$errors")
