@@ -772,7 +772,7 @@ run_autofix() {
             check_user_actions
             
             local apk; apk=$(find "$PROJECT_ROOT/app/build/outputs/apk" -name "*.apk" 2>/dev/null | head -1)
-            [[ -n "$apk" ]] && mkdir -p "/sdcard/Download/apk-cikti" && rm -f "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}"*.apk "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}"*.aab 2>/dev/null && cp "$apk" "/sdcard/Download/apk-cikti/$(basename "$apk")" 2>/dev/null && touch "/sdcard/Download/apk-cikti/$(basename "$apk")" && ok "APK → Download/apk-cikti"
+            [[ -n "$apk" ]] && mkdir -p "/sdcard/Download/apk-cikti" && rm -f "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}"*.apk "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}"*.aab 2>/dev/null && cp "$apk" "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}.apk" 2>/dev/null && touch "/sdcard/Download/apk-cikti/${P_NAME:-$(basename $PROJECT_ROOT)}.apk" && ok "APK → Download/apk-cikti"
 
             # --- OTONOM ZİNCİRLEME: SADECE BAŞARI DURUMUNDA TETİKLE ---
             if [[ -f "$SISTEM_DIR/next_task_${P_NAME:-$(basename $PROJECT_ROOT)}.txt" ]]; then

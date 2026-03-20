@@ -782,17 +782,20 @@ class App : Application() {{
                         if pr["name"] == p:
                             pkg = pr.get("package", p)
                             break
-                    chain_file = f"{SISTEM_DIR}/chain_task.txt"
-                    if os.path.exists(chain_file):
-                        task_content = open(chain_file).read().strip()
-                        await ws.send(json.dumps({"type":"chain_task","task":task_content,"project":p}))
-                    else:
-                        await ws.send(json.dumps({"type":"chain_task","task":"","project":p}))
+                            
+                    found_task = ""
+                    for cf in [f"{SISTEM_DIR}/next_task_{pkg}.txt" if pkg else "", f"{SISTEM_DIR}/next_task_{p}.txt", f"{SISTEM_DIR}/next_task.txt", f"{SISTEM_DIR}/chain_task.txt"]:
+                        if cf and os.path.exists(cf):
+                            found_task = open(cf).read().strip()
+                            if found_task: break
+                            
+                    await ws.send(json.dumps({"type":"chain_task","task":found_task,"project":p}))
 
                 elif t == "delete_chain_task":
-                    chain_file = f"{SISTEM_DIR}/chain_task.txt"
-                    if os.path.exists(chain_file):
-                        os.remove(chain_file)
+                    import glob as _g
+                    for cf in _g.glob(f"{SISTEM_DIR}/next_task*.txt") + [f"{SISTEM_DIR}/chain_task.txt"]:
+                        try: os.remove(cf)
+                        except: pass
                     await ws.send(json.dumps({"type":"task_done","success":True,"text":"🗑 Bekleyen görev silindi"}))
 
                 elif t == "check_next_task":
