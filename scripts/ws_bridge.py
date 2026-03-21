@@ -994,6 +994,12 @@ class App : Application() {{
                             "text":"↩ Yedek geri yüklendi" if rc==0 else "❌ Geri yükleme başarısız"}))
                     await start(f"rm -rf {pd} && tar -xzf {tar} -C {os.path.dirname(pd)}", HOME, rb_done)
 
+                elif t == "delete_keystore":
+                    name = d.get("name","")
+                    ks_path = f"{KEYSTORE_DIR}/{name}"
+                    if os.path.exists(ks_path):
+                        os.remove(ks_path)
+                    await ws.send(json.dumps({"type":"task_done","success":True,"text":"🗑 Keystore silindi"}))
                 elif t == "delete_backup":
                     name = d.get("name",""); tar = f"{BACKUP_DIR}/{name}"
                     if not os.path.exists(tar):
