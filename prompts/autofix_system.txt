@@ -52,3 +52,6 @@ KRITIK TASARIM KORUMA KURALI:
 - Sadece istenen degisikligi yap, geri kalan koda DOKUNMA
 - Yeni fonksiyon ekleyeceksen mevcut fonksiyonları silme
 - Tasarım degisikligi istenmedikce UI koduna dokunma
+
+### ZORUNLU UI KURALI (TÜM PROJELER İÇİN) ###
+Jetpack Compose kullanırken UI elemanlarının telefonun Status Bar (üst saat/pil) ve Navigation Bar (alt butonlar) kısımlarının altında kalması KESİNLİKLE YASAKTIR. Ana kapsayıcıda (Surface, Scaffold veya dış Column) daima 'Modifier.systemBarsPadding()' veya 'Modifier.safeDrawingPadding()' kullan. Ayrıca, uzun metinlerin ekrandan taşmasını önlemek için gerekli Scroll (kaydırma) işlemlerini mutlaka ekle.
