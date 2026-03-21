@@ -90,9 +90,23 @@ object GlobalApiState {
     var defModel by androidx.compose.runtime.mutableStateOf("")
     var seniorProv by androidx.compose.runtime.mutableStateOf("")
     var seniorModel by androidx.compose.runtime.mutableStateOf("")
+    var uixProv by androidx.compose.runtime.mutableStateOf("")
+    var uixModel by androidx.compose.runtime.mutableStateOf("")
     var pendingAction: (() -> Unit)? by androidx.compose.runtime.mutableStateOf(null)
     var warningType by androidx.compose.runtime.mutableStateOf("")
     var showApiDialog by androidx.compose.runtime.mutableStateOf(false)
+}
+
+fun executeWithUixCheck(action: () -> Unit) {
+    val isSelected = GlobalApiState.uixProv.isNotEmpty() && GlobalApiState.uixProv != "Seçilmedi"
+    val hasKey = if (isSelected) GlobalApiState.apis.find { it.name.equals(GlobalApiState.uixProv, ignoreCase = true) }?.hasKey == true else false
+
+    if (!isSelected || !hasKey) {
+        GlobalApiState.warningType = "uix"
+        GlobalApiState.pendingAction = action
+    } else {
+        action()
+    }
 }
 
 fun executeWithApiCheck(action: () -> Unit) {
@@ -207,6 +221,8 @@ fun MainScreen() {
                     GlobalApiState.defModel = event.data["DEFAULT_MODEL"] ?: ""
                     GlobalApiState.seniorProv = event.data["SENIOR_PROVIDER"] ?: ""
                     GlobalApiState.seniorModel = event.data["SENIOR_MODEL"] ?: ""
+                    GlobalApiState.uixProv = event.data["UIX_PROVIDER"] ?: ""
+                    GlobalApiState.uixModel = event.data["UIX_MODEL"] ?: ""
                 }
                 is WsEvent.Disconnected -> { delay(8000); WsManager.connect() }
                         is WsEvent.UserAction -> logs = (logs + "\n⚠️ KULLANICI AKSİYONU:\n${event.text}").takeLast(600)
@@ -380,25 +396,30 @@ fun MainScreen() {
         AlertDialog(
             onDismissRequest = { GlobalApiState.warningType = ""; GlobalApiState.pendingAction = null },
             containerColor = CARD, shape = RoundedCornerShape(16.dp),
-            title = { Text(if (GlobalApiState.warningType == "junior") "🛑 API Key Eksik!" else "⚠️ Senior API Eksik", color = if (GlobalApiState.warningType == "junior") RED else ORANGE, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) },
+            title = { 
+                val tColor = when(GlobalApiState.warningType) { "junior" -> RED; "uix" -> PURPLE; else -> ORANGE }
+                val tText = when(GlobalApiState.warningType) { "junior" -> "🛑 API Key Eksik!"; "uix" -> "🎨 UIX Modeli Eksik!"; else -> "⚠️ Senior API Eksik" }
+                Text(tText, color = tColor, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) 
+            },
             text = {
                 Column {
-                    if (GlobalApiState.warningType == "junior") {
-                        Text("Ana yapay zeka (${GlobalApiState.defProv}) için API Key girilmemiş. İşleme devam edemezsiniz.", color = WHITE, fontSize = 13.sp)
-                    } else {
-                        Text("Gözlemci yapay zeka (${GlobalApiState.seniorProv}) için API Key girilmemiş. Hata olursa Senior AI devreye giremeyecek. Yine de devam edilsin mi?", color = WHITE, fontSize = 13.sp)
+                    when(GlobalApiState.warningType) {
+                        "junior" -> Text("Ana yapay zeka (${GlobalApiState.defProv}) için API Key girilmemiş. İşleme devam edemezsiniz.", color = WHITE, fontSize = 13.sp)
+                        "uix" -> Text("UIX Müfettişi için geçerli bir Vision Modeli seçilmemiş veya API Key girilmemiş. Lütfen Ayarlar sekmesinden model seçin ve API Key'inizi girin.", color = WHITE, fontSize = 13.sp)
+                        else -> Text("Gözlemci yapay zeka (${GlobalApiState.seniorProv}) için API Key girilmemiş. Hata olursa Senior AI devreye giremeyecek. Yine de devam edilsin mi?", color = WHITE, fontSize = 13.sp)
                     }
                 }
             },
             confirmButton = {
-                if (GlobalApiState.warningType == "junior") {
-                    Button(onClick = { GlobalApiState.warningType = ""; GlobalApiState.pendingAction = null; activeTab = AppTab.SETTINGS }, colors = ButtonDefaults.buttonColors(containerColor = ACCENT)) { Text("Tamam") }
+                if (GlobalApiState.warningType == "junior" || GlobalApiState.warningType == "uix") {
+                    val btnColor = if (GlobalApiState.warningType == "uix") PURPLE else ACCENT
+                    Button(onClick = { GlobalApiState.warningType = ""; GlobalApiState.pendingAction = null; activeTab = AppTab.SETTINGS }, colors = ButtonDefaults.buttonColors(containerColor = btnColor)) { Text("Ayarlara Git") }
                 } else {
                     Button(onClick = { GlobalApiState.warningType = ""; GlobalApiState.pendingAction?.invoke(); GlobalApiState.pendingAction = null }, colors = ButtonDefaults.buttonColors(containerColor = ORANGE)) { Text("Devam Et") }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { GlobalApiState.warningType = ""; GlobalApiState.pendingAction = null }) { Text(if (GlobalApiState.warningType == "junior") "İptal" else "Vazgeç", color = GREY) }
+                TextButton(onClick = { GlobalApiState.warningType = ""; GlobalApiState.pendingAction = null }) { Text(if (GlobalApiState.warningType == "senior") "Vazgeç" else "İptal", color = GREY) }
             }
         )
     }
@@ -1069,9 +1090,68 @@ fun AutoFixTab(
     var showBuildMenu by remember { mutableStateOf(false) }
     val ctx = LocalContext.current
     var showTermuxPermissionError by remember { mutableStateOf(false) }
+    var showTaskDialog by remember { mutableStateOf(false) }
+    var showUixDialog by remember { mutableStateOf(false) }
+    var uixComplaint by remember { mutableStateOf("") }
+    var uixImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val imagePicker = rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) uixImageUri = uri
+    }
         
     LaunchedEffect(logs.size) { scrollState.animateScrollTo(scrollState.maxValue) }
     LaunchedEffect(copyToast) { if (copyToast.isNotEmpty()) { delay(1800); copyToast = "" } }
+
+    if (showUixDialog) {
+        AlertDialog(
+            onDismissRequest = { showUixDialog = false },
+            containerColor = CARD, shape = RoundedCornerShape(16.dp),
+            title = { Text("🎨 UIX Teşhis Merkezi", color = PURPLE, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Tasarım veya etkileşim sorununu anlatın. Sistem ekran görüntüsü ve projedeki kodları okuyarak UIX modeline iletecektir.", color = GREY, fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = uixComplaint, onValueChange = { uixComplaint = it },
+                        placeholder = { Text("Örn: Buton sağdan taştı...", fontSize = 12.sp) },
+                        modifier = Modifier.fillMaxWidth().height(100.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PURPLE, unfocusedBorderColor = BORDER, focusedTextColor = WHITE, unfocusedTextColor = WHITE, focusedContainerColor = SURFACE, unfocusedContainerColor = SURFACE)
+                    )
+                    OutlinedButton(
+                        onClick = { imagePicker.launch("image/*") },
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, if (uixImageUri != null) GREEN else PURPLE),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = if (uixImageUri != null) GREEN else PURPLE)
+                    ) {
+                        Icon(Icons.Default.Image, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (uixImageUri != null) "✅ Ekran Görüntüsü Seçildi" else "📸 İsteğe Bağlı Resim Ekle", fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showUixDialog = false
+                        if (selectedProject != null) {
+                            val hasImage = uixImageUri != null
+                            if (hasImage) {
+                                try {
+                                    val inputStream = ctx.contentResolver.openInputStream(uixImageUri!!)
+                                    val destFile = java.io.File("/storage/emulated/0/termux-otonom-sistem/uix_referans.jpg")
+                                    inputStream?.use { input -> destFile.outputStream().use { output -> input.copyTo(output) } }
+                                } catch (e: Exception) {}
+                            }
+                            // Python motoruna bunun bir UIX görevi olduğunu belirten özel etiket
+                            val finalTask = "[UIX_MODE] " + uixComplaint
+                            onTask(selectedProject, finalTask)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PURPLE),
+                    enabled = uixComplaint.isNotBlank() || uixImageUri != null
+                ) { Text("Analizi Başlat") }
+            },
+            dismissButton = { TextButton(onClick = { showUixDialog = false }) { Text("İptal", color = GREY) } }
+        )
+    }
 
     if (GlobalApiState.showApiDialog) {
         AlertDialog(
@@ -1094,6 +1174,14 @@ fun AutoFixTab(
                             Spacer(Modifier.height(4.dp))
                             val isSeniorActive = GlobalApiState.seniorProv.isNotEmpty() && GlobalApiState.seniorProv != "Devre Dışı"
                             Text(if (isSeniorActive) "${GlobalApiState.seniorProv} - ${GlobalApiState.seniorModel.ifEmpty { "Seçilmedi" }}" else "Devre Dışı", color = if (isSeniorActive) WHITE else GREY, fontSize = 12.sp)
+                        }
+                    }
+                    Card(colors = CardDefaults.cardColors(containerColor = SURFACE), border = BorderStroke(1.dp, PURPLE.copy(alpha = 0.5f)), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text("UIX Müfettişi (Vision)", color = PURPLE, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(4.dp))
+                            val isUixActive = GlobalApiState.uixProv.isNotEmpty() && GlobalApiState.uixProv != "Seçilmedi"
+                            Text(if (isUixActive) "${GlobalApiState.uixProv} - ${GlobalApiState.uixModel.ifEmpty { "Seçilmedi" }}" else "Devre Dışı", color = if (isUixActive) WHITE else GREY, fontSize = 12.sp)
                         }
                     }
                 }
@@ -1212,51 +1300,111 @@ fun AutoFixTab(
 
                 // ── Görev satırı (idle + proje seçili) ─────────────────────────────
         if (runMode == RunMode.IDLE && selectedProject != null) {
-            Column(modifier = Modifier.background(SURFACE.copy(alpha = 0.4f))
-                .padding(horizontal = 10.dp, vertical = 8.dp)) {
 
-                // Textbox + butonlar
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    OutlinedTextField(
-                        value = task, onValueChange = { task = it },
-                        placeholder = { Text("Görev yaz... (boş bırakırsan otodüzelt)", fontSize = 11.sp) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp), singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = ACCENT, unfocusedBorderColor = BORDER,
-                            focusedTextColor = WHITE, unfocusedTextColor = WHITE, cursorColor = ACCENT,
-                            focusedContainerColor = CARD, unfocusedContainerColor = CARD),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
-                    )
-                    // 🤖 AI butonu
-                    // Boş → prj af | Dolu → prj e "task"
+            val taskFileLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
+                uri?.let {
+                    try {
+                        val txt = ctx.contentResolver.openInputStream(it)?.bufferedReader()?.readText() ?: ""
+                        task = if (task.isBlank()) txt else "$task\n\n$txt"
+                        copyToast = "📄 Dosya içeriği eklendi"
+                    } catch (e: Exception) { copyToast = "❌ Dosya okunamadı" }
+                }
+            }
+
+            if (showTaskDialog) {
+                AlertDialog(
+                    onDismissRequest = { showTaskDialog = false },
+                    containerColor = CARD, shape = RoundedCornerShape(16.dp),
+                    title = { Text("✨ Yeni Görev Ver", color = GREEN, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column {
+                            Text("Yapay zekanın bu projede yapmasını istediğiniz yeni özelliği veya değişikliği yazın.", color = GREY, fontSize = 12.sp)
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = task, onValueChange = { task = it },
+                                placeholder = { Text("Örn: Uygulamaya gece modu ekle...", fontSize = 12.sp) },
+                                modifier = Modifier.fillMaxWidth().height(100.dp),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = GREEN, unfocusedBorderColor = BORDER, focusedTextColor = WHITE, unfocusedTextColor = WHITE, focusedContainerColor = SURFACE, unfocusedContainerColor = SURFACE)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = { taskFileLauncher.launch("text/*") },
+                                modifier = Modifier.fillMaxWidth(),
+                                border = BorderStroke(1.dp, GREEN),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = GREEN)
+                            ) {
+                                Icon(Icons.Default.FileUpload, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("TXT Dosyasından Oku", fontSize = 12.sp)
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = { 
+                                showTaskDialog = false
+                                executeWithApiCheck {
+                                    if (task.isNotBlank()) onTask(selectedProject, task)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = GREEN)
+                        ) { Text("Görevi Başlat") }
+                    },
+                    dismissButton = { TextButton(onClick = { showTaskDialog = false }) { Text("İptal", color = GREY) } }
+                )
+            }
+
+            Column(modifier = Modifier.background(SURFACE.copy(alpha = 0.4f)).padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // ÜST SATIR: AutoFix ve Görev
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = { executeWithApiCheck { onAutofix(selectedProject) } },
+                        modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ACCENT)
+                    ) {
+                        Icon(Icons.Default.SmartToy, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("AutoFix", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+
+                    Button(
+                        onClick = { showTaskDialog = true },
+                        modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = GREEN)
+                    ) {
+                        Icon(Icons.Default.Code, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Görev Ver", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+
+                // ALT SATIR: UIX ve Build
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(
                         onClick = {
-                            executeWithApiCheck {
-                                if (task.isBlank()) onAutofix(selectedProject)
-                                else onTask(selectedProject, task)
+                            executeWithUixCheck {
+                                uixComplaint = ""
+                                uixImageUri = null
+                                showUixDialog = true
                             }
                         },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = ACCENT),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)
+                        modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PURPLE)
                     ) {
-                        Icon(Icons.Default.SmartToy, null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("AI", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Icon(Icons.Default.Brush, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("UIX Düzelt", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
-                    // 🔨 Build butonu → menü açar
-                    Box {
+
+                    Box(modifier = Modifier.weight(1f)) {
                         Button(
                             onClick = { showBuildMenu = true },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = GREEN),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)
+                            modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = ORANGE)
                         ) {
-                            Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Build", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Build Al", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                         DropdownMenu(
                             expanded = showBuildMenu,
@@ -1264,47 +1412,38 @@ fun AutoFixTab(
                             modifier = Modifier.background(CARD)
                         ) {
                             DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.BugReport, null, tint = GREEN, modifier = Modifier.size(16.dp))
+                                text = { 
+                                    Row(verticalAlignment = Alignment.CenterVertically) { 
+                                        Icon(Icons.Default.BugReport, null, tint = ORANGE, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(8.dp))
-                                        Column {
-                                            Text("prj d — Debug APK", color = WHITE, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                            Text("Build + Download'a taşı", color = GREY, fontSize = 10.sp)
-                                        }
-                                    }
+                                        Column { 
+                                            Text("prj d — Debug", color = WHITE, fontSize = 13.sp)
+                                            Text("Hızlı derleme", color = GREY, fontSize = 10.sp) 
+                                        } 
+                                    } 
                                 },
                                 onClick = { showBuildMenu = false; onBuildDebug(selectedProject) }
                             )
-                            Divider(color = BORDER, thickness = 0.5.dp)
+                            Divider(color = BORDER, thickness = 0.5f.dp)
                             DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                text = { 
+                                    Row(verticalAlignment = Alignment.CenterVertically) { 
                                         Icon(Icons.Default.RocketLaunch, null, tint = PURPLE, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(8.dp))
-                                        Column {
-                                            Text("prj b — Release AAB", color = WHITE, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                            Text("AAB build + imzala", color = GREY, fontSize = 10.sp)
-                                        }
-                                    }
+                                        Column { 
+                                            Text("prj b — Release", color = WHITE, fontSize = 13.sp)
+                                            Text("İmzalı Market Çıktısı", color = GREY, fontSize = 10.sp) 
+                                        } 
+                                    } 
                                 },
                                 onClick = { showBuildMenu = false; onBuildRelease(selectedProject) }
                             )
                         }
                     }
                 }
-
-                // Kısa açıklama
-                Text(
-                    if (task.isBlank()) "AI: boş → prj af (build+otodüzelt)  |  Yazarsan → prj e \"görev\""
-                    else "→ prj e \"$task\"",
-                    fontSize = 9.sp, color = GREY.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(top = 3.dp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
         }
+
 
 
 
@@ -1882,6 +2021,8 @@ fun SettingsTab() {
     var backupSearch by remember { mutableStateOf("") }
     var seniorProv by remember { mutableStateOf("") }
     var seniorModel by remember { mutableStateOf("") }
+    var uixProv by remember { mutableStateOf("") }
+    var uixModel by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) { WsManager.getSettings(); WsManager.getProviders() }
     LaunchedEffect(toast) { if (toast.isNotEmpty()) { delay(2500); toast = "" } }
@@ -1909,6 +2050,8 @@ fun SettingsTab() {
                     maxChars  = event.data["MAX_CHARS"] ?: "200000"
                     seniorProv = event.data["SENIOR_PROVIDER"] ?: ""
                     seniorModel = event.data["SENIOR_MODEL"] ?: ""
+                    uixProv = event.data["UIX_PROVIDER"] ?: ""
+                    uixModel = event.data["UIX_MODEL"] ?: ""
                 }
                 else -> {}
             }
@@ -2125,8 +2268,43 @@ fun SettingsTab() {
                 }
                 Spacer(Modifier.height(12.dp))
 
+                // UIX Vision Modeli Seçimi
+                Text("🎨 UIX / Vision Modeli", fontSize = 12.sp, color = GREY)
+                Text("Arayüz düzeltmelerinde kullanılacak Vision model (Örn: Claude 3.5 Sonnet, GPT-4o, Gemini 1.5 Pro).", fontSize = 10.sp, color = GREY.copy(alpha = 0.6f))
+                Spacer(Modifier.height(6.dp))
+                var showUixMenu by remember { mutableStateOf(false) }
+                var showUixModelMenu by remember { mutableStateOf(false) }
+                val uixOptions = listOf("Seçilmedi") + providers.map { it["name"] as String }
+                val uixModels = providers.find { it["name"] == uixProv }?.let { (it["models"] as? List<*>)?.filterIsInstance<String>() } ?: emptyList()
+
+                Box {
+                    OutlinedButton(onClick = { showUixMenu = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, BORDER), colors = ButtonDefaults.outlinedButtonColors(contentColor = WHITE)) {
+                        Text(if (uixProv.isEmpty()) "Provider Seç..." else uixProv, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        Icon(Icons.Default.ArrowDropDown, null, tint = GREY)
+                    }
+                    DropdownMenu(expanded = showUixMenu, onDismissRequest = { showUixMenu = false }, modifier = Modifier.background(CARD)) {
+                        uixOptions.forEach { opt ->
+                            DropdownMenuItem(text = { Text(opt, color = if (opt == "Seçilmedi") GREY else WHITE, fontSize = 13.sp) }, onClick = { uixProv = if (opt == "Seçilmedi") "" else opt; uixModel = ""; showUixMenu = false })
+                        }
+                    }
+                }
+
+                if (uixProv.isNotEmpty() && uixModels.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Box {
+                        OutlinedButton(onClick = { showUixModelMenu = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, BORDER), colors = ButtonDefaults.outlinedButtonColors(contentColor = WHITE)) {
+                            Text(if (uixModel.isEmpty()) "Vision Model seç..." else uixModel, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            Icon(Icons.Default.ArrowDropDown, null, tint = GREY)
+                        }
+                        DropdownMenu(expanded = showUixModelMenu, onDismissRequest = { showUixModelMenu = false }, modifier = Modifier.background(CARD)) {
+                            uixModels.forEach { m -> DropdownMenuItem(text = { Text(m, color = WHITE, fontSize = 12.sp) }, onClick = { uixModel = m; showUixModelMenu = false }) }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+
                 Button(onClick = { WsManager.saveSettings(mapOf("DEFAULT_PROVIDER" to defProv,
-                    "DEFAULT_MODEL" to selModel, "MAX_LOOPS" to maxLoops, "MAX_TOKENS" to maxTokens, "MAX_CHARS" to maxChars, "KEYSTORE_PASS" to ksPass, "SENIOR_PROVIDER" to seniorProv, "SENIOR_MODEL" to seniorModel)) },
+                    "DEFAULT_MODEL" to selModel, "MAX_LOOPS" to maxLoops, "MAX_TOKENS" to maxTokens, "MAX_CHARS" to maxChars, "KEYSTORE_PASS" to ksPass, "SENIOR_PROVIDER" to seniorProv, "SENIOR_MODEL" to seniorModel, "UIX_PROVIDER" to uixProv, "UIX_MODEL" to uixModel)) },
                     modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = ACCENT)) {
                     Icon(Icons.Default.Save, null, modifier = Modifier.size(16.dp))
@@ -2472,6 +2650,7 @@ fun PromptSection(
     var selectedPrompt  by remember { mutableStateOf("autofix_system") }
     var systemContent   by remember { mutableStateOf("") }
     var taskContent     by remember { mutableStateOf("") }
+    var uixContent      by remember { mutableStateOf("") }
     var isEditing       by remember { mutableStateOf(false) }
     var editText        by remember { mutableStateOf("") }
     var isDefault       by remember { mutableStateOf(true) }
@@ -2504,12 +2683,19 @@ fun PromptSection(
                 is WsEvent.PromptContent -> {
                     loading = false; resetting = false
                     isDefault = event.isDefault
-                    if (event.name == "autofix_system") {
-                        systemContent = event.content  // bellekte güncelle
-                        if (selectedPrompt == "autofix_system") editText = event.content
-                    } else {
-                        taskContent = event.content  // bellekte güncelle
-                        if (selectedPrompt == "autofix_task") editText = event.content
+                    when (event.name) {
+                        "autofix_system" -> {
+                            systemContent = event.content
+                            if (selectedPrompt == "autofix_system") editText = event.content
+                        }
+                        "uix_system" -> {
+                            uixContent = event.content
+                            if (selectedPrompt == "uix_system") editText = event.content
+                        }
+                        else -> {
+                            taskContent = event.content
+                            if (selectedPrompt == "autofix_task") editText = event.content
+                        }
                     }
                 }
                 is WsEvent.PromptArchives -> archives = event.list
@@ -2533,6 +2719,7 @@ fun PromptSection(
             loading = true
             WsManager.getPrompt("autofix_system")
             WsManager.getPrompt("autofix_task")
+            WsManager.getPrompt("uix_system")
             WsManager.listPromptArchives()
         }
     }
@@ -2587,10 +2774,10 @@ fun PromptSection(
 
             // Prompt tipi seçici
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("autofix_system" to "🔧 Hata Düzeltici", "autofix_task" to "✨ Görev").forEach { (name, label) ->
+                listOf("autofix_system" to "🔧 Hata Düzeltici", "autofix_task" to "✨ Görev", "uix_system" to "🎨 UIX Müfettişi").forEach { (name, label) ->
                     val sel = selectedPrompt == name
                     Surface(
-                        onClick = { selectedPrompt = name; editText = if (name == "autofix_system") systemContent else taskContent; isEditing = false },
+                        onClick = { selectedPrompt = name; editText = when (name) { "autofix_system" -> systemContent; "uix_system" -> uixContent; else -> taskContent }; isEditing = false },
                         shape = RoundedCornerShape(20.dp),
                         color = if (sel) ACCENT.copy(alpha = 0.15f) else CARD,
                         border = BorderStroke(1.dp, if (sel) ACCENT else BORDER)
@@ -2605,10 +2792,11 @@ fun PromptSection(
             Card(colors = CardDefaults.cardColors(containerColor = SURFACE),
                 shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, BORDER)) {
                 Text(
-                    if (selectedPrompt == "autofix_system")
-                        "🔧 Build hatası olduğunda AI'ya gönderilir. Nasıl düzelteceğini belirler."
-                    else
-                        "✨ 'prj e' veya AutoFix ekranından görev verildiğinde kullanılır.",
+                    when (selectedPrompt) {
+                        "autofix_system" -> "🔧 Build hatası olduğunda AI'ya gönderilir. Nasıl düzelteceğini belirler."
+                        "uix_system" -> "🎨 'UIX' butonuna basıldığında ekran görüntüsü ve projenin kodlarıyla birlikte tasarım müfettişine giden ana Prompt (Talimat)."
+                        else -> "✨ 'prj e' veya AutoFix ekranından görev verildiğinde kullanılır."
+                    },
                     modifier = Modifier.padding(10.dp), color = GREY, fontSize = 11.sp
                 )
             }
@@ -2695,7 +2883,7 @@ fun PromptSection(
                             Text("Kaydet", fontSize = 12.sp)
                         }
                         TextButton(onClick = {
-                            editText = if (selectedPrompt == "autofix_system") systemContent else taskContent
+                            editText = when (selectedPrompt) { "autofix_system" -> systemContent; "uix_system" -> uixContent; else -> taskContent }
                             isEditing = false
                         }) { Text("İptal", color = GREY, fontSize = 12.sp) }
                     }
