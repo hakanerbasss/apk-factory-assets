@@ -3,6 +3,31 @@
 import asyncio, websockets, json, os, pty, signal, shutil, glob, re, subprocess
 from datetime import datetime
 
+# --- BROKEN PIPE YÖNETİCİSİ ---
+import sys, os
+_old_excepthook = sys.excepthook
+def _friendly_excepthook(exctype, value, traceback):
+    if issubclass(exctype, BrokenPipeError):
+        print("\nℹ️ [SİSTEM NOTU]: İhtiyaç olan veri başarıyla alındı. İhtiyaç fazlası akış (Broken Pipe) güvenle kesildi.", file=sys.stderr)
+    else:
+        _old_excepthook(exctype, value, traceback)
+sys.excepthook = _friendly_excepthook
+
+# Flush (çıktı boşaltma) sırasındaki kırılmaları kibarlaştırmak için:
+if hasattr(sys.stdout, 'flush'):
+    _orig_flush = sys.stdout.flush
+    def _safe_flush():
+        try:
+            _orig_flush()
+        except BrokenPipeError:
+            print("\nℹ️ [SİSTEM NOTU]: İhtiyaç olan veri başarıyla alındı. İhtiyaç fazlası akış (Broken Pipe) güvenle kesildi.", file=sys.stderr)
+            try:
+                devnull = os.open(os.devnull, os.O_WRONLY)
+                os.dup2(devnull, sys.stdout.fileno())
+            except: pass
+    sys.stdout.flush = _safe_flush
+# ------------------------------
+
 SISTEM_DIR    = "/storage/emulated/0/termux-otonom-sistem"
 GITHUB_RAW    = "https://raw.githubusercontent.com/hakanerbasss/apk-factory-assets/main"
 HOME          = os.path.expanduser("~")

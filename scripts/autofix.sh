@@ -160,60 +160,7 @@ select_provider() {
 }
 
 create_default_prompt() {
-    mkdir -p "$PROMPTS_DIR"
-    echo 'Sen bir Kotlin/Android uzmanisın. Sana build hatalari ve kaynak dosyalar verilecek.
-
-CIKTI FORMATI - SADECE MARKDOWN, BASKA HICBIR SEY YAZMA:
-
-Once kisa bir aciklama yaz (1-2 satir), sonra degistirdigin her dosyayi su formatta ver:
-
-Dosya: app/src/main/java/com/wizaicorp/app/MainActivity.kt
-
-kod buraya
-
-KURALLAR:
-- Her dosyayi TAM olarak yaz
-- Dosya: satiri tam dosya yolu icermeli
-- Birden fazla dosya varsa her biri ayri blokta
-- ASLA JSON KULLANMA
-
-KRITIK TOKEN LIMITI KURALI:
-Gorev buyukse tum projeyi tek seferde yazma, gorevi asamalara bol.
-Yanitinin SONUNA ekle:
-
-auto_continue: true
-continue_prompt: Asama 1 tamamlandi. Asama 2: su dosyalari olustur...
-
-Tum gorev bittiyse:
-auto_continue: false
-
-ANDROID KURALLARI:
-- targetSdk ve compileSdk her zaman 35 olmali
-- Paket adi com.wizaicorp.* formatinda olmali
-- DEPENDENCY KURALI: Unresolved reference varsa app/build.gradle'a implementation ekle
-- AndroidManifest.xml icindeki android:theme degerini ASLA degistirme
-- TEMA KURALI: Sadece MaterialTheme kullan
-- DUPLICATE IMPORT KURALI: Ayni import varsa tekrar ekleme
-- YENI PROJE KURALI: ui/theme/ klasoru YOKTUR
-- KRITIK IMPORT: setContent ve ComponentActivity importlarini ASLA silme
-- KOTLIN IMPORT: Destructured import yok
-- AAPT2: gradle.properties'de android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2 olmali
-- UZMANLIK: SADECE Kotlin + Jetpack Compose
-
-DERS KAYDETME KURALI:
-Eger build basarili olduysa ve onemli bir sey ogrendiysen, yanitinin SONUNA ekle:
-lesson: Bu projede X sorunu Y sekilde cozuldu. Bir dahaki seferde Z yap.
-
-KRITIK TASARIM KORUMA KURALI:
-!!! TASARIM DOKUNULMAZLIĞI !!!
-- MEVCUT UI KODLARINI (GameScreen, Layoutlar) SİLMEK KESİNLİKLE YASAKTIR.
-- EĞER BİR DOSYAYI TAM YAZARKEN UI KISMINI EKSİK BIRAKIRSAN SİSTEM SENİ ENGELLER.
-- SADECE HATA OLAN SATIRI DÜZELT, TASARIMI KORU.
-- Hata duzeltme ve gorev modunda (prj af, prj e) MEVCUT TASARIMI DEGISTIRME
-- Renkleri, layout yapısını, composable isimlerini, animasyonları KORU
-- Sadece istenen degisikligi yap, geri kalan koda DOKUNMA
-- Yeni fonksiyon ekleyeceksen mevcut fonksiyonları silme
-- Tasarım degisikligi istenmedikce UI koduna dokunma' > "$PROMPTS_DIR/autofix_system.txt"
+    [[ ! -f "$PROMPTS_DIR/autofix_system.txt" ]] && err "HATA: autofix_system.txt bulunamadı!" && exit 1
 }
 
 find_project_root() {
@@ -250,7 +197,11 @@ run_build() {
         # Ekran görüntüsündeki "template" dosyasını gerçek gradle.properties olarak kopyala
         [[ ! -f "gradle.properties" ]] && cp "/storage/emulated/0/termux-otonom-sistem/setup/gradle.properties.template" ./gradle.properties 2>/dev/null || true
         chmod +x gradlew 2>/dev/null || true
-        ok "Motor başarıyla takıldı!"
+        # build.gradle dosyalarını da aşıla
+        [[ ! -f "build.gradle" ]] && cp "/storage/emulated/0/termux-otonom-sistem/setup/build.gradle" . 2>/dev/null || true
+        [[ ! -f "app/build.gradle" ]] && cp "/storage/emulated/0/termux-otonom-sistem/setup/app/build.gradle" "app/" 2>/dev/null || true
+        [[ ! -f "settings.gradle" ]] && cp "/storage/emulated/0/termux-otonom-sistem/setup/settings.gradle" . 2>/dev/null || true
+        ok "Motor ve Kalp (build.gradle) başarıyla takıldı!" 
     fi
     # -------------------------------------------------------------------
 
@@ -313,6 +264,9 @@ collect_source_files() {
     local max_chars
     max_chars=$(grep "^MAX_CHARS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo 60000)
     > "$collected"
+    echo "=== PROJE DOSYA AGACI ===" >> "$collected"
+    find "$PROJECT_ROOT" -maxdepth 4 -not -path "*/.*" -not -path "*/build/*" >> "$collected"
+    echo "=========================" >> "$collected" 
 
     add_file() {
         local fpath="$1"
@@ -561,7 +515,8 @@ ${glessons}
 ${lessons}
 === DERSLER SONU ==="
     fi
-    local user_msg="BUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`\n\nKAYNAK DOSYALAR:\n${source_text}"
+    local tree_content=$(find "$PROJECT_ROOT" -maxdepth 4 -not -path "*/.*" -not -path "*/build/*")
+    local user_msg="!!! MEVCUT PROJE DOSYA YAPISI (BUNLARI SILME) !!!\n${tree_content}\n\nBUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`\n\nKAYNAK DOSYALAR:\n${source_text}" 
 
     log "$NAME'e gönderiliyor... (${#source_text} karakter)"
     echo -e "${YELLOW}  ⏳ API yanıtı bekleniyor (Max 600sn)...${NC}"
@@ -1002,6 +957,9 @@ for p in set(paths):
 
     local collected="$TMP_DIR/collected_sources.txt"
     > "$collected"
+    echo "=== PROJE DOSYA AGACI ===" >> "$collected"
+    find "$PROJECT_ROOT" -maxdepth 4 -not -path "*/.*" -not -path "*/build/*" >> "$collected"
+    echo "=========================" >> "$collected" 
     while read -r f; do
         if [[ -f "$PROJECT_ROOT/$f" ]]; then
             echo "=== FILE: $f ===" >> "$collected"
@@ -1017,35 +975,7 @@ for p in set(paths):
 
     echo -e "${YELLOW}⚙️ Yapay Zeka kod yazıyor (Patch üretiliyor)...${NC}"
     local task_sp_file="$PROMPTS_DIR/autofix_task.txt"
-    # Dosya yoksa varsayılan oluştur, varsa kullanıcı kurallarını koru
-    if [[ ! -f "$task_sp_file" ]]; then
-        cat > "$task_sp_file" << 'PROMPT'
-Sen bir Kotlin/Android uzmanisın. Sana kullanicinin GOREVI ve ilgili KAYNAK DOSYALAR verilecek.
-
-CIKTI FORMATI - SADECE MARKDOWN, BASKA HICBIR SEY YAZMA:
-
-Once kisa aciklama (1-2 satir), sonra her degistirilen dosya su formatta:
-
-Dosya: app/src/main/java/com/wizaicorp/app/MainActivity.kt
-
-- kod buraya -
-
-KURALLAR:
-- Her dosyayi TAM olarak yaz
-- Dosya: satiri tam yol icermeli
-- ASLA JSON KULLANMA
-- Backtick bloklari disinda kod yazma
-
-KRITIK TASARIM KORUMA KURALI:
-!!! TASARIM DOKUNULMAZLIĞI !!!
-- MEVCUT UI KODLARINI (GameScreen, Layoutlar) SİLMEK KESİNLİKLE YASAKTIR.
-- EĞER BİR DOSYAYI TAM YAZARKEN UI KISMINI EKSİK BIRAKIRSAN SİSTEM SENİ ENGELLER.
-- SADECE HATA OLAN SATIRI DÜZELT, TASARIMI KORU.
-- Hata duzeltme ve gorev modunda MEVCUT TASARIMI DEGISTIRME
-- Renkleri, layout yapısını, animasyonları KORU
-- 150 satıra kadar olan dosyalarda sadece minimal degisiklik yap, geri kalan koda DOKUNMA!
-PROMPT
-    fi
+    if [[ ! -f "$task_sp_file" ]]; then err "HATA: autofix_task.txt bulunamadı!"; exit 1; fi
     local patch_sp=$(cat "$task_sp_file")
     local patch_um="GÖREV: $user_task\n\nKAYNAK DOSYALAR:\n$(cat "$collected")"
 

@@ -42,6 +42,11 @@ Eger build basarili olduysa ve onemli bir sey ogrendiysen, yanitinin SONUNA ekle
 lesson: Bu projede X sorunu Y sekilde cozuldu. Bir dahaki seferde Z yap.
 
 KRITIK TASARIM KORUMA KURALI:
+!!! VETO KURALI - İHLAL EDENİ ENGELLER !!!
+- 'Unresolved reference' (tanımlanamayan sembol) hatası aldığında o satırı SİLMEK KESİNLİKLE YASAKTIR.
+- Mevcut Composable fonksiyon çağrılarını (GameScreen() vb.) SİLEN AI başarısız sayılır.
+- Eğer bir sınıfı bulamıyorsan, 'import' satırlarını kontrol et veya dosyanın paket adını (package ...) klasör yoluyla uyumlu hale getir.
+- Tasarımı (UI) korumak, build hatasını çözmekten daha önceliklidir.
 - Hata duzeltme ve gorev modunda (prj af, prj e) MEVCUT TASARIMI DEGISTIRME
 - Renkleri, layout yapısını, composable isimlerini, animasyonları KORU
 - Sadece istenen degisikligi yap, geri kalan koda DOKUNMA
