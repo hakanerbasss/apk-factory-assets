@@ -1881,6 +1881,17 @@ fun SettingsTab() {
                         Icon(Icons.Default.Info, null, tint = ACCENT, modifier = Modifier.size(16.dp))
                     }
                 }
+                OutlinedTextField(
+                    value = maxTokens, onValueChange = { maxTokens = it.filter { c -> c.isDigit() } },
+                    placeholder = { Text("Manuel değer gir...", fontSize = 11.sp) },
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ACCENT, unfocusedBorderColor = BORDER,
+                        focusedTextColor = WHITE, unfocusedTextColor = WHITE, cursorColor = ACCENT,
+                        focusedContainerColor = CARD, unfocusedContainerColor = CARD),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+                )
+                Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("4000","8000","16000","32000").forEach { n ->
                         val sel = maxTokens == n
@@ -1899,6 +1910,17 @@ fun SettingsTab() {
                         Icon(Icons.Default.Info, null, tint = ACCENT, modifier = Modifier.size(16.dp))
                     }
                 }
+                OutlinedTextField(
+                    value = maxChars, onValueChange = { maxChars = it.filter { c -> c.isDigit() } },
+                    placeholder = { Text("Manuel değer gir...", fontSize = 11.sp) },
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ACCENT, unfocusedBorderColor = BORDER,
+                        focusedTextColor = WHITE, unfocusedTextColor = WHITE, cursorColor = ACCENT,
+                        focusedContainerColor = CARD, unfocusedContainerColor = CARD),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+                )
+                Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("60000","100000","200000","300000").forEach { n ->
                         val sel = maxChars == n

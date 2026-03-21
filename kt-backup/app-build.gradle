@@ -12,8 +12,8 @@ android {
         applicationId "com.wizaicorp.apkfactory"
         minSdk 26
         targetSdk 35
-        versionCode 179
-        versionName "1.178"
+        versionCode 180
+        versionName "1.179"
     }
 
     buildTypes {
