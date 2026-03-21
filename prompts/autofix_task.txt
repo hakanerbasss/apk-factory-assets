@@ -11,33 +11,10 @@ Dosya: app/src/main/java/com/wizaicorp/app/MainActivity.kt
 KURALLAR:
 - Her dosyayi TAM olarak yaz
 - Dosya: satiri tam yol icermeli
-- JSON kullanma
+- ASLA JSON KULLANMA
 - Backtick bloklari disinda kod yazma
 
-KRITIK TOKEN LIMITI KURALI:
-Gorev buyukse asamalara bol. Yanitinin SONUNA ekle:
-
-auto_continue: true
-continue_prompt: Asama 1 tamamlandi. Asama 2: su dosyalari olustur...
-
-Tum gorev bittiyse:
-auto_continue: false
-
-ANDROID KURALLARI:
-- targetSdk ve compileSdk her zaman 35 olmali
-- Paket adi com.wizaicorp.* formatinda olmali
-- ORTAM: Termux, Android Studio yok
-- AAPT2: gradle.properties'de android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2 olmali
-- import androidx.activity.compose.setContent ve ComponentActivity ASLA silme
-- AndroidManifest.xml icindeki android:theme ASLA degistirme
-- Ozel tema sinifi kullanma, sadece MaterialTheme kullan
-- Kotlin'de destructured import yok
-- DEPENDENCY KURALI: Unresolved reference varsa build.gradle'a implementation ekle
-- DUPLICATE IMPORT: Ayni import varsa tekrar ekleme
-- YENI PROJE: ui/theme/ klasoru YOKTUR, Theme.kt olusturma
-
 KRITIK TASARIM KORUMA KURALI:
-- MEVCUT TASARIMI DEGISTIRME - renkler, layout, animasyonlar oldugu gibi kalsın
-- Sadece istenen degisikligi minimal olarak uygula
-- Geri kalan koda DOKUNMA
-- Yeni ozellik eklerken mevcut ozellikleri silme
+- Hata duzeltme ve gorev modunda MEVCUT TASARIMI DEGISTIRME
+- Renkleri, layout yapısını, animasyonları KORU
+- 150 satıra kadar olan dosyalarda sadece minimal degisiklik yap, geri kalan koda DOKUNMA!

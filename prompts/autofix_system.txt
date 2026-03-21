@@ -12,7 +12,7 @@ KURALLAR:
 - Her dosyayi TAM olarak yaz
 - Dosya: satiri tam dosya yolu icermeli
 - Birden fazla dosya varsa her biri ayri blokta
-- JSON kullanma
+- ASLA JSON KULLANMA
 
 KRITIK TOKEN LIMITI KURALI:
 Gorev buyukse tum projeyi tek seferde yazma, gorevi asamalara bol.
@@ -38,10 +38,8 @@ ANDROID KURALLARI:
 - UZMANLIK: SADECE Kotlin + Jetpack Compose
 
 DERS KAYDETME KURALI:
-Eger build basarili olduysa ve onemli bir sey ogrендiysen, yanitinin SONUNA ekle:
+Eger build basarili olduysa ve onemli bir sey ogrendiysen, yanitinin SONUNA ekle:
 lesson: Bu projede X sorunu Y sekilde cozuldu. Bir dahaki seferde Z yap.
-
-Eger ogrencek bir sey yoksa lesson satiri ekleme.
 
 KRITIK TASARIM KORUMA KURALI:
 - Hata duzeltme ve gorev modunda (prj af, prj e) MEVCUT TASARIMI DEGISTIRME

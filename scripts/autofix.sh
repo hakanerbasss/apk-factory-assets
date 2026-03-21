@@ -161,56 +161,65 @@ select_provider() {
 
 create_default_prompt() {
     mkdir -p "$PROMPTS_DIR"
-    # Dosya zaten varsa kullanıcı kurallarını koru, üzerine yazma
-    [[ -f "$PROMPTS_DIR/autofix_system.txt" ]] && return 0
-    cat > "$PROMPTS_DIR/autofix_system.txt" << 'PROMPT'
-Sen bir Kotlin/Android uzmanısın. Sana build hataları ve kaynak dosyalar verilecek.
+    echo 'Sen bir Kotlin/Android uzmanisın. Sana build hatalari ve kaynak dosyalar verilecek.
 
-KRİTİK KURAL — BÜYÜK DOSYALAR: Eğer bir dosyaya 30+ satır kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" kullan. full_content = dosyanın TAM yeni içeriği.
-Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity : ComponentActivity() {...}"}
+CIKTI FORMATI - SADECE MARKDOWN, BASKA HICBIR SEY YAZMA:
 
-YENİ DOSYA OLUŞTURMA: Yeni bir .kt dosyası oluşturmak istersen full_content ile yeni dosya yolunu belirt. Sistem otomatik oluşturur.
-Örnek: {"path": "app/src/main/java/com/wizaicorp/proje/MusicService.kt", "full_content": "package com.wizaicorp.proje\n..."}
+Once kisa bir aciklama yaz (1-2 satir), sonra degistirdigin her dosyayi su formatta ver:
 
-ÇIKTI FORMATI - SADECE JSON, BAŞKA HİÇBİR ŞEY YAZMA:
-{
-  "explanation": "Hatayı buldum, x satırını y ile değiştiriyorum.",
-  "changes": [
-    {
-      "path": "app/build.gradle",
-      "original": "    implemntation 'com.example:library:1.0'",
-      "replacement": "    implementation 'com.example:library:1.0'"
-    }
-  ]
-}
+Dosya: app/src/main/java/com/wizaicorp/app/MainActivity.kt
+
+kod buraya
 
 KURALLAR:
-- "original" alanı için devasa bloklar yerine, SADECE hatanın olduğu 1-2 satırı ve değişecek yeri yaz. Çok satır yazarsan eşleşme başarısız olur.
-- "original" kod, dosyadakiyle harfi harfine aynı olmalı.
-- JSON dışında hiçbir şey yazma.
+- Her dosyayi TAM olarak yaz
+- Dosya: satiri tam dosya yolu icermeli
+- Birden fazla dosya varsa her biri ayri blokta
+- ASLA JSON KULLANMA
+
+KRITIK TOKEN LIMITI KURALI:
+Gorev buyukse tum projeyi tek seferde yazma, gorevi asamalara bol.
+Yanitinin SONUNA ekle:
+
+auto_continue: true
+continue_prompt: Asama 1 tamamlandi. Asama 2: su dosyalari olustur...
+
+Tum gorev bittiyse:
+auto_continue: false
 
 ANDROID KURALLARI:
-- targetSdk ve compileSdk her zaman 35 olmalı, 34 kullanma.
-- Paket adı com.wizaicorp.* formatında olmalı, com.fileexplorer veya com.example kullanma.
-- @OptIn hatası: @OptIn(ExperimentalFoundationApi::class) fonksiyon ÜSTÜNE yaz, statement olarak yazma.
-- İkon: SADECE Material Icons kullan, drawable XML ikonu oluşturma.
-- NativeAdView: adView.mediaView MUTLAKA set et. MediaView en az 120x120dp olmalı. visibility=GONE YAPMA, alpha=0f kullan, reklam gelince alpha=1f yap.
-- LazyColumn veya LazyRow asla verticalScroll/horizontalScroll içine koyma.
-- Eğer dosyada setContent { Text("AI Kodluyor...") } görürsen, "original" olarak "setContent { Text(\"AI Kodluyor...\") }" satırını kullan ve "replacement" olarak oyunun TÜM yeni setContent bloğunu ve importlarını yaz. Paket adını değiştirmeye çalışma.
-- KRİTİK IMPORT KURALI: "import androidx.activity.compose.setContent" ve "import androidx.activity.ComponentActivity" ASLA silinmez.
-- TEMA KURALI: Özel tema sınıfı (YourAppTheme, AppTheme, MyTheme vb.) KULLANMA. ui.theme.* paketi yoksa import etme. Sadece MaterialTheme kullan.
-- DUPLICATE IMPORT KURALI: Import satırı eklemeden önce dosyadaki mevcut importları kontrol et. Aynı import zaten varsa tekrar ekleme.
-- YENİ PROJE KURALI: factory.sh tarafından oluşturulan yeni projelerde ui/theme/ klasörü YOKTUR. Theme.kt dosyası oluşturma, sadece MaterialTheme kullan.
-- AndroidManifest.xml içindeki android:theme değerini ASLA değiştirme.
-- BÜYÜK KOD KURALI: Eğer bir dosyaya 50 satırdan fazla kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" alanını kullan. full_content dosyanın TAM içeriğini içerir. Bu JSON escape sorununu önler.
-  Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity..."}
-PROMPT
+- targetSdk ve compileSdk her zaman 35 olmali
+- Paket adi com.wizaicorp.* formatinda olmali
+- DEPENDENCY KURALI: Unresolved reference varsa app/build.gradle'a implementation ekle
+- AndroidManifest.xml icindeki android:theme degerini ASLA degistirme
+- TEMA KURALI: Sadece MaterialTheme kullan
+- DUPLICATE IMPORT KURALI: Ayni import varsa tekrar ekleme
+- YENI PROJE KURALI: ui/theme/ klasoru YOKTUR
+- KRITIK IMPORT: setContent ve ComponentActivity importlarini ASLA silme
+- KOTLIN IMPORT: Destructured import yok
+- AAPT2: gradle.properties'de android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2 olmali
+- UZMANLIK: SADECE Kotlin + Jetpack Compose
+
+DERS KAYDETME KURALI:
+Eger build basarili olduysa ve onemli bir sey ogrendiysen, yanitinin SONUNA ekle:
+lesson: Bu projede X sorunu Y sekilde cozuldu. Bir dahaki seferde Z yap.
+
+KRITIK TASARIM KORUMA KURALI:
+!!! TASARIM DOKUNULMAZLIĞI !!!
+- MEVCUT UI KODLARINI (GameScreen, Layoutlar) SİLMEK KESİNLİKLE YASAKTIR.
+- EĞER BİR DOSYAYI TAM YAZARKEN UI KISMINI EKSİK BIRAKIRSAN SİSTEM SENİ ENGELLER.
+- SADECE HATA OLAN SATIRI DÜZELT, TASARIMI KORU.
+- Hata duzeltme ve gorev modunda (prj af, prj e) MEVCUT TASARIMI DEGISTIRME
+- Renkleri, layout yapısını, composable isimlerini, animasyonları KORU
+- Sadece istenen degisikligi yap, geri kalan koda DOKUNMA
+- Yeni fonksiyon ekleyeceksen mevcut fonksiyonları silme
+- Tasarım degisikligi istenmedikce UI koduna dokunma' > "$PROMPTS_DIR/autofix_system.txt"
 }
 
 find_project_root() {
     local dir="$1"
     while [[ "$dir" != "/" ]]; do
-        [[ -f "$dir/gradlew" ]] && echo "$dir" && return 0
+        [[ -f "$dir/gradlew" || -f "$dir/build.gradle" || -f "$dir/build.gradle.kts" || -d "$dir/app" ]] && echo "$dir" && return 0
         dir="$(dirname "$dir")"
     done; return 1
 }
@@ -218,8 +227,8 @@ find_project_root() {
 detect_project() {
     PROJECT_ROOT=""
     [[ -n "${1:-}" && -d "$1" && -f "$1/gradlew" ]] && PROJECT_ROOT="$1"
-    [[ -z "$PROJECT_ROOT" ]] && PROJECT_ROOT=$(find_project_root "$(pwd)") || true
-    if [[ -z "$PROJECT_ROOT" ]] || [[ ! -f "$PROJECT_ROOT/gradlew" ]]; then
+    [[ -z "$PROJECT_ROOT" ]] && PROJECT_ROOT=$(find_project_root "$(pwd)") || PROJECT_ROOT=$(pwd)
+    if [[ -z "$PROJECT_ROOT" ]]; then
         err "Gradle projesi bulunamadı. Proje klasöründen çalıştırın."; exit 1
     fi
     SRC_ROOT="$PROJECT_ROOT/app/src/main/java"
@@ -232,6 +241,19 @@ run_build() {
     local build_out="$TMP_DIR/build_output.txt"
     local result_file="$TMP_DIR/build_result.txt"
     cd "$PROJECT_ROOT"
+
+    # --- YENİ: ZIP İLE GELEN EKSİK PROJELER İÇİN OTOMATİK MOTOR AŞILAMA ---
+    if [[ ! -f "gradlew" ]]; then
+        warn "Motor (gradlew) eksik! Setup klasöründen otomatik aşılanıyor..."
+        cp -r "/storage/emulated/0/termux-otonom-sistem/setup/gradle" . 2>/dev/null || true
+        cp "/storage/emulated/0/termux-otonom-sistem/setup/gradlew" . 2>/dev/null || true
+        # Ekran görüntüsündeki "template" dosyasını gerçek gradle.properties olarak kopyala
+        [[ ! -f "gradle.properties" ]] && cp "/storage/emulated/0/termux-otonom-sistem/setup/gradle.properties.template" ./gradle.properties 2>/dev/null || true
+        chmod +x gradlew 2>/dev/null || true
+        ok "Motor başarıyla takıldı!"
+    fi
+    # -------------------------------------------------------------------
+
     ./gradlew assembleDebug 2>&1 | tee "$build_out" | while IFS= read -r line; do
         if   [[ "$line" == *"> Task"* ]];           then echo -e "${CYAN}  ⚙  ${line#*> Task }${NC}"
         elif [[ "$line" == *"e: file://"* ]];       then echo -e "${RED}  ✗  $line${NC}"
@@ -388,7 +410,7 @@ call_senior_ai() {
 
     log "🎓 SENIOR GÖZLEMCİ devreye giriyor: $senior_name"
 
-    local senior_prompt="Sen kıdemli bir Android/Kotlin kod inceleyicisisin. Görütüm: Junior AI aynı build hatasını defalarca çözemedi. Kod YAZMA. Sadece Junior AI'a ne yapması gerektiğini 3-5 maddede, kısa ve net olarak açıkla. Türkçe yaz."
+    local senior_prompt="Sen Termux (APK Factory) ortamında çalışan kıdemli bir Android/Kotlin kod Mimarı ve Gözlemcisisin.\nKRİTİK BİLGİ: AAPT2 hatası varsa çözüm kesinlikle şudur: Junior AI'a 'gradle.properties' dosyasının en altına 'android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2' eklemesini söyle.\nGörütüm: Junior AI aynı build hatasını defalarca çözemedi. Kod YAZMA.\nSadece Junior AI'a Termux kısıtlamalarını hatırlatarak hatayı nasıl çözeceğini 3-5 maddede, kısa ve net açıkla.\nTürkçe yaz."
 
     # Geçmiş AI yanıtlarını topla (son 3 yanıt)
     local history_text=""
@@ -669,13 +691,23 @@ def apply_markdown_fixes(content_file, project_root, backup_map_file):
         abs_path = os.path.join(project_root, rel_path)
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
         if os.path.exists(abs_path):
-            bak = abs_path + '.bak_agent'
+            bak = os.path.join('/storage/emulated/0/termux-otonom-sistem/agent_yedekler', rel_path.replace('/', '_') + '.bak_agent')
             shutil.copy2(abs_path, bak)
             backup_map[abs_path] = bak
             old_lines = len(open(abs_path).readlines())
+            if abs_path.endswith('build.gradle'):
+                from re import sub
+                # Versiyon satırlarını prj scriptinin okuyabileceği alt alta formata zorla
+                new_content = sub(r'([;{])\s*(versionCode|versionName)', r'\1\n        \2', new_content)
+                new_content = sub(r'(versionCode \d+|versionName ".*?")\s*([;}])', r'\1\n    \2', new_content)
             open(abs_path, 'w', encoding='utf-8').write(new_content + '\n')
             print(f"MODIFIED:{rel_path}|{old_lines}|{len(new_content.splitlines())}")
         else:
+            if abs_path.endswith('build.gradle'):
+                from re import sub
+                # Versiyon satırlarını prj scriptinin okuyabileceği alt alta formata zorla
+                new_content = sub(r'([;{])\s*(versionCode|versionName)', r'\1\n        \2', new_content)
+                new_content = sub(r'(versionCode \d+|versionName ".*?")\s*([;}])', r'\1\n    \2', new_content)
             open(abs_path, 'w', encoding='utf-8').write(new_content + '\n')
             print(f"CREATED:{rel_path}|0|{len(new_content.splitlines())}")
     if backup_map_file and backup_map:
@@ -928,9 +960,9 @@ run_task() {
         done > "$tree_file"
 
     echo -e "${YELLOW}🔍 Görev için ilgili dosyalar keşfediliyor...${NC}"
-    local sp="Sen uzman bir Android asistanısın. Sadece JSON formatında dosya yollarını döndürürsün."
+    local sp="Sen uzman bir Android asistanısın. Sadece Markdown liste formatında dosya yollarını döndür."
     local pkg=$(grep "applicationId" "$PROJECT_ROOT/app/build.gradle" 2>/dev/null | head -1 | grep -oE '"[^"]+"'  | head -1 | tr -d '"')
-    local um="PROJE DOSYALARI:\n$(cat "$tree_file")\n\nPROJE PAKET ADI: $pkg\n\nGÖREV: $user_task\n\nSadece bu görevi yapmak için okumam ve değiştirmem gereken dosyaların yollarını içeren bir JSON dizisi döndür. DOSYA YOLLARI MUTLAKA PROJE DOSYALARI LİSTESİNDEN SEÇİLMELİ, uydurma yol yazma.\nÖrnek: [\"app/src/main/java/com/.../MainActivity.kt\"]"
+    local um="PROJE DOSYALARI:\n$(cat "$tree_file")\n\nPROJE PAKET ADI: $pkg\n\nGÖREV: $user_task\n\nSadece bu görevi yapmak için okumam ve değiştirmem gereken dosyaların yollarını içeren bir Markdown liste döndür (- app/src/...). DOSYA YOLLARI MUTLAKA PROJE DOSYALARI LİSTESİNDEN SEÇİLMELİ, uydurma yol yazma.\nÖrnek:\n- app/src/main/java/com/.../MainActivity.kt"
 
     if ! _call_active_ai "$sp" "$um"; then
         err "Keşif başarısız oldu."; return 1
@@ -942,13 +974,11 @@ import json, sys, re
 t=open('$TMP_DIR/ai_content.txt').read()
 t=re.sub(r'^\`+json\s*','',t,flags=re.MULTILINE)
 t=re.sub(r'^\`+\s*$','',t,flags=re.MULTILINE)
-try:
-    arr = json.loads(t)
-    if isinstance(arr, dict) and 'files' in arr: arr = arr['files']
-    elif isinstance(arr, dict) and 'changes' in arr: arr = [c['path'] for c in arr.get('changes', [])]
-    for f in arr: print(f)
-except Exception as e:
-    pass
+# Markdown listesinden dosya yollarını ayıkla (- path/to/file)
+import re
+paths = re.findall(r'[-\*]\s+([a-zA-Z0-9_/.-]+\.[a-z]+)', t)
+for p in set(paths):
+    print(p.strip())
 " > "$target_files"
 
     local file_count=$(wc -l < "$target_files" || echo 0)
@@ -990,49 +1020,30 @@ except Exception as e:
     # Dosya yoksa varsayılan oluştur, varsa kullanıcı kurallarını koru
     if [[ ! -f "$task_sp_file" ]]; then
         cat > "$task_sp_file" << 'PROMPT'
-Sen bir Kotlin/Android uzmanısın. Sana kullanıcının GÖREVİ ve ilgili KAYNAK DOSYALAR verilecek.
+Sen bir Kotlin/Android uzmanisın. Sana kullanicinin GOREVI ve ilgili KAYNAK DOSYALAR verilecek.
 
-KRİTİK KURAL — BÜYÜK DOSYALAR: Eğer bir dosyaya 30+ satır kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" kullan. full_content = dosyanın TAM yeni içeriği.
-Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity : ComponentActivity() {...}"}
+CIKTI FORMATI - SADECE MARKDOWN, BASKA HICBIR SEY YAZMA:
 
-YENİ DOSYA OLUŞTURMA: Yeni bir .kt dosyası oluşturmak istersen full_content ile yeni dosya yolunu belirt. Sistem otomatik oluşturur.
-Örnek: {"path": "app/src/main/java/com/wizaicorp/proje/MusicService.kt", "full_content": "package com.wizaicorp.proje\n..."}
+Once kisa aciklama (1-2 satir), sonra her degistirilen dosya su formatta:
 
-ÇIKTI FORMATI - SADECE JSON, BAŞKA HİÇBİR ŞEY YAZMA:
-{
-  "explanation": "Görev için şu dosyada şu değişikliği yapıyorum...",
-  "changes": [
-    {
-      "path": "app/src/.../Dosya.kt",
-      "original": "eski kodun değişecek 1-2 satırı",
-      "replacement": "yeni kod"
-    }
-  ]
-}
+Dosya: app/src/main/java/com/wizaicorp/app/MainActivity.kt
+
+- kod buraya -
 
 KURALLAR:
-- "original" alanı, dosyadaki hedef metinle harfi harfine aynı olmalı.
-- Dev bloklar yerine sadece değişecek kritik satırları seç.
-- JSON dışında hiçbir şey yazma.
+- Her dosyayi TAM olarak yaz
+- Dosya: satiri tam yol icermeli
+- ASLA JSON KULLANMA
+- Backtick bloklari disinda kod yazma
 
-ANDROID KURALLARI:
-- targetSdk ve compileSdk her zaman 35 olmalı, 34 kullanma.
-- Paket adı com.wizaicorp.* formatında olmalı, com.fileexplorer veya com.example kullanma.
-- @OptIn hatası: @OptIn(ExperimentalFoundationApi::class) fonksiyon ÜSTÜNE yaz, statement olarak yazma.
-- İkon: SADECE Material Icons kullan, drawable XML ikonu oluşturma.
-- NativeAdView: adView.mediaView MUTLAKA set et. MediaView en az 120x120dp olmalı. visibility=GONE YAPMA, alpha=0f kullan, reklam gelince alpha=1f yap.
-- LazyColumn veya LazyRow asla verticalScroll/horizontalScroll içine koyma.
-- Eğer dosyada setContent { Text("AI Kodluyor...") } görürsen, "original" olarak "setContent { Text(\"AI Kodluyor...\") }" satırını kullan ve "replacement" olarak oyunun TÜM yeni setContent bloğunu ve importlarını yaz. Paket adını değiştirmeye çalışma.
-- KRİTİK IMPORT KURALI: "import androidx.activity.compose.setContent" ve "import androidx.activity.ComponentActivity" ASLA silinmez. Import bloğunu yeniden yazarken bu iki satırın mutlaka korunduğunu kontrol et.
-- Import bloğunu yeniden yazarken mevcut importları SİLME, sadece eksik olanları EKLE.
-- TEMA KURALI: Özel tema sınıfı (YourAppTheme, AppTheme, MyTheme vb.) KULLANMA. ui.theme.* paketi yoksa import etme. Sadece MaterialTheme kullan.
-- DUPLICATE IMPORT KURALI: Import satırı eklemeden önce dosyadaki mevcut importları kontrol et. Aynı import zaten varsa tekrar ekleme.
-- YENİ PROJE KURALI: factory.sh tarafından oluşturulan yeni projelerde ui/theme/ klasörü YOKTUR. Theme.kt dosyası oluşturma, sadece MaterialTheme kullan.
-- setContent bloğunu değiştirirken fonksiyon tanımları (fun ...) ASLA setContent bloğu içine yazma. Composable fonksiyonlar her zaman Activity sınıfının DIŞINDA tanımlanır.
-- Yeni Composable fonksiyon eklerken önce Activity sınıfının kapanış parantezini bul, onun DIŞINA yaz.
-- AndroidManifest.xml içindeki android:theme değerini ASLA değiştirme.
-- BÜYÜK KOD KURALI: Eğer bir dosyaya 50 satırdan fazla kod yazman gerekiyorsa "original"/"replacement" yerine "full_content" alanını kullan. full_content dosyanın TAM içeriğini içerir.
-  Örnek: {"path": "MainActivity.kt", "full_content": "package com.x\nimport ...\nclass MainActivity..."}
+KRITIK TASARIM KORUMA KURALI:
+!!! TASARIM DOKUNULMAZLIĞI !!!
+- MEVCUT UI KODLARINI (GameScreen, Layoutlar) SİLMEK KESİNLİKLE YASAKTIR.
+- EĞER BİR DOSYAYI TAM YAZARKEN UI KISMINI EKSİK BIRAKIRSAN SİSTEM SENİ ENGELLER.
+- SADECE HATA OLAN SATIRI DÜZELT, TASARIMI KORU.
+- Hata duzeltme ve gorev modunda MEVCUT TASARIMI DEGISTIRME
+- Renkleri, layout yapısını, animasyonları KORU
+- 150 satıra kadar olan dosyalarda sadece minimal degisiklik yap, geri kalan koda DOKUNMA!
 PROMPT
     fi
     local patch_sp=$(cat "$task_sp_file")
