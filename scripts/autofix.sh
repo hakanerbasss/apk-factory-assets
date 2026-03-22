@@ -233,12 +233,17 @@ parse_errors() {
 
     # Sadece ilk 6'yı değil, ilk 20 satırı al ama BENZERSİZ (sort -u) olanları seç. 
     # Uyarıları (w:) eliyoruz, sadece gerçek hatalara (e:, error, Exception) odaklanıyoruz.
-    # FIX: ^e: ile tum Kotlin hatalarini yakala + fallback
-    grep -E "^e:|error:|^ERROR|AAPT|Could not find|Could not resolve|[Uu]nresolved|FAILED|Exception|Manifest|What went wrong" \
-        "$build_out" | head -n 40 | sort -u > "$errors_file" 2>/dev/null || true
-    # Hic hata satiri yoksa son 30 satiri al
+    # ONCELIK 1: Kotlin compile hatalarini yakala (^e: ile baslayanlar)
+    grep "^e:" "$build_out" | head -n 30 > "$errors_file" 2>/dev/null || true
+    # ONCELIK 2: ^e: yoksa diger hata pattern'lerini dene
     if [[ ! -s "$errors_file" ]]; then
-        tail -n 30 "$build_out" > "$errors_file"
+        grep -E "error:|^ERROR|AAPT|Could not find|Could not resolve|What went wrong" \
+            "$build_out" | grep -v "Caching disabled\|Thread\[\|Resolve mutations\|Skipping task\|started\.$\|Tasks to be" \
+            | head -n 20 | sort -u > "$errors_file" 2>/dev/null || true
+    fi
+    # ONCELIK 3: Hic yoksa son 30 satir (ama noise filtreli)
+    if [[ ! -s "$errors_file" ]]; then
+        tail -n 50 "$build_out" | grep -v "UP-TO-DATE\|NO-SOURCE\|Caching disabled\|Thread\[\|Resolve mutations\|Skipping task\|started\.$\|Tasks to be" | tail -n 20 > "$errors_file"
     fi
 
     # Hata veren dosya yollarını çıkar
@@ -341,7 +346,9 @@ _call_active_ai() {
 # ─── SENIOR (GÖZLEMCI) AI ───────────────────────────────────────────────────
 call_senior_ai() {
     local errors="$1" sources="$2"
-    local error_text; error_text=$(cat "$errors")
+    # Senior'a sadece ^e: satirlari gonder, --info gurultusu degil
+    local error_text; error_text=$(grep "^e:" "$errors" 2>/dev/null)
+    [[ -z "$error_text" ]] && error_text=$(cat "$errors")
     local source_text; source_text=$(cat "$sources")
     local original_task="${3:-}"
     local next_task_content=""
@@ -372,7 +379,7 @@ call_senior_ai() {
 
     log "🎓 SENIOR GÖZLEMCİ devreye giriyor: $senior_name"
 
-    local senior_prompt="Sen Termux (APK Factory) ortamında çalışan kıdemli bir Android/Kotlin kod Mimarı ve Gözlemcisisin.\nKRİTİK BİLGİ: AAPT2 hatası varsa çözüm kesinlikle şudur: Junior AI'a 'gradle.properties' dosyasının en altına 'android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2' eklemesini söyle.\nGörütüm: Junior AI aynı build hatasını defalarca çözemedi. Kod YAZMA.\nSadece Junior AI'a Termux kısıtlamalarını hatırlatarak hatayı nasıl çözeceğini 3-5 maddede, kısa ve net açıkla.\nTürkçe yaz."
+    local senior_prompt="Sen Termux ortaminda calisan kidemli Android/Kotlin Mimari.\nJunior AI ayni hatada donguye girmis. Asagidaki GERCEK hata satirlarini analiz et.\nKod YAZMA. Sadece Junior AI\'a 3-5 maddede net talimat ver:\n- Hangi dosyada hangi import eksik\n- Hangi sinif adi yanlis yazilmis (ornegin isSystemInDarkMode yerine isSystemInDarkTheme)\n- Hangi dependency eksik (artifact adi ver)\n- Unresolved reference varsa: import satirini VER\nKRITIK: Genel tavsiye verme (cache temizle, aapt2 ekle gibi). SOMUT HATA SATIRINA SOMUT COZUM ver.\nTurkce yaz."
 
     # Geçmiş AI yanıtlarını topla (son 3 yanıt)
     local history_text=""
@@ -706,12 +713,22 @@ if lesson_text:
     lessons_file = os.path.join(project_root, 'lessons.md')
     with open(lessons_file, 'a', encoding='utf-8') as lf:
         lf.write(f'\n- [{ts}] {lesson_text}\n')
-    # Global ders
+    # Global ders (dedup: ayni ders varsa tekrar ekleme)
     sistem_dir = os.environ.get('SISTEM_DIR', '/storage/emulated/0/termux-otonom-sistem')
     global_file = os.path.join(sistem_dir, 'global_lessons.md')
     proj_name = os.path.basename(project_root)
-    with open(global_file, 'a', encoding='utf-8') as gf:
-        gf.write(f'\n- [{ts}] [{proj_name}] {lesson_text}\n')
+    existing = ''
+    if os.path.exists(global_file):
+        existing = open(global_file, 'r', encoding='utf-8', errors='replace').read()
+    # Dersin ilk 50 karakteri zaten varsa ekleme (dedup)
+    if lesson_text[:50] not in existing:
+        with open(global_file, 'a', encoding='utf-8') as gf:
+            gf.write(f'\n- [{ts}] [{proj_name}] {lesson_text}\n')
+        # Global dosya 5000 karakteri gecerse eski dersleri kirp
+        if len(existing) > 5000:
+            lines = existing.strip().split('\n')
+            trimmed = '\n'.join(lines[-30:])  # son 30 ders
+            open(global_file, 'w', encoding='utf-8').write(trimmed + '\n')
     print(f"LESSON_SAVED:{lesson_text[:80]}")
 
 ok = apply_markdown_fixes(content_file, project_root, backup_map_file)
