@@ -1037,6 +1037,28 @@ class App : Application() {{
                             
                     await ws.send(json.dumps({"type":"chain_task","task":found_task,"project":p}))
 
+                elif t == "restore_agent_backups":
+                    SDIR2 = "/storage/emulated/0/termux-otonom-sistem"
+                    bmap  = f"{SDIR2}/agent_yedekler/backup_map.txt"
+                    restored = 0; errors = []
+                    if os.path.exists(bmap):
+                        for line in open(bmap):
+                            line = line.strip()
+                            if "|" not in line: continue
+                            orig, bak = line.split("|", 1)
+                            if os.path.exists(bak):
+                                try:
+                                    os.makedirs(os.path.dirname(orig), exist_ok=True)
+                                    import shutil as _sh2; _sh2.copy2(bak, orig); restored += 1
+                                except Exception as re: errors.append(str(re))
+                        open(bmap, "w").write("")
+                    if errors:
+                        await ws.send(json.dumps({"type":"task_done","success":False,
+                            "text":f"⚠️ {restored} dosya geri yüklendi, {len(errors)} hata"}))
+                    else:
+                        await ws.send(json.dumps({"type":"task_done","success":True,
+                            "text":f"↩ Yedeğe dönüldü ({restored} dosya)"}))
+
                 elif t == "delete_chain_task":
                     import glob as _g
                     for cf in _g.glob(f"{SISTEM_DIR}/next_task*.txt") + [f"{SISTEM_DIR}/chain_task.txt"]:
