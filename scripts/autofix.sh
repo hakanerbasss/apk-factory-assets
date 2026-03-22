@@ -184,9 +184,9 @@ detect_project() {
 
 run_build() {
     log "Build başlatılıyor..."
-    mkdir -p "$(dirname "$build_out")"
     echo -e "${CYAN}────────────────────────────────────────${NC}"
     local build_out="$TMP_DIR/build_output.txt"
+    mkdir -p "$TMP_DIR"
     local result_file="$TMP_DIR/build_result.txt"
     cd "$PROJECT_ROOT"
 
@@ -229,6 +229,7 @@ run_build() {
 
 parse_errors() {
     local build_out="$TMP_DIR/build_output.txt"
+    mkdir -p "$TMP_DIR"
     local errors_file="$TMP_DIR/errors.txt"
     local files_file="$TMP_DIR/error_files.txt"
 
