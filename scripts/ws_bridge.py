@@ -199,6 +199,30 @@ async def run_uix(ws, proj_name, proj_dir, complaint, start_fn=None):
                 except: pass
         await ul(f"📂 Kodlar toplandı ({len(kodlar)//1024}KB)")
 
+        # Yedek al — autofix.sh ile aynı sistemi kullan (agent_yedekler + backup_map)
+        AGENT_YEDEK_DIR = f"{SDIR}/agent_yedekler"
+        BACKUP_MAP = f"{AGENT_YEDEK_DIR}/backup_map.txt"
+        os.makedirs(AGENT_YEDEK_DIR, exist_ok=True)
+        # Mevcut backup_map'i temizle (taze başlangıç)
+        open(BACKUP_MAP, "w").write("")
+        yedek_sayisi = 0
+        for root, dirs, files in os.walk(proj_dir):
+            dirs[:] = [d for d in dirs if d not in {"build",".gradle",".idea",".git","outputs","intermediates","tmp"}]
+            for fname in files:
+                if os.path.splitext(fname)[1].lower() not in (".kt", ".xml"): continue
+                fpath = os.path.join(root, fname)
+                rel = os.path.relpath(fpath, proj_dir)
+                bak_name = rel.replace("/", "_") + ".bak_agent"
+                bak_path = os.path.join(AGENT_YEDEK_DIR, bak_name)
+                try:
+                    import shutil as _sh
+                    _sh.copy2(fpath, bak_path)
+                    with open(BACKUP_MAP, "a") as bm:
+                        bm.write(f"{fpath}|{bak_path}\n")
+                    yedek_sayisi += 1
+                except: pass
+        await ul(f"💾 UIX yedek alındı: {yedek_sayisi} dosya → agent_yedekler/")
+
         # Prompt
         pf = f"{SDIR}/prompts/uix_system.txt"
         if os.path.exists(pf):
