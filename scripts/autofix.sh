@@ -841,12 +841,12 @@ ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B
         local src; src=$(collect_source_files)
         
         # Senior AI devreye girme noktası (MAX_LOOPS/2)
-        local senior_threshold=$(( MAX_LOOPS / 2 ))
+        local senior_threshold=$(( (MAX_LOOPS + 1) / 2 ))
         [[ $senior_threshold -lt 2 ]] && senior_threshold=2
         local senior_prov; senior_prov=$(grep "^SENIOR_PROVIDER=" ~/.config/autofix.conf 2>/dev/null | cut -d'"' -f2)
         local senior_model; senior_model=$(grep "^SENIOR_MODEL=" ~/.config/autofix.conf 2>/dev/null | cut -d'"' -f2)
 
-        if [[ $loop -eq $senior_threshold && -n "$senior_prov" ]]; then
+        if [[ $loop -ge $senior_threshold && -n "$senior_prov" ]]; then
             warn "🎓 $loop. denemede Senior AI devreye giriyor: $senior_prov / $senior_model"
             if call_senior_ai "$ef" "$src" "${TASK_DESCRIPTION:-}" "af" "$loop"; then
                 # Senior tavsiyesini bir sonraki call_ai'a ekle
