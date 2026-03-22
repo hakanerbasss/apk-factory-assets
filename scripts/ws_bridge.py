@@ -85,7 +85,9 @@ def save_settings(data):
            f'MAX_TOKENS={data.get("MAX_TOKENS","8000")}\n',
            f'MAX_CHARS={data.get("MAX_CHARS","60000")}\n',
            f'SENIOR_PROVIDER="{data.get("SENIOR_PROVIDER","")}"\n',
-           f'SENIOR_MODEL="{data.get("SENIOR_MODEL","")}"\n']
+           f'SENIOR_MODEL="{data.get("SENIOR_MODEL","")}"\n',
+           f'UIX_PROVIDER="{data.get("UIX_PROVIDER","")}"\n',
+           f'UIX_MODEL="{data.get("UIX_MODEL","")}"\n']
     
     with open(ac, 'w') as f:
         f.writelines(ls)
@@ -131,6 +133,180 @@ def read_api_key(path):
                 return line[8:].strip().strip('"').strip("'")
     except: pass
     return ""
+
+
+async def run_uix(ws, proj_name, proj_dir, complaint):
+    import urllib.request, urllib.error, base64, ssl, io
+    import json as _j
+
+    SDIR = "/storage/emulated/0/termux-otonom-sistem"
+    HOME2 = os.path.expanduser("~")
+
+    async def ul(msg):
+        try: await ws.send(_j.dumps({"type":"log","text":msg}))
+        except: pass
+
+    try:
+        # Config oku
+        ac = f"{HOME2}/.config/autofix.conf"
+        cfg = {"UIX_PROVIDER":"Claude","UIX_MODEL":"claude-sonnet-4-5-20251001"}
+        if os.path.exists(ac):
+            for line in open(ac):
+                line=line.strip()
+                if "=" in line and not line.startswith("#"):
+                    k,v=line.split("=",1)
+                    cfg[k.strip()]=v.strip().strip('"').strip("'")
+        prov = cfg.get("UIX_PROVIDER","Claude").lower()
+        model = cfg.get("UIX_MODEL","claude-sonnet-4-5-20251001")
+        api_key = read_api_key(f"{SDIR}/apiler/{prov}.conf")
+        if not api_key:
+            await ul(f"❌ UIX: {prov} API key bulunamadı")
+            await ws.send(_j.dumps({"type":"task_done","success":False,"text":f"❌ UIX: {prov} API key eksik"}))
+            return
+        await ul(f"🔑 UIX: {prov.title()} / {model}")
+
+        # Resim
+        img_b64 = ""
+        img_path = f"{SDIR}/uix_referans.jpg"
+        if os.path.exists(img_path):
+            try:
+                from PIL import Image as _IMG
+                raw = open(img_path,"rb").read()
+                img = _IMG.open(io.BytesIO(raw)).convert("RGB")
+                w,h = img.size
+                if max(w,h) > 1080:
+                    r = 1080/max(w,h)
+                    img = img.resize((int(w*r),int(h*r)),_IMG.LANCZOS)
+                buf = io.BytesIO()
+                img.save(buf,format="JPEG",quality=85)
+                img_b64 = base64.b64encode(buf.getvalue()).decode()
+                await ul(f"🖼️ Resim hazır ({len(img_b64)//1024}KB)")
+            except Exception as ie:
+                await ul(f"⚠️ Resim işlenemedi: {ie}")
+
+        # Kodları topla
+        SKIP_D = {"build",".gradle",".idea",".git","outputs","intermediates","tmp","__pycache__"}
+        kodlar = ""
+        for root,dirs,files in os.walk(proj_dir):
+            dirs[:] = [d for d in dirs if d not in SKIP_D]
+            for fname in files:
+                if os.path.splitext(fname)[1].lower() not in (".kt",".xml"): continue
+                rel = os.path.relpath(os.path.join(root,fname), proj_dir)
+                try:
+                    blk = f"\n--- Dosya: {rel} ---\n" + open(os.path.join(root,fname),encoding="utf-8",errors="replace").read() + "\n"
+                    if len(kodlar)+len(blk) > 50000: kodlar += "\n--- [Limit: kalan atlandı] ---\n"; break
+                    kodlar += blk
+                except: pass
+        await ul(f"📂 Kodlar toplandı ({len(kodlar)//1024}KB)")
+
+        # Prompt
+        pf = f"{SDIR}/prompts/uix_system.txt"
+        if os.path.exists(pf):
+            sys_p = open(pf,encoding="utf-8",errors="replace").read().strip()
+            await ul("📋 Özel UIX prompt yüklendi")
+        else:
+            sys_p = ("Sen kıdemli bir Android UI/UX uzmanısın (Jetpack Compose ve XML).\n"
+                     "Görsel ve kod analizi yaparak sorunları düzelt.\n\n"
+                     "ÇIKIŞ FORMATI:\nDosya: yol/dosya.kt\n```kotlin\n// kodun tamamı\n```")
+
+        user_txt = f"Proje: {proj_name}\nŞikayet: {complaint}\n\nKodlar:\n{kodlar}"
+
+        # API isteği
+        ctx2 = ssl.create_default_context()
+        ctx2.check_hostname = False; ctx2.verify_mode = ssl.CERT_NONE
+
+        if prov == "claude":
+            parts = []
+            if img_b64: parts.append({"type":"image","source":{"type":"base64","media_type":"image/jpeg","data":img_b64}})
+            parts.append({"type":"text","text":user_txt})
+            payload = {"model":model,"max_tokens":8000,"system":sys_p,"messages":[{"role":"user","content":parts}]}
+            req = urllib.request.Request("https://api.anthropic.com/v1/messages",
+                data=_j.dumps(payload).encode(),
+                headers={"x-api-key":api_key,"anthropic-version":"2023-06-01","content-type":"application/json"},
+                method="POST")
+        elif prov == "gemini":
+            parts2 = []
+            if img_b64: parts2.append({"inline_data":{"mime_type":"image/jpeg","data":img_b64}})
+            parts2.append({"text":f"{sys_p}\n\n{user_txt}"})
+            payload = {"contents":[{"parts":parts2}]}
+            req = urllib.request.Request(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
+                data=_j.dumps(payload).encode(),
+                headers={"content-type":"application/json"}, method="POST")
+        else:
+            await ws.send(_j.dumps({"type":"task_done","success":False,"text":f"❌ UIX: Desteklenmeyen provider: {prov}"}))
+            return
+
+        await ul("⏳ Vision AI'ya gönderildi, yanıt bekleniyor...")
+        def do_req():
+            with urllib.request.urlopen(req, timeout=120, context=ctx2) as r:
+                return _j.loads(r.read().decode())
+        rj = await asyncio.to_thread(do_req)
+
+        # Yanıt
+        ai_txt = ""
+        if prov == "claude":
+            for b in rj.get("content",[]):
+                if b.get("type")=="text": ai_txt += b.get("text","")
+        elif prov == "gemini":
+            for c in rj.get("candidates",[]):
+                for p in c.get("content",{}).get("parts",[]):
+                    ai_txt += p.get("text","")
+
+        if not ai_txt.strip():
+            await ws.send(_j.dumps({"type":"task_done","success":False,"text":"❌ UIX: Boş yanıt"}))
+            return
+        await ul(f"✅ Yanıt alındı ({len(ai_txt)} karakter)")
+
+        # Dosyaları yaz
+        import re as _re
+        matches = list(_re.compile(r"Dosya:\s*([^\n`]+?)\s*\n```[a-zA-Z]*\n(.*?)```", _re.DOTALL).finditer(ai_txt))
+        if not matches:
+            await ul("⚠️ Dosya bloğu bulunamadı:\n" + ai_txt[:500])
+            await ws.send(_j.dumps({"type":"task_done","success":False,"text":"⚠️ UIX: AI yanıtında dosya bloğu yok"}))
+            return
+
+        yazilan = 0
+        for m in matches:
+            rel = m.group(1).strip()
+            code = m.group(2)
+            abs_p = os.path.join(proj_dir, rel)
+            try:
+                os.makedirs(os.path.dirname(abs_p), exist_ok=True)
+                open(abs_p,"w",encoding="utf-8").write(code)
+                await ul(f"✏️ Güncellendi: {rel}")
+                yazilan += 1
+            except Exception as we:
+                await ul(f"❌ Yazma hatası [{rel}]: {we}")
+
+        if yazilan == 0:
+            await ws.send(_j.dumps({"type":"task_done","success":False,"text":"❌ UIX: Hiçbir dosya yazılamadı"}))
+            return
+
+        await ul(f"📝 {yazilan} dosya güncellendi — build başlatılıyor...")
+        PRJ_SH2 = f"{SDIR}/prj.sh"
+        proc = await asyncio.create_subprocess_shell(f"bash {PRJ_SH2} d", cwd=proj_dir,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+        while True:
+            lb = await proc.stdout.readline()
+            if not lb: break
+            try: await ws.send(_j.dumps({"type":"log","text":lb.decode("utf-8",errors="replace").rstrip()}))
+            except: break
+        await proc.wait()
+        rc = proc.returncode or 0
+        apk = copy_apk(proj_dir, proj_name) if rc == 0 else None
+        await ws.send(_j.dumps({"type":"task_done","success":rc==0,
+            "text":"✅ UIX tamamlandı!" if rc==0 else "❌ UIX Build başarısız",
+            "apk_path":apk or "","project":proj_name}))
+
+    except urllib.error.HTTPError as he:
+        body = he.read().decode(errors="replace")
+        await ul(f"❌ API HTTP {he.code}: {body[:300]}")
+        await ws.send(_j.dumps({"type":"task_done","success":False,"text":f"❌ UIX API hatası: HTTP {he.code}"}))
+    except Exception as ex:
+        import traceback
+        await ul(f"❌ UIX hata: {ex}\n{traceback.format_exc()[:400]}")
+        await ws.send(_j.dumps({"type":"task_done","success":False,"text":f"❌ UIX: {ex}"}))
 
 def copy_apk(proj_dir, proj_name):
     candidates = [
@@ -836,10 +1012,18 @@ class App : Application() {{
                         await ws.send(json.dumps({"type":"next_task","task":"","project":p}))
 
                 elif t == "task":
-                    p    = d.get("project","")
-                    task = d.get("task","").replace("'","'\\''")
-                    pd   = get_proj_dir(p)
-                    await ws.send(json.dumps({"type":"status","text":f"✨ prj e: {p}"}))
+                    _raw = d.get("task","")
+                    if _raw.strip().upper().startswith("[UIX_MODE]"):
+                        _complaint = _raw.strip()[len("[UIX_MODE]"):].strip()
+                        _pd2 = get_proj_dir(d.get("project",""))
+                        await ws.send(json.dumps({"type":"status","text":"👁️ UIX Modu — Vision AI başlatılıyor..."}))
+                        asyncio.create_task(run_uix(ws, d.get("project",""), _pd2, _complaint))
+                        continue
+                    else:
+                        p    = d.get("project","")
+                        task = d.get("task","").replace("'","'\\''")
+                        pd   = get_proj_dir(p)
+                        await ws.send(json.dumps({"type":"status","text":f"✨ prj e: {p}"}))
                     # Paket adini bul (proje adi yerine, degismez)
                     pkg = ""
                     for pr in read_projeler():
