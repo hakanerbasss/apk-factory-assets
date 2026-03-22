@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/python3
 """APK Factory WS Bridge v11 — asyncio-native PTY (fork yok)"""
-import asyncio, websockets, json, os, pty, signal, shutil, glob, re, subprocess
+import asyncio, websockets, json, os, pty, signal, shutil, glob, re, subprocess, zipfile
 from datetime import datetime
 
 # --- BROKEN PIPE YÖNETİCİSİ ---
@@ -1548,6 +1548,69 @@ class App : Application() {{
                 elif t == "check_updates":
                     subprocess.Popen(["bash", "/storage/emulated/0/termux-otonom-sistem/check_updates.sh", "force"])
                     await ws.send(json.dumps({"type":"task_done","success":True,"text":"🔄 Güncelleme başlatıldı"}))
+
+
+                elif t == "export_sources":
+                    p = d.get("project",""); pd = get_proj_dir(p)
+                    fmt = d.get("format","txt")
+                    ts = datetime.now().strftime("%Y%m%d-%H%M")
+                    SKIP_EXT = {'.jpg','.jpeg','.png','.gif','.webp','.bmp','.ico','.svg',
+                                '.apk','.aab','.jar','.class','.dex','.so',
+                                '.keystore','.jks','.tar','.gz','.zip','.rar',
+                                '.mp3','.mp4','.wav','.ogg','.ttf','.otf','.woff','.woff2',
+                                '.db','.sqlite','.bin','.dat','.o','.a','.pyc'}
+                    SKIP_DIRS = {'build','.gradle','.idea','.git','__pycache__','node_modules','.cxx','intermediates','tmp','generated'}
+                    MAX_SIZE = 100 * 1024
+
+                    if not os.path.isdir(pd):
+                        await ws.send(json.dumps({"type":"error","text":f"Proje bulunamadı: {pd}"}))
+                        continue
+
+                    try:
+                        if fmt == "zip":
+                            out_path = f"/sdcard/Download/{p}-proje-{ts}.zip"
+                            with zipfile.ZipFile(out_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                                file_count = 0
+                                for root, dirs, files in os.walk(pd):
+                                    dirs[:] = [dd for dd in dirs if dd not in SKIP_DIRS]
+                                    for fname in sorted(files):
+                                        fp = os.path.join(root, fname)
+                                        ext = os.path.splitext(fname)[1].lower()
+                                        if ext in SKIP_EXT: continue
+                                        try:
+                                            if os.path.getsize(fp) > MAX_SIZE: continue
+                                        except OSError: continue
+                                        arc_name = os.path.relpath(fp, os.path.dirname(pd))
+                                        zf.write(fp, arc_name)
+                                        file_count += 1
+                            size_kb = os.path.getsize(out_path) // 1024
+                            await ws.send(json.dumps({"type":"export_done","path":out_path,"format":"zip",
+                                "text":f"📦 ZIP: {os.path.basename(out_path)} ({file_count} dosya, {size_kb}KB)"}))
+                        else:
+                            out_path = f"/sdcard/Download/{p}-tum-kod-{ts}.txt"
+                            file_count = 0
+                            with open(out_path, 'w', encoding='utf-8', errors='replace') as out:
+                                for root, dirs, files in os.walk(pd):
+                                    dirs[:] = [dd for dd in dirs if dd not in SKIP_DIRS]
+                                    for fname in sorted(files):
+                                        fp = os.path.join(root, fname)
+                                        ext = os.path.splitext(fname)[1].lower()
+                                        if ext in SKIP_EXT: continue
+                                        try:
+                                            if os.path.getsize(fp) > MAX_SIZE: continue
+                                        except OSError: continue
+                                        rel = os.path.relpath(fp, pd)
+                                        try: content = open(fp,'r',encoding='utf-8',errors='replace').read()
+                                        except: continue
+                                        out.write(f"// ═══ FILE: {rel} ═══\n")
+                                        out.write(content)
+                                        if not content.endswith('\n'): out.write('\n')
+                                        file_count += 1
+                            size_kb = os.path.getsize(out_path) // 1024
+                            await ws.send(json.dumps({"type":"export_done","path":out_path,"format":"txt",
+                                "text":f"📄 TXT: {os.path.basename(out_path)} ({file_count} dosya, {size_kb}KB)"}))
+                    except Exception as ex:
+                        await ws.send(json.dumps({"type":"error","text":f"Export hatası: {ex}"}))
 
                 elif t == "system_info":
                     await ws.send(json.dumps({"type":"system_info","data":{
