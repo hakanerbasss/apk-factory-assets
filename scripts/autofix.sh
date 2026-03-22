@@ -184,6 +184,7 @@ detect_project() {
 
 run_build() {
     log "Build başlatılıyor..."
+    mkdir -p "$(dirname "$build_out")"
     echo -e "${CYAN}────────────────────────────────────────${NC}"
     local build_out="$TMP_DIR/build_output.txt"
     local result_file="$TMP_DIR/build_result.txt"
