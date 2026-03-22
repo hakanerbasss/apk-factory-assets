@@ -135,7 +135,7 @@ def read_api_key(path):
     return ""
 
 
-async def run_uix(ws, proj_name, proj_dir, complaint):
+async def run_uix(ws, proj_name, proj_dir, complaint, start_fn=None):
     import urllib.request, urllib.error, base64, ssl, io
     import json as _j
 
@@ -283,21 +283,32 @@ async def run_uix(ws, proj_name, proj_dir, complaint):
             await ws.send(_j.dumps({"type":"task_done","success":False,"text":"❌ UIX: Hiçbir dosya yazılamadı"}))
             return
 
-        await ul(f"📝 {yazilan} dosya güncellendi — build başlatılıyor...")
+        await ul(f"📝 {yazilan} dosya güncellendi — AutoFix başlatılıyor...")
         PRJ_SH2 = f"{SDIR}/prj.sh"
-        proc = await asyncio.create_subprocess_shell(f"bash {PRJ_SH2} d", cwd=proj_dir,
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
-        while True:
-            lb = await proc.stdout.readline()
-            if not lb: break
-            try: await ws.send(_j.dumps({"type":"log","text":lb.decode("utf-8",errors="replace").rstrip()}))
-            except: break
-        await proc.wait()
-        rc = proc.returncode or 0
-        apk = copy_apk(proj_dir, proj_name) if rc == 0 else None
-        await ws.send(_j.dumps({"type":"task_done","success":rc==0,
-            "text":"✅ UIX tamamlandı!" if rc==0 else "❌ UIX Build başarısız",
-            "apk_path":apk or "","project":proj_name}))
+        if start_fn:
+            # PTY üzerinden prj e → AutoFix döngüsü devreye girer, loglar ekrana gelir
+            async def uix_done(rc, _pn=proj_name, _pd=proj_dir):
+                apk = copy_apk(_pd, _pn) if rc == 0 else None
+                await ws.send(_j.dumps({"type":"task_done","success":rc==0,
+                    "text":"✅ UIX tamamlandı!" if rc==0 else "❌ UIX Build başarısız",
+                    "apk_path":apk or "","project":_pn}))
+            escaped = "UIX duzeltme sonrasi build ve hata duzelt".replace("'","'\''")
+            await start_fn(f"bash {PRJ_SH2} e '{escaped}'", proj_dir, uix_done)
+        else:
+            # start_fn yoksa eski yöntem
+            proc = await asyncio.create_subprocess_shell(f"bash {PRJ_SH2} d", cwd=proj_dir,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+            while True:
+                lb = await proc.stdout.readline()
+                if not lb: break
+                try: await ws.send(_j.dumps({"type":"log","text":lb.decode("utf-8",errors="replace").rstrip()}))
+                except: break
+            await proc.wait()
+            rc = proc.returncode or 0
+            apk = copy_apk(proj_dir, proj_name) if rc == 0 else None
+            await ws.send(_j.dumps({"type":"task_done","success":rc==0,
+                "text":"✅ UIX tamamlandı!" if rc==0 else "❌ UIX Build başarısız",
+                "apk_path":apk or "","project":proj_name}))
 
     except urllib.error.HTTPError as he:
         body = he.read().decode(errors="replace")
@@ -1017,7 +1028,7 @@ class App : Application() {{
                         _complaint = _raw.strip()[len("[UIX_MODE]"):].strip()
                         _pd2 = get_proj_dir(d.get("project",""))
                         await ws.send(json.dumps({"type":"status","text":"👁️ UIX Modu — Vision AI başlatılıyor..."}))
-                        asyncio.create_task(run_uix(ws, d.get("project",""), _pd2, _complaint))
+                        asyncio.create_task(run_uix(ws, d.get("project",""), _pd2, _complaint, start))
                         continue
                     else:
                         p    = d.get("project","")
