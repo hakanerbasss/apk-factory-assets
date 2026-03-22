@@ -206,7 +206,7 @@ run_build() {
     # -------------------------------------------------------------------
 
     # FIX: pipe chain yerine dosyaya yaz (Broken Pipe onleme)
-    ./gradlew assembleDebug --no-daemon --info 2>&1 > "$build_out"
+    ./gradlew assembleDebug --no-daemon 2>--no-daemon --info 2>&11 > "$build_out"
     # Ekrana ozet bas
     while IFS= read -r line; do
         if   [[ "$line" == *"> Task"* ]];           then echo -e "${CYAN}  ⚙  ${line#*> Task }${NC}"
