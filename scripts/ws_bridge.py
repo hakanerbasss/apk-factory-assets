@@ -292,7 +292,16 @@ async def run_uix(ws, proj_name, proj_dir, complaint, start_fn=None):
                 await ws.send(_j.dumps({"type":"task_done","success":rc==0,
                     "text":"✅ UIX tamamlandı!" if rc==0 else "❌ UIX Build başarısız",
                     "apk_path":apk or "","project":_pn}))
-            escaped = "UIX duzeltme sonrasi build ve hata duzelt".replace("'","'\''")
+            # AI'ya tam bağlam ver: hangi dosyalar değişti + build hatasını düzelt
+            degisen = ", ".join([m.group(1).strip() for m in matches])
+            uix_task = (
+                f"UIX modeli az önce şu dosyaları güncelledi: {degisen}. "
+                f"Kullanıcı şikayeti: {complaint}. "
+                f"Build hatası oluştuysa SADECE o hatayı düzelt, "
+                f"UIX değişikliklerini silme veya geri alma. "
+                f"Eksik bağımlılık varsa app/build.gradle'a ekle."
+            )
+            escaped = uix_task.replace("'","'\''")
             await start_fn(f"bash {PRJ_SH2} e '{escaped}'", proj_dir, uix_done)
         else:
             # start_fn yoksa eski yöntem
