@@ -205,16 +205,19 @@ run_build() {
     fi
     # -------------------------------------------------------------------
 
-    ./gradlew assembleDebug 2>&1 | tee "$build_out" | while IFS= read -r line; do
+    # FIX: pipe chain yerine dosyaya yaz (Broken Pipe onleme)
+    ./gradlew assembleDebug --no-daemon 2>&1 > "$build_out"
+    # Ekrana ozet bas
+    while IFS= read -r line; do
         if   [[ "$line" == *"> Task"* ]];           then echo -e "${CYAN}  ⚙  ${line#*> Task }${NC}"
-        elif [[ "$line" == *"e: file://"* ]];       then echo -e "${RED}  ✗  $line${NC}"
+        elif [[ "$line" == *"e: "* ]];              then echo -e "${RED}  ✗  $line${NC}"
         elif [[ "$line" == *"error:"* ]];           then echo -e "${RED}  ✗  $line${NC}"
         elif [[ "$line" == *"Could not find"* ]];   then echo -e "${RED}  ✗  $line${NC}"
         elif [[ "$line" == *"BUILD SUCCESSFUL"* ]]; then echo -e "${GREEN}  ✅  BUILD SUCCESSFUL${NC}"
         elif [[ "$line" == *"BUILD FAILED"* ]];     then echo -e "${RED}  ❌  BUILD FAILED${NC}"
         elif [[ "$line" == *"warning:"* ]];         then echo -e "${YELLOW}  ⚠  $line${NC}"
         fi
-    done
+    done < "$build_out"
     echo -e "${CYAN}────────────────────────────────────────${NC}"
     if grep -q "BUILD SUCCESSFUL" "$build_out"; then
         echo "SUCCESS" > "$result_file"
@@ -230,8 +233,13 @@ parse_errors() {
 
     # Sadece ilk 6'yı değil, ilk 20 satırı al ama BENZERSİZ (sort -u) olanları seç. 
     # Uyarıları (w:) eliyoruz, sadece gerçek hatalara (e:, error, Exception) odaklanıyoruz.
-    grep -E "^e: file://|error:|^ERROR|AAPT:|AAPT2|Could not find|Could not resolve|unresolved|FAILED|Exception|Manifest" \
-        "$build_out" | head -n 20 | sort -u > "$errors_file" 2>/dev/null || true
+    # FIX: ^e: ile tum Kotlin hatalarini yakala + fallback
+    grep -E "^e:|error:|^ERROR|AAPT|Could not find|Could not resolve|[Uu]nresolved|FAILED|Exception|Manifest|What went wrong" \
+        "$build_out" | head -n 40 | sort -u > "$errors_file" 2>/dev/null || true
+    # Hic hata satiri yoksa son 30 satiri al
+    if [[ ! -s "$errors_file" ]]; then
+        tail -n 30 "$build_out" > "$errors_file"
+    fi
 
     # Hata veren dosya yollarını çıkar
     grep -oE '/[^ :]+\.[a-zA-Z0-9]+' "$errors_file" \
@@ -721,6 +729,26 @@ PYEOF
     local rc=$?
 
     if [[ $rc -ne 0 ]]; then
+        # FIX: AI kod yerine soru sormussa, hata detayini artir
+        local ai_text=$(cat "$TMP_DIR/ai_content.txt" 2>/dev/null)
+        if echo "$ai_text" | grep -qiE "gonder|send|gönder|lütfen|please|bilgi ver"; then
+            warn "AI soru sordu (kod vermedi). Stacktrace ile hata detayi arttiriliyor..."
+            cd "$PROJECT_ROOT"
+            ./gradlew compileDebugKotlin --no-daemon --stacktrace 2>&1 | grep -E "^e:|error:|Exception|Caused by" | head -30 > "$TMP_DIR/errors.txt"
+            if [[ -s "$TMP_DIR/errors.txt" ]]; then
+                log "Detayli hata bulundu: $(wc -l < \"$TMP_DIR/errors.txt\") satir"
+            fi
+        fi
+        # FIX: AI kod yerine soru sormussa, hata detayini artir
+        local ai_text=$(cat "$TMP_DIR/ai_content.txt" 2>/dev/null)
+        if echo "$ai_text" | grep -qiE "gonder|send|gönder|lütfen|please|bilgi ver"; then
+            warn "AI soru sordu (kod vermedi). Stacktrace ile hata detayi arttiriliyor..."
+            cd "$PROJECT_ROOT"
+            ./gradlew compileDebugKotlin --no-daemon --stacktrace 2>&1 | grep -E "^e:|error:|Exception|Caused by" | head -30 > "$TMP_DIR/errors.txt"
+            if [[ -s "$TMP_DIR/errors.txt" ]]; then
+                log "Detayli hata bulundu: $(wc -l < \"$TMP_DIR/errors.txt\") satir"
+            fi
+        fi
         err "Markdown parser başarısız — dosya güncellenemedi"
         return 1
     fi
