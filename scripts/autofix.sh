@@ -516,11 +516,17 @@ call_ai() {
     local source_text; source_text=$(cat "$sources")
     local max_chars
     max_chars=$(grep "^MAX_CHARS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo 60000)
-    # AKILLI TOKEN: Buyuk dosyalarda input kirp, output icin yer birak
+    # Model bazlı max input hesapla — output için yer bırak
     local source_len=${#source_text}
-    if [[ $source_len -gt 25000 ]]; then
-        max_chars=20000
-        warn "Buyuk kaynak ($source_len char) → input $max_chars'e kirpildi (output icin yer aciliyor)"
+    local model_input_limit=80000
+    if [[ "$MODEL" == *"haiku"* ]]; then
+        model_input_limit=30000
+    elif [[ "$MODEL" == *"sonnet"* || "$MODEL" == *"gpt-4"* || "$MODEL" == *"deepseek"* ]]; then
+        model_input_limit=60000
+    fi
+    if [[ $source_len -gt $model_input_limit ]]; then
+        warn "Buyuk kaynak ($source_len char) → input ${model_input_limit}'e kirpildi"
+        source_text="${source_text:0:$model_input_limit}"
     fi
     [[ ${#source_text} -gt $max_chars ]] && source_text="${source_text:0:$max_chars}"
 
@@ -968,13 +974,52 @@ ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B
             fi
         fi
 
-        if ! call_ai "$ef" "$src"; then
-            # Geçici prompt varsa geri yükle
-            [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt"
-            err "API hatası — $((MAX_LOOPS - loop)) deneme kaldı"; sleep 3; continue
+        # Hatalı dosya büyükse (300+ satır) orkestratörle yeniden yaz
+        local ork_used=false
+        local ork_script="$SISTEM_DIR/orchestrator.py"
+        if [[ -f "$ork_script" ]]; then
+            # Hata veren dosyaları bul
+            local error_files_list="$TMP_DIR/error_files.txt"
+            local big_error_file=""
+            if [[ -f "$error_files_list" ]]; then
+                while IFS= read -r fpath; do
+                    [[ ! -f "$fpath" ]] && continue
+                    local line_count; line_count=$(wc -l < "$fpath" 2>/dev/null || echo 0)
+                    if [[ $line_count -gt 300 ]]; then
+                        big_error_file="$fpath"
+                        break
+                    fi
+                done < "$error_files_list"
+            fi
+
+            if [[ -n "$big_error_file" ]]; then
+                local rel_path="${big_error_file#$PROJECT_ROOT/}"
+                warn "📐 Büyük dosya ($rel_path, $(wc -l < "$big_error_file") satır) — Orkestratör devreye giriyor..."
+                local error_text; error_text=$(cat "$ef")
+                local ork_task="Şu dosyayı hatasız olarak yeniden yaz: $rel_path
+Build hatası: $error_text
+KURAL: Sadece bu dosyayı yaz. Tüm fonksiyonları tamamla. Yarım bırakma."
+                local ork_out="$TMP_DIR/ork_fix_output.txt"
+                if python3 "$ork_script"                     --task "$ork_task"                     --project-root "$PROJECT_ROOT"                     --package "$PACKAGE"                     --provider "$PROVIDER_NAME"                     --api-url "$API_URL"                     --api-key "$API_KEY"                     --model "$MODEL"                     --max-tokens "$MAX_TOKENS"                     --output "$ork_out"                     --collected "$src"; then
+                    cp "$ork_out" "$TMP_DIR/ai_content.txt"
+                    ork_used=true
+                    ok "Orkestratör dosyayı yazdı → apply_fixes devralıyor"
+                else
+                    warn "Orkestratör başarısız — call_ai'a düşülüyor"
+                fi
+            fi
         fi
-        # Geçici prompt varsa geri yükle
-        [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
+
+        if [[ "$ork_used" == false ]]; then
+            if ! call_ai "$ef" "$src"; then
+                # Geçici prompt varsa geri yükle
+                [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt"
+                err "API hatası — $((MAX_LOOPS - loop)) deneme kaldı"; sleep 3; continue
+            fi
+            # Geçici prompt varsa geri yükle
+            [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
+        fi
+
         if ! apply_fixes; then
             err "Düzeltme başarısız — $((MAX_LOOPS - loop)) deneme kaldı"; sleep 2; continue
         fi
