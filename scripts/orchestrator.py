@@ -69,16 +69,23 @@ def call_api(provider, api_url, api_key, model, max_tokens, system_prompt, user_
     
     req = urllib.request.Request(api_url, data=payload, headers=headers, method="POST")
     
-    try:
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            data = json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        body = e.read().decode(errors="replace")[:500]
-        err(f"API HTTP {e.code}: {body}")
-        return None
-    except Exception as e:
-        err(f"API hata: {e}")
-        return None
+    MAX_RETRY = 3
+    for attempt in range(1, MAX_RETRY + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                data = json.loads(resp.read().decode())
+            break
+        except urllib.error.HTTPError as e:
+            body = e.read().decode(errors="replace")[:300]
+            if e.code == 429 and attempt < MAX_RETRY:
+                warn(f"⏳ Rate limit (429) — 60s bekleniyor... ({attempt}/{MAX_RETRY})")
+                time.sleep(60)
+                continue
+            err(f"API HTTP {e.code}: {body}")
+            return None
+        except Exception as e:
+            err(f"API hata: {e}")
+            return None
     
     # Yanıtı çıkar
     if provider == "Claude":
@@ -437,7 +444,7 @@ def main():
                 all_interfaces[os.path.basename(path)] = "\n".join(iface_lines)
             
             ok(f"{os.path.basename(path)} yazıldı ({i+1}/{len(files)})")
-            time.sleep(0.5)  # Rate limit koruması
+            time.sleep(30)  # Rate limit koruması — 30s bekleme
         else:
             err(f"{os.path.basename(path)} yazılamadı!")
     
