@@ -362,6 +362,11 @@ def copy_apk(proj_dir, proj_name):
     ]
     for p, ext in candidates:
         if os.path.exists(p):
+            # Aynı projenin eski APK/AAB'larını sil
+            import glob as _glob
+            for old in _glob.glob(f"{APK_OUT_DIR}/{proj_name}-*.{ext}"):
+                try: os.remove(old)
+                except: pass
             ts  = datetime.now().strftime("%Y%m%d-%H%M%S")
             dst = f"{APK_OUT_DIR}/{proj_name}-{ts}.{ext}"
             shutil.copy2(p, dst); return dst
