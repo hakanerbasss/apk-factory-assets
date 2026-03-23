@@ -903,6 +903,9 @@ run_autofix() {
     PACKAGE=$(grep 'applicationId' "$PROJECT_ROOT/app/build.gradle" 2>/dev/null | grep -o '"[^"]*"' | tr -d '"' | head -1)
     [ -z "$PACKAGE" ] && PACKAGE=$(grep 'namespace' "$PROJECT_ROOT/app/build.gradle" 2>/dev/null | grep -o '"[^"]*"' | tr -d '"' | head -1)
     [ -z "$PACKAGE" ] && PACKAGE="com.wizaicorp.app"
+    # SnapShot — döngü başlamadan önce tam yedek al
+    mkdir -p "$AGENT_YEDEK_DIR"
+    tar -czf "$AGENT_YEDEK_DIR/full_snapshot.tar.gz" -C "$PROJECT_ROOT" app/ build.gradle settings.gradle 2>/dev/null || true
     local TASK_DESCRIPTION="${1:-}"
     title "AutoFix Döngüsü — $NAME"
     log "Proje: $PROJECT_ROOT | Model: $MODEL"
@@ -940,6 +943,8 @@ run_autofix() {
             read -r -p "$(echo -e "
 ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B=Yedeğe Dön]: ${NC}")" res
             if [[ "$res" == "b" || "$res" == "B" ]]; then
+                log "🌀 SnapShot geri yükleniyor..."
+                tar -xzf "$AGENT_YEDEK_DIR/full_snapshot.tar.gz" -C "$PROJECT_ROOT" 2>/dev/null || true
                 restore_agent_backups
                 clean_agent_backups
                 ok "Yedeğe dönüldü."

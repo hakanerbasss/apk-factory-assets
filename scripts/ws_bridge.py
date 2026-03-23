@@ -1240,7 +1240,10 @@ class App : Application() {{
                     name = d.get("name",""); tar = f"{BACKUP_DIR}/{name}"
                     if not os.path.exists(tar):
                         await ws.send(json.dumps({"type":"error","text":"Yedek bulunamadı"})); continue
-                    pn = name.split('-202')[0]; pd = get_proj_dir(pn)
+                    # not(...) ve -hizli/-tam/-yedek suffix'lerini temizle
+                    raw = name.split('-202')[0]          # gamev9-not(v1)
+                    pn  = raw.split('-not(')[0].split('-hizli')[0].split('-tam')[0]  # gamev9
+                    pd  = get_proj_dir(pn)
                     async def rb_done(rc):
                         await ws.send(json.dumps({"type":"task_done","success":rc==0,
                             "text":"↩ Yedek geri yüklendi" if rc==0 else "❌ Geri yükleme başarısız"}))
