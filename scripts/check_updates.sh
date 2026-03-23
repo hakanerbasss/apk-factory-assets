@@ -14,6 +14,12 @@ curl -sf --max-time 30 "$GITHUB_RAW/scripts/ws_bridge.py" -o "$WS_BRIDGE" \
     && bash ~/restart_bridge.sh \
     || echo "ws_bridge güncellenemedi"
 
+# ── Orkestratör güncelle ─────────────────────────────────────────────────────
+curl -sf --max-time 30 "$GITHUB_RAW/scripts/orchestrator.py" -o "$SISTEM_DIR/orchestrator.py" \
+    && chmod +x "$SISTEM_DIR/orchestrator.py" \
+    && echo "orchestrator.py güncellendi" \
+    || echo "orchestrator.py güncellenemedi (opsiyonel)"
+
 # ── API conf - key korunarak güncelle ────────────────────────────────────────
 mkdir -p "$APILER_DIR"
 for conf in deepseek gemini openai claude groq qwen; do
