@@ -111,15 +111,30 @@ JSON formatı:
   "notes": "Tek cümle genel not"
 }
 
-KURALLAR:
-- Dosyaları küçük tut: her dosya MAX 200 satır
-- MainActivity.kt: sadece Activity + setContent + tema (80 satır max)
-- Data class'lar ayrı dosyada
-- Her ekran ayrı dosyada
-- build.gradle ve AndroidManifest.xml her zaman dahil et
-- Paket adı: com.wizaicorp.PROJE_ADI (altçizgi ile)
+!!! KRITIK DOSYA BOLME KURALI !!!
+HER DOSYA MAKSIMUM 200 SATIR. 200 SATIRDAN BUYUK DOSYA YASAKTIR.
+Tek dosyaya her seyi koyan plan REDDEDILIR.
+
+ZORUNLU DOSYA YAPISI (minimum 4-5 dosya):
+1. MainActivity.kt — SADECE Activity + setContent + tema (MAX 60 satir)
+2. Screens.kt VEYA her ekran ayri dosya (HomeScreen.kt, QuizScreen.kt vs)
+3. Data.kt — data class'lar + soru havuzu + sabit veriler
+4. Utils.kt — hesaplama fonksiyonlari, helper'lar
+5. AndroidManifest.xml
+
+ORNEK PLAN (IQ Testi):
+- MainActivity.kt (60 satir): Activity + sealed class Screen + tema
+- QuizData.kt (150 satir): data class IQQuestion + 30 soru havuzu + generateQuestions()
+- HomeScreen.kt (80 satir): Giris ekrani composable
+- QuizScreen.kt (150 satir): Test ekrani + timer + soru gosterim
+- ResultScreen.kt (100 satir): Sonuc + paylasim + IQ seviye aciklamasi
+- IQCalculator.kt (50 satir): calculateIQScore + calculateIQLevel fonksiyonlari
+
+- build.gradle ve AndroidManifest.xml her zaman dahil et (ama bunlari dosya listesine KOYMA, otomatik olusturulur)
+- Paket adi: com.wizaicorp.PROJE_ADI (altcizgi ile)
 - Navigation KULLANMA (sealed class Screen + mutableStateOf)
-- ui/theme klasörü OLUŞTURMA"""
+- ui/theme klasoru OLUSTURMA
+- Her Kotlin dosyasi AYNI pakette olsun (alt paket OLUSTURMA)"""
 
     pkg_path = args.package.replace(".", "/")
     user = f"""GÖREV: {args.task}
@@ -231,67 +246,110 @@ def phase3_build_gradle(args, plan):
     
     dep_lines = ""
     for d in deps:
-        dep_lines += f"    implementation \"{d}\"\n"
+        dep_lines += f"    implementation '{d}'\n"
     
-    # Sabit şablon — AI hatası IMKANSIZ
+    # Sabit şablon — Groovy DSL (Kotlin DSL DEĞİL!)
     gradle_content = f"""Dosya: app/build.gradle
 ```groovy
 plugins {{
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
 }}
 
 android {{
-    namespace = "{args.package}"
-    compileSdk = 35
+    namespace '{args.package}'
+    compileSdk 35
 
     defaultConfig {{
-        applicationId = "{args.package}"
-        minSdk = 24
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        applicationId '{args.package}'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
     }}
 
     buildTypes {{
         release {{
-            isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }}
     }}
     compileOptions {{
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }}
     kotlinOptions {{
-        jvmTarget = "1.8"
+        jvmTarget = '1.8'
     }}
     buildFeatures {{
-        compose = true
+        compose true
     }}
     composeOptions {{
-        kotlinCompilerExtensionVersion = "1.5.8"
+        kotlinCompilerExtensionVersion '1.5.8'
     }}
 }}
 
 dependencies {{
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.activity:activity-compose:1.8.0")
-    implementation(platform("androidx.compose:compose-bom:2023.10.01"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended:1.5.4")
-    implementation("androidx.compose.foundation:foundation:1.5.4")
-{dep_lines}    debugImplementation("androidx.compose.ui:ui-tooling")
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+    implementation 'androidx.activity:activity-compose:1.8.0'
+    implementation platform('androidx.compose:compose-bom:2023.10.01')
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.material:material-icons-extended:1.5.4'
+    implementation 'androidx.compose.foundation:foundation:1.5.4'
+{dep_lines}    debugImplementation 'androidx.compose.ui:ui-tooling'
 }}
 ```
 
 auto_continue: false"""
     
     return gradle_content
+
+
+def phase1_plan_retry(args, existing_files):
+    """Plan tekrar — tek dosya planını parçala."""
+    log("📐 Plan yeniden oluşturuluyor (dosya bölme zorunlu)...")
+    
+    system = """Sen bir Android/Kotlin proje planlayıcısın.
+SADECE JSON döndür, başka hiçbir şey yazma.
+!!! KRITIK: HER DOSYA MAKSIMUM 150 SATIR. TEK DOSYAYA HERSEYI KOYMA !!!
+
+JSON formatı:
+{
+  "files": [
+    {"path": "app/src/main/java/PKG/DosyaAdi.kt", "description": "...", "depends_on": [], "estimated_lines": 100}
+  ],
+  "dependencies": []
+}
+
+ZORUNLU: Minimum 4 Kotlin dosyası! MainActivity.kt MAX 60 satır!"""
+
+    pkg_path = args.package.replace(".", "/")
+    user = f"""GÖREV: {args.task}
+PAKET: {args.package}
+DOSYA YOLU: app/src/main/java/{pkg_path}/
+
+ÖNCEKİ PLAN TEK DOSYAYDII — REDDEDILDI.
+Şimdi minimum 4 Kotlin dosyası ile yeni plan ver.
+SADECE JSON döndür."""
+
+    response = call_api(
+        args.provider, args.api_url, args.api_key, args.model,
+        2000, system, user
+    )
+    
+    if not response:
+        return None
+    try:
+        clean = response.strip()
+        if clean.startswith("```"): clean = clean.split("\n", 1)[1]
+        if clean.endswith("```"): clean = clean[:-3]
+        return json.loads(clean.strip())
+    except:
+        return None
 
 
 def main():
@@ -320,6 +378,25 @@ def main():
         return 1
     
     files = plan["files"]
+    
+    # Plan doğrulama: 200+ satır dosya varsa uyar
+    for f in files:
+        est = f.get("estimated_lines", 0)
+        if est > 300:
+            warn(f"{f['path']} çok büyük ({est} satır)! Bölünmeli ama devam ediliyor...")
+    
+    # Tek dosya planı varsa ve büyükse → zorlayarak böl
+    kt_files = [f for f in files if f["path"].endswith(".kt")]
+    if len(kt_files) == 1 and kt_files[0].get("estimated_lines", 0) > 250:
+        warn("Tek Kotlin dosyası planlandı — otomatik bölme uygulanıyor!")
+        # Plan yetersiz, tekrar iste ama daha zorla
+        plan2 = phase1_plan_retry(args, existing)
+        if plan2 and "files" in plan2:
+            kt2 = [f for f in plan2["files"] if f["path"].endswith(".kt")]
+            if len(kt2) > 1:
+                plan = plan2
+                files = plan["files"]
+                ok(f"Bölünmüş plan: {len(files)} dosya")
     ok(f"Plan hazır: {len(files)} dosya")
     for f in files:
         print(f"  📄 {f['path']} (~{f.get('estimated_lines','?')} satır) — {f.get('description','')}")
