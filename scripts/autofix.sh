@@ -1120,7 +1120,10 @@ for p in set(paths):
     fi
 
     echo -e "\n${BOLD}${BLUE}🚀 Görev koda entegre edildi, otomatik derleme (Build & Fix) devralınıyor...${NC}"
-    run_autofix "$user_task"
+    if ! run_autofix "$user_task"; then
+        exit 1
+    fi
+    exit 0
 }
 
 main() {
@@ -1148,7 +1151,10 @@ main() {
             
             # --- YENİ: Normal hata çözmede de yedekleri temizle ---
             clean_agent_backups
-            run_autofix
+            if ! run_autofix; then
+                exit 1
+            fi
+            exit 0
             ;;
     esac
 }

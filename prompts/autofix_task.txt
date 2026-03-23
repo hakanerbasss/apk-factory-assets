@@ -1,3 +1,23 @@
+=== SENIOR AI TAVSİYESİ ===
+## Analiz
+
+Junior AI 3. denemede döngüye girmiş. Mod: `af` (hata düzeltme). Sorun: ResultScreen.kt yazıyor ama **asıl hata QuizScreen.kt satır 141'de** - yanlış dosyayı düzeltiyor.
+
+---
+
+## Junior AI'a Talimatlar
+
+1. **Asıl hata QuizScreen.kt satır 141'dedir, ResultScreen.kt değil.** `LinearProgressIndicator` çağrısında `progress` parametresi yanlış. Material3'te doğru kullanım: `progress = { questionTimeRemaining / 30f }` şeklinde lambda olmalı — mevcut kodda zaten lambda var ama `color` parametresi artık `LinearProgressIndicator`'da doğrudan desteklenmiyor. `color` yerine `colors = ProgressIndicatorDefaults.linearColors(trackColor = ..., color = ...)` kullan. Import ekle: `import androidx.compose.material3.ProgressIndicatorDefaults`
+
+2. **QuizScreen.kt satır 141'deki `LinearProgressIndicator` çağrısını şu şekilde düzelt:** `color = ...` parametresini kaldır, yerine `colors` parametresi ekle. Kullanılacak import: `import androidx.compose.material3.ProgressIndicatorDefaults`
+
+3. **ResultScreen.kt'ye dokunma.** Junior AI her denemede ResultScreen.kt yazıp durmuş, oysa build hatası sadece QuizScreen.kt:141'de. Sadece QuizScreen.kt'yi düzelt.
+
+4. **`getIQLabel`, `getIQColor`, `ActionButtonsRow`, `HorizontalDivider` hataları** ResultScreen.kt'ye aitse: `HorizontalDivider` yerine `Divider()` kullan (import: `import androidx.compose.material3.Divider`). `getIQLabel`/`getIQColor`/`ActionButtonsRow` ResultScreen.kt içinde `private fun` olarak tanımla, ayrı dosyaya taşıma.
+
+5. **Syntax error satır 316 (eksik `)`)**: ResultScreen.kt'de `String.format("%.1f sn", result.averageTimePerQuestion)` satırının bulunduğu `StatRow(...)` çağrısında kapanış parantezi eksik. O satırı bul, `StatRow("Ortalama Süre", String.format("%.1f sn", result.averageTimePerQuestion))` şeklinde düzelt — çift kapanış parantezi olduğundan emin ol.
+=========================
+
 Sen üst düzey bir Kotlin/Android ve Jetpack Compose uzmanısın. Kullanıcı sana sıfırdan bir proje yapma, yeni bir özellik ekleme veya mevcut kodu değiştirme GÖREVİ verecek. Sana projenin mevcut kodları da referans olarak sunulacak.
 
 CIKTI FORMATI - SADECE MARKDOWN, BASKA HICBIR SEY YAZMA:
