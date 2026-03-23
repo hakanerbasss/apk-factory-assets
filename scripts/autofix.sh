@@ -1074,14 +1074,45 @@ for p in set(paths):
         fi
     done < "$target_files"
 
-    echo -e "${YELLOW}⚙️ Yapay Zeka kod yazıyor (Patch üretiliyor)...${NC}"
-    local task_sp_file="$PROMPTS_DIR/autofix_task.txt"
-    if [[ ! -f "$task_sp_file" ]]; then err "HATA: autofix_task.txt bulunamadı!"; exit 1; fi
-    local patch_sp=$(cat "$task_sp_file")
-    local patch_um="GÖREV: $user_task\n\nKAYNAK DOSYALAR:\n$(cat "$collected")"
-
-    if ! _call_active_ai "$patch_sp" "$patch_um"; then
-         err "Kod üretilemedi."; return 1
+    # ═══ ORKESTRATÖR: Dosya dosya yaz (token taşması önleme) ═══
+    local ork_script="$SISTEM_DIR/orchestrator.py"
+    local ork_success=false
+    
+    if [[ -f "$ork_script" ]]; then
+        echo -e "${YELLOW}🏗️ Orkestratör: Proje planlanıyor ve dosya dosya yazılıyor...${NC}"
+        local ork_pkg="${P_PKG:-com.wizaicorp.$(basename $PROJECT_ROOT | tr '-' '_')}"
+        
+        mkdir -p "$TMP_DIR"
+        if python3 "$ork_script" \
+            --task "$user_task" \
+            --project-root "$PROJECT_ROOT" \
+            --package "$ork_pkg" \
+            --provider "$NAME" \
+            --api-url "$API_URL" \
+            --api-key "$API_KEY" \
+            --model "$MODEL" \
+            --max-tokens "$MAX_TOKENS" \
+            --output "$TMP_DIR/ai_content.txt" \
+            --collected "$collected"; then
+            ork_success=true
+            ok "Orkestratör tamamlandı!"
+        else
+            warn "Orkestratör başarısız — eski yönteme düşülüyor..."
+        fi
+    else
+        warn "orchestrator.py bulunamadı — eski yöntem kullanılıyor..."
+    fi
+    
+    # Fallback: Eski tek-geçiş modu
+    if [[ "$ork_success" != "true" ]]; then
+        echo -e "${YELLOW}⚙️ Yapay Zeka kod yazıyor (Tek geçiş)...${NC}"
+        local task_sp_file="$PROMPTS_DIR/autofix_task.txt"
+        if [[ ! -f "$task_sp_file" ]]; then err "HATA: autofix_task.txt bulunamadı!"; exit 1; fi
+        local patch_sp=$(cat "$task_sp_file")
+        local patch_um="GÖREV: $user_task\n\nKAYNAK DOSYALAR:\n$(cat "$collected")"
+        if ! _call_active_ai "$patch_sp" "$patch_um"; then
+             err "Kod üretilemedi."; return 1
+        fi
     fi
 
     if ! apply_fixes; then
