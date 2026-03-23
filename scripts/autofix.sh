@@ -1110,7 +1110,14 @@ for p in set(paths):
     local ork_script="$SISTEM_DIR/orchestrator.py"
     local ork_success=false
     
-    if [[ -f "$ork_script" ]]; then
+    local total_kt_lines=$(find "app/src/main/java" -type f -name "*.kt" -exec cat {} + 2>/dev/null | wc -l)
+    local is_new_project=false
+    # Kodda "AI Kodluyor" varsa VEYA 40 satırdan kısaysa bu yeni projedir
+    if grep -r -q "AI Kodluyor" "app/src/main/java" 2>/dev/null || [[ "$total_kt_lines" -lt 40 ]]; then
+        is_new_project=true
+    fi
+    
+    if [[ -f "$ork_script" ]] && [[ "$is_new_project" == true ]]; then
         echo -e "${YELLOW}🏗️ Orkestratör: Proje planlanıyor ve dosya dosya yazılıyor...${NC}"
         local ork_pkg="${P_PKG:-com.wizaicorp.$(basename $PROJECT_ROOT | tr '-' '_')}"
         

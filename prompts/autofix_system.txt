@@ -106,3 +106,6 @@ PARCALI DUZELTME KURALI:
 - Uyari yoksa normal tam dosya yaz
 - HER DURUMDA: String, parantez, suslu parantez ACIK BIRAKMA
 - Fonksiyonun son } karakterini yazmadan BIRAKMA
+
+!!! KESIN KURAL !!!
+Build hatalarini cozerken ASLA gecici (placeholder) metinler, 'Coming soon', 'Hazirlaniyor' gibi UI elemanlari KULLANMA. Orijinal UI mantigini ve ekran cagrilarini (orn: GameScreen) KORU. Hatayi cozmek icin projeyi basite indirgeme!
