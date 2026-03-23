@@ -556,7 +556,38 @@ ${lessons}
     if [[ ${#source_text} -gt 15000 ]]; then
         size_warning="\n\n!!! BUYUK DOSYA UYARISI !!!\nBu dosya cok buyuk. Tek seferde yazamazsan auto_continue: true kullan.\nDosyayi ASLA yarida birakma. Yarim kalan string YASAKTIR.\nEger dosya token limitine sigmazsa, onceki kod yapisini koru ve sadece HATALI SATIRLARI duzelt.\nTum dosyayi bastan yazma — sadece hatali fonksiyonu yeniden yaz."
     fi
-    local user_msg="!!! MEVCUT PROJE DOSYA YAPISI (BUNLARI SILME) !!!\n${tree_content}\n\nBUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`${size_warning}\n\nKAYNAK DOSYALAR:\n${source_text}" 
+    # ═══ AKILLI TOKEN HESAPLAYICI ═══
+    local input_chars=${#source_text}
+    local input_tokens=$((input_chars / 4))
+    
+    # Model output limitleri (API SABIT - degistirilemez)
+    local model_max_output=8192
+    local model_lower=$(echo "$MODEL" | tr '[:upper:]' '[:lower:]')
+    [[ "$model_lower" == *"sonnet"* || "$model_lower" == *"opus"* ]] && model_max_output=16384
+    [[ "$model_lower" == *"gemini"* ]] && model_max_output=16384
+    local max_output_lines=$((model_max_output * 4 / 80))
+    
+    # En buyuk hatali dosyanin satir sayisi
+    local biggest_file_lines=0
+    local biggest_file_name=""
+    while IFS= read -r ef; do
+        [[ -f "$ef" ]] || continue
+        local fl=$(wc -l < "$ef" 2>/dev/null || echo 0)
+        if [[ $fl -gt $biggest_file_lines ]]; then
+            biggest_file_lines=$fl
+            biggest_file_name=$(basename "$ef")
+        fi
+    done < "$TMP_DIR/error_files.txt" 2>/dev/null
+    
+    local size_warning=""
+    if [[ $biggest_file_lines -gt $max_output_lines ]]; then
+        size_warning="\n\n!!! KRITIK: PARCALI DUZELTME MODU !!!\nDosya: ${biggest_file_name} (${biggest_file_lines} satir) > Senin limitin (~${max_output_lines} satir)\nTUM DOSYAYI YAZMA! Sadece HATALI fonksiyonu yaz.\nDiger fonksiyonlara DOKUNMA. Ornek:\nDosya: app/.../MainActivity.kt\n\\`\\`\\`kotlin\n// ... onceki kod aynen ...\nfun hataliFonksiyon() {\n    // SADECE BU DUZELTILDI\n}\n// ... sonraki kod aynen ...\n\\`\\`\\`\nASLA string/parantez ACIK BIRAKMA!"
+    elif [[ $biggest_file_lines -gt $((max_output_lines / 2)) ]]; then
+        size_warning="\n\n!!! UYARI: Dosya buyuk (${biggest_file_lines} satir, limit ~${max_output_lines})\nDikkatli yaz. Sigmazsa auto_continue: true kullan. YARIM BIRAKMA!"
+    fi
+    
+    log "Token: input=${input_tokens}tok model_limit=${model_max_output} max_satir=~${max_output_lines} dosya=${biggest_file_lines}satir"
+    local user_msg="!!! MEVCUT PROJE DOSYA YAPISI (BUNLARI SILME) !!!\n${tree_content}\n\nBUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`${size_warning}\n\nKAYNAK DOSYALAR:\n${source_text}"
 
     log "$NAME'e gönderiliyor... (${#source_text} karakter)"
     echo -e "${YELLOW}  ⏳ API yanıtı bekleniyor (Max 600sn)...${NC}"

@@ -98,3 +98,11 @@ TOKEN YONETIMI KURALI:
 - ASLA dosyayi yarim birakma — string veya parantez ACIK KALMASI YASAKTIR
 - Eger tek seferde sigmazsa: auto_continue: true kullan
 - Dosya: satirinda sadece degisen dosyayi yaz, degismeyenleri ATLAMA
+
+PARCALI DUZELTME KURALI:
+- Mesajda "PARCALI DUZELTME MODU" varsa TUM dosyayi yazma
+- Sadece hatali fonksiyonu yaz, digerleri "// ... mevcut kod ..." olsun
+- Mesajda "UYARI: Dosya buyuk" varsa dikkatli yaz, sigmazsa auto_continue kullan
+- Uyari yoksa normal tam dosya yaz
+- HER DURUMDA: String, parantez, suslu parantez ACIK BIRAKMA
+- Fonksiyonun son } karakterini yazmadan BIRAKMA
