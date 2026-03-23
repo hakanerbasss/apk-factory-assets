@@ -84,6 +84,10 @@ def call_api(provider, api_url, api_key, model, max_tokens, system_prompt, user_
             err(f"API HTTP {e.code}: {body}")
             return None
         except Exception as e:
+            if attempt < MAX_RETRY:
+                warn(f"⏳ Bağlantı hatası ({e}) — 10s sonra tekrar... ({attempt}/{MAX_RETRY})")
+                time.sleep(10)
+                continue
             err(f"API hata: {e}")
             return None
     
