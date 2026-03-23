@@ -87,7 +87,8 @@ def save_settings(data):
            f'SENIOR_PROVIDER="{data.get("SENIOR_PROVIDER","")}"\n',
            f'SENIOR_MODEL="{data.get("SENIOR_MODEL","")}"\n',
            f'UIX_PROVIDER="{data.get("UIX_PROVIDER","")}"\n',
-           f'UIX_MODEL="{data.get("UIX_MODEL","")}"\n']
+           f'UIX_MODEL="{data.get("UIX_MODEL","")}"\n',
+           f'DEFAULT_MODEL="{data.get("DEFAULT_MODEL","")}"\n']
     
     with open(ac, 'w') as f:
         f.writelines(ls)
