@@ -1247,7 +1247,9 @@ class App : Application() {{
                     async def rb_done(rc):
                         await ws.send(json.dumps({"type":"task_done","success":rc==0,
                             "text":"↩ Yedek geri yüklendi" if rc==0 else "❌ Geri yükleme başarısız"}))
-                    await start(f"rm -rf {pd} && tar -xzf {tar} -C {os.path.dirname(pd)}", HOME, rb_done)
+                    # Parantez içeren yedek adları için tırnak kullan
+                    safe_tar = tar.replace("'", "'\''")
+                    await start(f"rm -rf '{pd}' && tar -xzf '{safe_tar}' -C '{os.path.dirname(pd)}'", HOME, rb_done)
 
                 elif t == "delete_keystore":
                     name = d.get("name","")
