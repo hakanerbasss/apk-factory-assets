@@ -433,7 +433,10 @@ def main():
     if args.collected and os.path.exists(args.collected):
         existing = open(args.collected, 'r', errors='replace').read()[:5000]
     
+    total_start = time.time()
+    
     # ═══ FAZ 1: PLAN ═══
+    faz1_start = time.time()
     plan = phase1_plan(args, existing)
     if not plan or "files" not in plan:
         err("Plan oluşturulamadı! Tek-geçiş moduna düşülüyor.")
@@ -459,11 +462,12 @@ def main():
                 plan = plan2
                 files = plan["files"]
                 ok(f"Bölünmüş plan: {len(files)} dosya")
-    ok(f"Plan hazır: {len(files)} dosya")
+    ok(f"Plan hazır: {len(files)} dosya ({time.time()-faz1_start:.1f}s)")
     for f in files:
         print(f"  📄 {f['path']} (~{f.get('estimated_lines','?')} satır) — {f.get('description','')}")
     
     # ═══ FAZ 2: HER DOSYAYI YAZ ═══
+    faz2_start = time.time()
     print(f"\n\033[1;34m{'='*50}\033[0m")
     log(f"📝 FAZ 2: {len(files)} dosya yazılıyor (her biri ayrı API çağrısı)")
     print(f"\033[1;34m{'='*50}\033[0m\n")
@@ -485,7 +489,9 @@ def main():
         if "build.gradle" in path:
             continue
         
+        file_start = time.time()
         response = phase2_write_file(args, file_info, plan, all_interfaces)
+        file_elapsed = time.time() - file_start
         
         if response:
             all_content.append(response)
@@ -498,10 +504,10 @@ def main():
             if iface_lines:
                 all_interfaces[os.path.basename(path)] = "\n".join(iface_lines)
             
-            ok(f"{os.path.basename(path)} yazıldı ({i+1}/{len(files)})")
+            ok(f"{os.path.basename(path)} yazıldı ({i+1}/{len(files)}) [{file_elapsed:.1f}s]")
             time.sleep(30)  # Rate limit koruması — 30s bekleme
         else:
-            err(f"{os.path.basename(path)} yazılamadı!")
+            err(f"{os.path.basename(path)} yazılamadı! [{file_elapsed:.1f}s]")
     
     # ═══ FAZ 3: BİRLEŞTİR ═══
     if not all_content:
@@ -527,10 +533,13 @@ def main():
     
     ok(f"Orkestratör tamamlandı: {len(all_content)} dosya → {args.output}")
     
-    # İstatistik
+    # İstatistik + Zamanlama
+    total_elapsed = time.time() - total_start
+    faz2_elapsed = time.time() - faz2_start
     total_lines = combined.count("\n")
     log(f"Toplam: ~{total_lines} satır, {len(combined)} karakter")
     log(f"API çağrıları: 1 plan + {len(all_content)} dosya = {1 + len(all_content)} çağrı")
+    log(f"⏱️  Süre: Plan {faz2_start-faz1_start:.0f}s + Dosyalar {faz2_elapsed:.0f}s = Toplam {total_elapsed:.0f}s ({total_elapsed/60:.1f}dk)")
     
     return 0
 
