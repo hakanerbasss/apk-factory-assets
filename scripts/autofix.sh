@@ -695,20 +695,40 @@ apply_fixes() {
     cat > "$py_script" << 'PYEOF'
 import re, os, shutil, sys
 
+def extract_path_from_code(code_content, ext):
+    import re
+    if ext in ['kt', 'java']:
+        pkg_match = re.search(r'package\s+([a-zA-Z0-9_.]+)', code_content)
+        cls_match = re.search(r'(?:class|interface|object|enum class)\s+([A-Za-z0-9_]+)', code_content)
+        comp_match = re.search(r'@Composable\s+(?:.*?\s+)?fun\s+([A-Za-z0-9_]+)', code_content)
+        name = None
+        if cls_match: name = cls_match.group(1)
+        elif comp_match: name = comp_match.group(1)
+        if pkg_match and name:
+            pkg_path = pkg_match.group(1).replace('.', '/')
+            return f'app/src/main/java/{pkg_path}/{name}.{ext}'
+    return None
+
 def parse_markdown_files(text):
+    import re
     results = []
-    pattern = re.compile(
-        r'(?:Dosya|File|=== FILE)\s*[:\s]*\s*((?:app/|\./|/data/)[^\n]{3,200})\s*(?:===)?\n'
-        r'[ \t]*\n?'
-        r'(?:[ \t]*```[^\n]*\n)?' 
-        r'(.*?)'
-        r'(?:^[ \t]*```[ \t]*$|(?=(?:Dosya|File)\s*:)|\Z)',
-        re.MULTILINE | re.DOTALL
-    )
-    for m in pattern.finditer(text):
-        path = m.group(1).strip()
-        code = m.group(2).rstrip('\n')
-        results.append((path, code))
+    pat1 = r'(?:(?:Dosya|File|=== FILE)\s*[:\s]*\s*((?:app/|\./|/data/)[^\n]{3,200})\s*(?:===)?\n)?[ \t]*\n?(?:^[ \t]*~~~([a-z]*)\n)(.*?)(?:^[ \t]*~~~[ \t]*$)'
+    blocks = re.finditer(pat1.replace('~~~', '`'*3), text, re.MULTILINE | re.DOTALL | re.IGNORECASE)
+    for m in blocks:
+        explicit_path = m.group(1)
+        lang = m.group(2).lower() if m.group(2) else 'kt'
+        code = m.group(3).rstrip('\n')
+        path = explicit_path.strip() if explicit_path else None
+        if not path:
+            ext = 'java' if 'java' in lang else 'kt'
+            path = extract_path_from_code(code, ext)
+        if path and code.strip():
+            results.append((path, code))
+    if not results:
+        pat2 = r'(?:Dosya|File|=== FILE)\s*[:\s]*\s*((?:app/|\./|/data/)[^\n]{3,200})\s*(?:===)?\n[ \t]*\n?(?:^[ \t]*~~~[a-z]*\n)?(.*?)(?:^[ \t]*~~~[ \t]*$|(?=(?:Dosya|File)\s*:)|\Z)'
+        pattern = re.compile(pat2.replace('~~~', '`'*3), re.MULTILINE | re.DOTALL | re.IGNORECASE)
+        for m in pattern.finditer(text):
+            results.append((m.group(1).strip(), m.group(2).rstrip('\n')))
     return results
 
 def apply_markdown_fixes(content_file, project_root, backup_map_file):
