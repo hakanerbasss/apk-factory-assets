@@ -21,7 +21,7 @@ MAX_LOOPS=$(grep "^MAX_LOOPS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 
 AGENT_YEDEK_DIR="$SISTEM_DIR/agent_yedekler"
 BACKUP_MAP="$AGENT_YEDEK_DIR/backup_map.txt"
 
-cleanup() { rm -rf "$TMP_DIR" 2>/dev/null; }
+cleanup() { rm -f "$TMP_DIR"/*.txt "$TMP_DIR"/*.json "$TMP_DIR"/*.py 2>/dev/null; }
 trap cleanup EXIT
 mkdir -p "$TMP_DIR" "$AGENT_YEDEK_DIR"
 
