@@ -363,6 +363,57 @@ SADECE JSON döndür."""
         return None
 
 
+def detect_missing_dependencies(all_content):
+    """Yazılan kodlardaki import'ları tarayıp eksik dependency'leri bulur."""
+    combined_code = "\n".join(all_content)
+    
+    IMPORT_TO_DEP = {
+        "androidx.room": "    implementation 'androidx.room:room-runtime:2.6.1'\n    implementation 'androidx.room:room-ktx:2.6.1'\n    kapt 'androidx.room:room-compiler:2.6.1'",
+        "androidx.navigation.compose": "    implementation 'androidx.navigation:navigation-compose:2.7.7'",
+        "kotlinx.coroutines": "    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'",
+        "kotlinx.serialization": "    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2'",
+        "coil.compose": "    implementation 'io.coil-kt:coil-compose:2.5.0'",
+        "retrofit2": "    implementation 'com.squareup.retrofit2:retrofit:2.9.0'\n    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'",
+        "com.google.gson": "    implementation 'com.google.code.gson:gson:2.10.1'",
+        "androidx.datastore": "    implementation 'androidx.datastore:datastore-preferences:1.0.0'",
+        "androidx.work": "    implementation 'androidx.work:work-runtime-ktx:2.9.0'",
+        "com.google.accompanist": "    implementation 'com.google.accompanist:accompanist-systemuicontroller:0.32.0'",
+    }
+    
+    needed = []
+    for import_prefix, dep_line in IMPORT_TO_DEP.items():
+        if f"import {import_prefix}" in combined_code:
+            needed.append((import_prefix, dep_line))
+    
+    return needed
+
+
+def inject_dependencies(all_content, needed_deps):
+    """build.gradle icindeki eksik dependency'leri ekler."""
+    if not needed_deps:
+        return all_content
+    
+    new_content = []
+    for content in all_content:
+        if "app/build.gradle" in content and "dependencies {" in content:
+            needs_kapt = any("room" in dep for _, dep in needed_deps)
+            if needs_kapt and "kapt" not in content:
+                content = content.replace(
+                    "    id 'org.jetbrains.kotlin.android'",
+                    "    id 'org.jetbrains.kotlin.android'\n    id 'kotlin-kapt'"
+                )
+            dep_lines = "\n".join(dep for _, dep in needed_deps)
+            content = content.replace(
+                "    debugImplementation",
+                f"{dep_lines}\n    debugImplementation"
+            )
+            log(f"\U0001f4e6 Otomatik dependency eklendi: {', '.join(imp for imp, _ in needed_deps)}")
+        new_content.append(content)
+    
+    return new_content
+
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", required=True)
@@ -457,9 +508,17 @@ def main():
         err("Hiçbir dosya yazılamadı!")
         return 1
     
+    # Otomatik dependency tarama ve ekleme
+    needed = detect_missing_dependencies(all_content)
+    if needed:
+        all_content = inject_dependencies(all_content, needed)
+    
     combined = "\n\n".join(all_content)
     
     # auto_continue: false ekle (tüm dosyalar yazıldı)
+    # AI'ın auto_continue:true satirlarini temizle (zincir tetiklemesin)
+    import re as _re
+    combined = _re.sub(r'auto_continue\s*:\s*true', 'auto_continue: false', combined)
     combined += "\n\nauto_continue: false\n"
     
     # Çıktı dosyasına yaz
