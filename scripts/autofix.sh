@@ -394,7 +394,7 @@ call_senior_ai() {
 
     log "🎓 SENIOR GÖZLEMCİ devreye giriyor: $senior_name"
 
-    local senior_prompt="Sen Termux ortaminda calisan kidemli Android/Kotlin Mimari.\nJunior AI ayni hatada donguye girmis. Asagidaki GERCEK hata satirlarini analiz et.\nKod YAZMA. Sadece Junior AI\'a 3-5 maddede net talimat ver:\n- Hangi dosyada hangi import eksik\n- Hangi sinif adi yanlis yazilmis (ornegin isSystemInDarkMode yerine isSystemInDarkTheme)\n- Hangi dependency eksik (artifact adi ver)\n- Unresolved reference varsa: import satirini VER\nKRITIK: Genel tavsiye verme (cache temizle, aapt2 ekle gibi). SOMUT HATA SATIRINA SOMUT COZUM ver.\nTurkce yaz."
+    local senior_prompt="Sen Termux ortaminda calisan kidemli Android/Kotlin Mimari.\nJunior AI ayni hatada donguye girmis. Asagidaki GERCEK hata satirlarini analiz et.\nKod YAZMA. Sadece Junior AI\'a 3-5 maddede net talimat ver:\n- Hangi dosyada hangi import eksik\n- Hangi sinif adi yanlis yazilmis (ornegin isSystemInDarkMode yerine isSystemInDarkTheme)\n- Hangi dependency eksik (artifact adi ver)\n- Unresolved reference varsa: import satirini VER\nKRITIK: Genel tavsiye verme (cache temizle, aapt2 ekle gibi). SOMUT HATA SATIRINA SOMUT COZUM ver. ASLA placeholder veya coming soon yazmasini onerme, TAM KOD YAZMASINI EMRET.\nTurkce yaz."
 
     # Geçmiş AI yanıtlarını topla (son 3 yanıt)
     local history_text=""
@@ -775,7 +775,7 @@ def parse_auto_continue(text):
     ac = re.search(r'auto_continue\s*:\s*(true|false)', text, re.IGNORECASE)
     cp = re.search(r'continue_prompt\s*:\s*(.+?)(?=\n(?:auto_continue|Dosya:|File:)|$)', text, re.IGNORECASE | re.DOTALL)
     lesson = re.search(r'lesson\s*:\s*(.+?)(?=\n(?:auto_continue|Dosya:|File:)|$)', text, re.IGNORECASE | re.DOTALL)
-    auto_cont = ac.group(1).lower() == 'true' if ac else False
+    auto_cont = False # ZINCIRLEME GOREV IPTAL
     cont_prompt = cp.group(1).strip() if cp else 'Goreve devam et.'
     lesson_text = lesson.group(1).strip() if lesson else None
     return auto_cont, cont_prompt, lesson_text
