@@ -878,6 +878,10 @@ PYEOF
 }
 
 run_autofix() {
+    local PACKAGE
+    PACKAGE=$(grep 'applicationId' "$PROJECT_ROOT/app/build.gradle" 2>/dev/null | grep -o '"[^"]*"' | tr -d '"' | head -1)
+    [ -z "$PACKAGE" ] && PACKAGE=$(grep 'namespace' "$PROJECT_ROOT/app/build.gradle" 2>/dev/null | grep -o '"[^"]*"' | tr -d '"' | head -1)
+    [ -z "$PACKAGE" ] && PACKAGE="com.wizaicorp.app"
     local TASK_DESCRIPTION="${1:-}"
     title "AutoFix Döngüsü — $NAME"
     log "Proje: $PROJECT_ROOT | Model: $MODEL"
