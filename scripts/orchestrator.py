@@ -505,7 +505,7 @@ def main():
                 all_interfaces[os.path.basename(path)] = "\n".join(iface_lines)
             
             ok(f"{os.path.basename(path)} yazıldı ({i+1}/{len(files)}) [{file_elapsed:.1f}s]")
-            time.sleep(30)  # Rate limit koruması — 30s bekleme
+            time.sleep(5)  # Rate limit koruması — 30s bekleme
         else:
             err(f"{os.path.basename(path)} yazılamadı! [{file_elapsed:.1f}s]")
     

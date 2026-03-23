@@ -3,7 +3,8 @@
 #  autofix.sh v5.1 — Tam Otonom Yapay Zeka Ajanı (Gölge Yedekli)
 # ═══════════════════════════════════════════════════════════════
 
-set -uo pipefail
+set -o pipefail
+set +u
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
@@ -139,7 +140,7 @@ select_provider() {
 
     fi
 
-    if [[ -z "$API_KEY" ]]; then
+    if [[ -z "${API_KEY:-}" ]]; then
         err "$NAME için API key yok!"
         read -r -p "Key gir: " new_key
         [[ -z "$new_key" ]] && exit 1
@@ -490,14 +491,14 @@ print(json.dumps({'model':'${MODEL}','max_tokens':500,'temperature':0.1,
     local result=""
     mkdir -p "$TMP_DIR" 2>/dev/null
     if [[ "$NAME" == "Claude" ]]; then
-        local hc; hc=$(curl -s -w "%{http_code}" -X POST "$API_URL"             -H "Content-Type: application/json"             -H "x-api-key: $API_KEY"             -H "anthropic-version: 2023-06-01"             -d "$payload" -o "$TMP_DIR/action_check.json"             --connect-timeout 30 --max-time 60 2>/dev/null)
+        local hc; hc=$(curl -s -w "%{http_code}" -X POST "${API_URL:-}"             -H "Content-Type: application/json"             -H "x-api-key: $API_KEY"             -H "anthropic-version: 2023-06-01"             -d "$payload" -o "$TMP_DIR/action_check.json"             --connect-timeout 30 --max-time 60 2>/dev/null)
         [[ "$hc" == "200" ]] && result=$(jq -r '.content[0].text' "$TMP_DIR/action_check.json" 2>/dev/null)
     else
         local payload2; payload2=$(python3 -c "
 import json,sys
 print(json.dumps({'model':'${MODEL}','max_tokens':500,'temperature':0.1,
 'messages':[{'role':'system','content':sys.argv[1]},{'role':'user','content':sys.argv[2]}]}))" "$check_prompt" "$src_text" 2>/dev/null)
-        local hc; hc=$(curl -s -w "%{http_code}" -X POST "$API_URL"             -H "Content-Type: application/json" -H "Authorization: Bearer $API_KEY"             -d "$payload2" -o "$TMP_DIR/action_check.json"             --connect-timeout 30 --max-time 60 2>/dev/null)
+        local hc; hc=$(curl -s -w "%{http_code}" -X POST "${API_URL:-}"             -H "Content-Type: application/json" -H "Authorization: Bearer $API_KEY"             -d "$payload2" -o "$TMP_DIR/action_check.json"             --connect-timeout 30 --max-time 60 2>/dev/null)
         if [[ "$hc" == "200" ]]; then
             result=$(jq -r '.choices[0].message.content' "$TMP_DIR/action_check.json" 2>/dev/null)
             # DeepSeek reasoning model - content bossa reasoning_content dene
@@ -607,7 +608,7 @@ _call_openai() {
 import json,sys
 print(json.dumps({'model':'${MODEL}','max_tokens':${MAX_TOKENS},'temperature':0.1,
 'messages':[{'role':'system','content':sys.argv[1]},{'role':'user','content':sys.argv[2]}]}))" "$sp" "$um")
-    local hc; hc=$(curl -s -w "%{http_code}" -X POST "$API_URL" \
+    local hc; hc=$(curl -s -w "%{http_code}" -X POST "${API_URL:-}" \
         -H "Content-Type: application/json" -H "Authorization: Bearer $API_KEY" \
         -d "$payload" -o "$rf" --connect-timeout 30 --max-time 600 2>/dev/null)
     [[ "$hc" != "200" ]] && { err "API hatası: HTTP $hc"; cat "$rf" 2>/dev/null; return 1; }
@@ -658,7 +659,7 @@ _call_claude() {
 import json,sys
 print(json.dumps({'model':'${MODEL}','max_tokens':${MAX_TOKENS},
 'system':sys.argv[1],'messages':[{'role':'user','content':sys.argv[2]}]}))" "$sp" "$um")
-    local hc; hc=$(curl -s -w "%{http_code}" -X POST "$API_URL" \
+    local hc; hc=$(curl -s -w "%{http_code}" -X POST "${API_URL:-}" \
         -H "Content-Type: application/json" -H "x-api-key: $API_KEY" \
         -H "anthropic-version: 2023-06-01" -d "$payload" \
         -o "$rf" --connect-timeout 30 --max-time 600 2>/dev/null)
@@ -998,51 +999,13 @@ ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B
             fi
         fi
 
-        # Hatalı dosya büyükse (300+ satır) orkestratörle yeniden yaz
-        local ork_used=false
-        local ork_script="$SISTEM_DIR/orchestrator.py"
-        if [[ -f "$ork_script" ]]; then
-            # Hata veren dosyaları bul
-            local error_files_list="$TMP_DIR/error_files.txt"
-            local big_error_file=""
-            if [[ -f "$error_files_list" ]]; then
-                while IFS= read -r fpath; do
-                    [[ ! -f "$fpath" ]] && continue
-                    local line_count; line_count=$(wc -l < "$fpath" 2>/dev/null || echo 0)
-                    if [[ $line_count -gt 300 ]]; then
-                        big_error_file="$fpath"
-                        break
-                    fi
-                done < "$error_files_list"
-            fi
-
-            if [[ -n "$big_error_file" ]]; then
-                local rel_path="${big_error_file#$PROJECT_ROOT/}"
-                warn "📐 Büyük dosya ($rel_path, $(wc -l < "$big_error_file") satır) — Orkestratör devreye giriyor..."
-                local error_text; error_text=$(cat "$ef")
-                local ork_task="Şu dosyayı hatasız olarak yeniden yaz: $rel_path
-Build hatası: $error_text
-KURAL: Sadece bu dosyayı yaz. Tüm fonksiyonları tamamla. Yarım bırakma."
-                local ork_out="$TMP_DIR/ork_fix_output.txt"
-                if python3 "$ork_script"                     --task "$ork_task"                     --project-root "$PROJECT_ROOT"                     --package "$PACKAGE"                     --provider "$PROVIDER_NAME"                     --api-url "$API_URL"                     --api-key "$API_KEY"                     --model "$MODEL"                     --max-tokens "$MAX_TOKENS"                     --output "$ork_out"                     --collected "$src"; then
-                    cp "$ork_out" "$TMP_DIR/ai_content.txt"
-                    ork_used=true
-                    ok "Orkestratör dosyayı yazdı → apply_fixes devralıyor"
-                else
-                    warn "Orkestratör başarısız — call_ai'a düşülüyor"
-                fi
-            fi
-        fi
-
-        if [[ "$ork_used" == false ]]; then
-            if ! call_ai "$ef" "$src"; then
-                # Geçici prompt varsa geri yükle
-                [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt"
-                err "API hatası — $((MAX_LOOPS - loop)) deneme kaldı"; sleep 3; continue
-            fi
+        if ! call_ai "$ef" "$src"; then
             # Geçici prompt varsa geri yükle
-            [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
+            [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt"
+            err "API hatası — $((MAX_LOOPS - loop)) deneme kaldı"; sleep 3; continue
         fi
+        # Geçici prompt varsa geri yükle
+        [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
 
         if ! apply_fixes; then
             err "Düzeltme başarısız — $((MAX_LOOPS - loop)) deneme kaldı"; sleep 2; continue
@@ -1157,8 +1120,8 @@ for p in set(paths):
             --project-root "$PROJECT_ROOT" \
             --package "$ork_pkg" \
             --provider "$NAME" \
-            --api-url "$API_URL" \
-            --api-key "$API_KEY" \
+            --api-url "${API_URL:-}" \
+            --api-key "${API_KEY:-}" \
             --model "$MODEL" \
             --max-tokens "$MAX_TOKENS" \
             --output "$TMP_DIR/ai_content.txt" \
