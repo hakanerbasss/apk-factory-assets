@@ -150,7 +150,18 @@ select_provider() {
     # Büyük modeller seçildiyse kullanıcının düşük ayarını ez ve sınırları zorla
     if [[ "$NAME" == "Claude" && $MAX_TOKENS -lt 8192 ]]; then
         MAX_TOKENS=8192
-        warn "Token limiti Claude için otomatik olarak 8192'ye yükseltildi."
+        warn "Token limiti Claude icin otomatik olarak 8192'ye yukseltildi."
+    fi
+    # AKILLI TOKEN: Kaynak dosya buyukse Claude icin max token'i zirveye cikar
+    if [[ "$NAME" == "Claude" ]]; then
+        local model_lower=$(echo "$MODEL" | tr '[:upper:]' '[:lower:]')
+        if [[ "$model_lower" == *"haiku"* ]]; then
+            MAX_TOKENS=8192
+        elif [[ "$model_lower" == *"sonnet"* ]]; then
+            MAX_TOKENS=16384
+        elif [[ "$model_lower" == *"opus"* ]]; then
+            MAX_TOKENS=16384
+        fi
     elif [[ "$NAME" == "Gemini" && $MAX_TOKENS -lt 16384 ]]; then
         MAX_TOKENS=16384
         warn "Token limiti Gemini için otomatik olarak 16384'e yükseltildi."
@@ -505,6 +516,12 @@ call_ai() {
     local source_text; source_text=$(cat "$sources")
     local max_chars
     max_chars=$(grep "^MAX_CHARS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo 60000)
+    # AKILLI TOKEN: Buyuk dosyalarda input kirp, output icin yer birak
+    local source_len=${#source_text}
+    if [[ $source_len -gt 25000 ]]; then
+        max_chars=20000
+        warn "Buyuk kaynak ($source_len char) → input $max_chars'e kirpildi (output icin yer aciliyor)"
+    fi
     [[ ${#source_text} -gt $max_chars ]] && source_text="${source_text:0:$max_chars}"
 
     local system_prompt
@@ -534,7 +551,12 @@ ${lessons}
 === DERSLER SONU ==="
     fi
     local tree_content=$(find "$PROJECT_ROOT" -maxdepth 4 -not -path "*/.*" -not -path "*/build/*")
-    local user_msg="!!! MEVCUT PROJE DOSYA YAPISI (BUNLARI SILME) !!!\n${tree_content}\n\nBUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`\n\nKAYNAK DOSYALAR:\n${source_text}" 
+    # AKILLI TOKEN: Buyuk dosyalarda auto_continue hatirlat
+    local size_warning=""
+    if [[ ${#source_text} -gt 15000 ]]; then
+        size_warning="\n\n!!! BUYUK DOSYA UYARISI !!!\nBu dosya cok buyuk. Tek seferde yazamazsan auto_continue: true kullan.\nDosyayi ASLA yarida birakma. Yarim kalan string YASAKTIR.\nEger dosya token limitine sigmazsa, onceki kod yapisini koru ve sadece HATALI SATIRLARI duzelt.\nTum dosyayi bastan yazma — sadece hatali fonksiyonu yeniden yaz."
+    fi
+    local user_msg="!!! MEVCUT PROJE DOSYA YAPISI (BUNLARI SILME) !!!\n${tree_content}\n\nBUILD HATALARI:\n\`\`\`\n${error_text}\n\`\`\`${size_warning}\n\nKAYNAK DOSYALAR:\n${source_text}" 
 
     log "$NAME'e gönderiliyor... (${#source_text} karakter)"
     echo -e "${YELLOW}  ⏳ API yanıtı bekleniyor (Max 600sn)...${NC}"

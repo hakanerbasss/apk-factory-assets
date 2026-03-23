@@ -90,3 +90,11 @@ TASARIM KORUMA KURALI:
 
 UI KURALI:
 Ana kapsayicida daima Modifier.systemBarsPadding() kullan.
+
+TOKEN YONETIMI KURALI:
+- Dosya buyukse (500+ satir) TUM dosyayi bastan yazma
+- Sadece HATALI fonksiyonu yeniden yaz, geri kalani DOKUNMA
+- Ornek: Satir 786'da hata varsa, sadece o fonksiyonu (generateQuestions gibi) yaz
+- ASLA dosyayi yarim birakma — string veya parantez ACIK KALMASI YASAKTIR
+- Eger tek seferde sigmazsa: auto_continue: true kullan
+- Dosya: satirinda sadece degisen dosyayi yaz, degismeyenleri ATLAMA
