@@ -1,97 +1,56 @@
 #!/data/data/com.termux/files/usr/bin/python3
 # -*- coding: utf-8 -*-
 """
-APK Factory Orkestratör v1.0
-Tek büyük API çağrısı yerine: Plan → Dosya dosya yaz → Birleştir
-
-Kullanım (autofix.sh tarafından çağrılır):
-  python3 orchestrator.py \
-    --task "IQ testi yap..." \
-    --project-root ~/q \
-    --package "com.wizaicorp.q" \
-    --provider Claude \
-    --api-url "https://api.anthropic.com/v1/messages" \
-    --api-key "sk-..." \
-    --model "claude-haiku-4-5-20251001" \
-    --max-tokens 8192 \
-    --output /tmp/ai_content.txt \
-    --collected /tmp/collected_sources.txt
+APK Factory Orkestratör v2.0
+Data dosyaları önce yazılır, tam kodu sonraki dosyalara gönderilir.
+Max 4 Kotlin dosyası. Ortak sözleşme sistemi.
 """
 
 import argparse, json, os, sys, time
 import urllib.request, urllib.error
 
-def log(msg):
-    print(f"\033[0;36m[ork]\033[0m {msg}", flush=True)
-
-def ok(msg):
-    print(f"\033[0;32m✅ {msg}\033[0m", flush=True)
-
-def warn(msg):
-    print(f"\033[1;33m⚠️  {msg}\033[0m", flush=True)
-
-def err(msg):
-    print(f"\033[0;31m❌ {msg}\033[0m", flush=True)
-
+def log(msg): print(f"\033[0;36m[ork]\033[0m {msg}", flush=True)
+def ok(msg):  print(f"\033[0;32m\u2705 {msg}\033[0m", flush=True)
+def warn(msg):print(f"\033[1;33m\u26a0\ufe0f  {msg}\033[0m", flush=True)
+def err(msg): print(f"\033[0;31m\u274c {msg}\033[0m", flush=True)
 
 def call_api(provider, api_url, api_key, model, max_tokens, system_prompt, user_msg):
-    """Tek bir API çağrısı yapar, yanıt metnini döndürür."""
     headers = {"Content-Type": "application/json"}
-    
     if provider == "Claude":
         headers["x-api-key"] = api_key
         headers["anthropic-version"] = "2023-06-01"
-        payload = json.dumps({
-            "model": model,
-            "max_tokens": max_tokens,
-            "temperature": 0.1,
-            "system": system_prompt,
-            "messages": [{"role": "user", "content": user_msg}]
-        }).encode()
+        payload = json.dumps({"model": model, "max_tokens": max_tokens, "temperature": 0.1,
+            "system": system_prompt, "messages": [{"role": "user", "content": user_msg}]}).encode()
     elif provider == "Gemini":
         api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        payload = json.dumps({
-            "systemInstruction": {"parts": [{"text": system_prompt}]},
+        payload = json.dumps({"systemInstruction": {"parts": [{"text": system_prompt}]},
             "contents": [{"parts": [{"text": user_msg}]}],
-            "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.1}
-        }).encode()
-    else:  # OpenAI uyumlu (DeepSeek vs)
+            "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.1}}).encode()
+    else:
         headers["Authorization"] = f"Bearer {api_key}"
-        payload = json.dumps({
-            "model": model,
-            "max_tokens": max_tokens,
-            "temperature": 0.1,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_msg}
-            ]
-        }).encode()
-    
-    req = urllib.request.Request(api_url, data=payload, headers=headers, method="POST")
+        payload = json.dumps({"model": model, "max_tokens": max_tokens, "temperature": 0.1,
+            "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_msg}]}).encode()
     
     MAX_RETRY = 3
+    data = None
     for attempt in range(1, MAX_RETRY + 1):
         try:
+            req = urllib.request.Request(api_url, data=payload, headers=headers, method="POST")
             with urllib.request.urlopen(req, timeout=300) as resp:
                 data = json.loads(resp.read().decode())
             break
         except urllib.error.HTTPError as e:
             body = e.read().decode(errors="replace")[:300]
             if e.code == 429 and attempt < MAX_RETRY:
-                warn(f"⏳ Rate limit (429) — 60s bekleniyor... ({attempt}/{MAX_RETRY})")
-                time.sleep(60)
-                continue
-            err(f"API HTTP {e.code}: {body}")
-            return None
+                warn(f"Rate limit (429) \u2014 60s bekleniyor... ({attempt}/{MAX_RETRY})")
+                time.sleep(60); continue
+            err(f"API HTTP {e.code}: {body}"); return None
         except Exception as e:
             if attempt < MAX_RETRY:
-                warn(f"⏳ Bağlantı hatası ({e}) — 10s sonra tekrar... ({attempt}/{MAX_RETRY})")
-                time.sleep(10)
-                continue
-            err(f"API hata: {e}")
-            return None
-    
-    # Yanıtı çıkar
+                warn(f"Ba\u011flant\u0131 hatas\u0131 ({e}) \u2014 10s sonra tekrar... ({attempt}/{MAX_RETRY})")
+                time.sleep(10); continue
+            err(f"API hata: {e}"); return None
+    if data is None: return None
     if provider == "Claude":
         return data.get("content", [{}])[0].get("text", "")
     elif provider == "Gemini":
@@ -101,166 +60,136 @@ def call_api(provider, api_url, api_key, model, max_tokens, system_prompt, user_
 
 
 def phase1_plan(args, existing_files):
-    """Faz 1: Proje planı al — hangi dosyalar oluşturulacak."""
-    log("📐 FAZ 1: Proje planı oluşturuluyor...")
-    
-    system = """Sen bir Android/Kotlin proje planlayıcısın.
-Sana bir görev verilecek. Projenin dosya planını JSON olarak döndür.
-SADECE JSON döndür, başka hiçbir şey yazma (açıklama, markdown, backtick yok).
+    log("\U0001f4d0 FAZ 1: Proje plan\u0131 olu\u015fturuluyor...")
+    system = """Sen bir Android/Kotlin proje planlay\u0131c\u0131s\u0131n.
+SADECE JSON d\u00f6nd\u00fcr, ba\u015fka hi\u00e7bir \u015fey yazma.
 
-JSON formatı:
+JSON format\u0131:
 {
   "files": [
     {
-      "path": "app/src/main/java/com/wizaicorp/PAKET/DosyaAdi.kt",
-      "description": "Bu dosya ne yapıyor (1 cümle)",
-      "depends_on": ["DigerDosya.kt"],
+      "path": "app/src/main/java/PKG_PATH/DosyaAdi.kt",
+      "type": "data|screen|main|util",
+      "description": "1 c\u00fcmle",
+      "classes": ["ClassName"],
+      "functions": ["funName(param: Type): ReturnType"],
       "estimated_lines": 150
     }
   ],
-  "dependencies": ["androidx.navigation:navigation-compose:2.7.7"],
-  "notes": "Tek cümle genel not"
+  "dependencies": [],
+  "shared_contracts": {
+    "sealed_class_screen": "sealed class Screen { object Home : Screen(); object Game : Screen(); data class Result(val score: Int) : Screen() }",
+    "data_classes": "data class GameItem(val id: Int, val content: String, val isActive: Boolean = true)"
+  }
 }
 
-!!! KRITIK DOSYA BOLME KURALI !!!
-HER DOSYA MAKSIMUM 200 SATIR. 200 SATIRDAN BUYUK DOSYA YASAKTIR.
-Tek dosyaya her seyi koyan plan REDDEDILIR.
-
-ZORUNLU DOSYA YAPISI (minimum 4-5 dosya):
-1. MainActivity.kt — SADECE Activity + setContent + tema (MAX 60 satir)
-2. Screens.kt VEYA her ekran ayri dosya (HomeScreen.kt, QuizScreen.kt vs)
-3. Data.kt — data class'lar + soru havuzu + sabit veriler
-4. Utils.kt — hesaplama fonksiyonlari, helper'lar
-5. AndroidManifest.xml
-
-ORNEK PLAN (IQ Testi):
-- MainActivity.kt (60 satir): Activity + sealed class Screen + tema
-- QuizData.kt (150 satir): data class IQQuestion + 30 soru havuzu + generateQuestions()
-- HomeScreen.kt (80 satir): Giris ekrani composable
-- QuizScreen.kt (150 satir): Test ekrani + timer + soru gosterim
-- ResultScreen.kt (100 satir): Sonuc + paylasim + IQ seviye aciklamasi
-- IQCalculator.kt (50 satir): calculateIQScore + calculateIQLevel fonksiyonlari
-
-- build.gradle ve AndroidManifest.xml her zaman dahil et (ama bunlari dosya listesine KOYMA, otomatik olusturulur)
-- Paket adi: com.wizaicorp.PROJE_ADI (altcizgi ile)
-- Navigation KULLANMA (sealed class Screen + mutableStateOf)
-- ui/theme klasoru OLUSTURMA
-- Her Kotlin dosyasi AYNI pakette olsun (alt paket OLUSTURMA)"""
+!!! KURALLAR !!!
+- MAKSIMUM 4 Kotlin dosyas\u0131
+- MainActivity.kt: SADECE Activity + setContent (MAX 50 sat\u0131r)
+- 1 Data dosyas\u0131: t\u00fcm data class + model + sabit veri (type: "data")
+- 1-2 Screen dosyas\u0131: composable'lar (type: "screen")
+- shared_contracts: T\u00dcM dosyalar\u0131n kullanaca\u011f\u0131 ortak s\u0131n\u0131f tan\u0131mlar\u0131
+- Navigation KULLANMA \u2014 sealed class Screen + mutableStateOf
+- ui/theme klas\u00f6r\u00fc OLU\u015eTURMA
+- Her dosya MAX 200 sat\u0131r"""
 
     pkg_path = args.package.replace(".", "/")
-    user = f"""GÖREV: {args.task}
+    user = f"""G\u00d6REV: {args.task}
 
 PAKET ADI: {args.package}
 DOSYA YOLU: app/src/main/java/{pkg_path}/
-PROJE KÖKÜ: {args.project_root}
 
-MEVCUT DOSYALAR:
-{existing_files}
+Bu g\u00f6rev i\u00e7in gereken dosyalar\u0131n plan\u0131n\u0131 JSON olarak ver.
+MAXIMUM 4 Kotlin dosyas\u0131. shared_contracts MUTLAKA doldur."""
 
-Bu görev için gereken tüm dosyaların planını JSON olarak ver."""
-
-    response = call_api(
-        args.provider, args.api_url, args.api_key, args.model,
-        2000,  # Plan için 2K token yeter
-        system, user
-    )
-    
-    if not response:
-        return None
-    
-    # JSON parse
+    response = call_api(args.provider, args.api_url, args.api_key, args.model, 2000, system, user)
+    if not response: return None
     try:
-        # Markdown backtick temizle
         clean = response.strip()
-        if clean.startswith("```"):
-            clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
-        if clean.endswith("```"):
-            clean = clean[:-3]
-        clean = clean.strip()
-        
-        plan = json.loads(clean)
-        return plan
+        if clean.startswith("```"): clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
+        if clean.endswith("```"): clean = clean[:-3]
+        return json.loads(clean.strip())
     except json.JSONDecodeError as e:
-        err(f"Plan JSON parse hatası: {e}")
-        err(f"Yanıt: {response[:500]}")
-        return None
+        err(f"Plan JSON parse hatas\u0131: {e}"); return None
 
 
-def phase2_write_file(args, file_info, plan, all_interfaces):
-    """Faz 2: Tek bir dosyayı yaz."""
+def phase1_plan_retry(args):
+    log("\U0001f4d0 Plan yeniden olu\u015fturuluyor...")
+    system = """SADECE JSON d\u00f6nd\u00fcr. MAKSIMUM 4 Kotlin dosyas\u0131. shared_contracts DOLDUR.
+JSON: {"files": [{"path": "...", "type": "data|screen|main", "description": "...", "classes": [], "functions": [], "estimated_lines": 100}], "dependencies": [], "shared_contracts": {}}"""
+    pkg_path = args.package.replace(".", "/")
+    user = f"""G\u00d6REV: {args.task}\nPAKET: {args.package}\nYOL: app/src/main/java/{pkg_path}/\n\n\u00d6NCEK\u0130 PLAN REDDEDILDI. 3-4 Kotlin dosyas\u0131 ile yeni plan ver. SADECE JSON."""
+    response = call_api(args.provider, args.api_url, args.api_key, args.model, 2000, system, user)
+    if not response: return None
+    try:
+        clean = response.strip()
+        if clean.startswith("```"): clean = clean.split("\n", 1)[1]
+        if clean.endswith("```"): clean = clean[:-3]
+        return json.loads(clean.strip())
+    except: return None
+
+
+def phase2_write_file(args, file_info, plan, written_files, contracts):
     path = file_info["path"]
     desc = file_info.get("description", "")
-    deps = file_info.get("depends_on", [])
+    log(f"\U0001f4dd Yaz\u0131l\u0131yor: {os.path.basename(path)} ({file_info.get('estimated_lines', '?')} sat\u0131r)")
     
-    log(f"📝 Yazılıyor: {os.path.basename(path)} ({file_info.get('estimated_lines', '?')} satır)")
+    context = ""
+    if written_files:
+        context = "\n\n=== DAHA \u00d6NCE YAZILAN DOSYALAR (import edebilirsin, AYNI \u0130S\u0130MLER\u0130 KULLAN) ===\n"
+        for wf_path, wf_code in written_files.items():
+            context += f"\n--- {os.path.basename(wf_path)} ---\n{wf_code}\n"
+        context += "=== DOSYALAR SONU ===\n"
     
-    # Bağımlılık bilgisi oluştur
-    dep_info = ""
-    if deps:
-        dep_info = "\n\nBU DOSYANIN BAĞIMLILIKLARI (import edeceksin):\n"
-        for d in deps:
-            if d in all_interfaces:
-                dep_info += f"\n--- {d} ---\n{all_interfaces[d]}\n"
+    contract_info = ""
+    if contracts:
+        contract_info = "\n\n=== ORTAK SINIF TANIMLARI (bunlar\u0131 kullan, yenisini uydurma) ===\n"
+        for k, v in contracts.items():
+            contract_info += f"{k}: {v}\n"
+        contract_info += "=== S\u00d6ZLE\u015eME SONU ===\n"
     
-    # Diğer dosyaların arayüzleri
     other_files = ""
     for f in plan.get("files", []):
         if f["path"] != path:
-            other_files += f"- {os.path.basename(f['path'])}: {f.get('description','')}\n"
+            other_files += f"- {os.path.basename(f['path'])}: {f.get('description','')}"
+            if f.get("classes"): other_files += f" [s\u0131n\u0131flar: {', '.join(f['classes'])}]"
+            other_files += "\n"
 
-    system = f"""Sen bir Kotlin/Android uzmanısın. SADECE TEK BİR DOSYA yazacaksın.
-Fenced markdown formatında yaz:
+    system = f"""Sen bir Kotlin/Android uzman\u0131s\u0131n. SADECE TEK DOSYA yaz.
 
 Dosya: {path}
 ```kotlin
-// dosya içeriği
+// tam dosya
 ```
 
 KURALLAR:
-- SADECE bu dosyayı yaz, başka dosya yazma
-- Dosyayı TAM yaz, yarıda bırakma
-- String ve parantezleri KAPAT
+- SADECE {os.path.basename(path)} yaz
+- TAM yaz, yar\u0131da b\u0131rakma YASAK
 - ASLA soru sorma
-- Paket adı: {args.package}
-- Navigation KULLANMA (sealed class Screen + mutableStateOf ile ekran geçişi)
-- ui/theme klasörü OLUŞTURMA
-- compileSdk/targetSdk = 35
-- isSystemInDarkTheme (isSystemInDarkMode DEĞİL)
-- LazyColumn/LazyVerticalGrid'e .verticalScroll() EKLEME
+- Paket: {args.package}
+- Navigation KULLANMA (sealed class Screen + mutableStateOf)
+- \u00d6NCEK\u0130 dosyalardaki s\u0131n\u0131f/fonksiyon isimlerini AYNEN kullan
+- Farkl\u0131 dosyadaki s\u0131n\u0131f\u0131 import et: import {args.package}.SinifAdi
+- isSystemInDarkTheme kullan (isSystemInDarkMode DE\u011e\u0130L)
 - Modifier.systemBarsPadding() kullan"""
 
-    user = f"""GÖREV: {args.task}
+    user = f"""G\u00d6REV: {args.task}
 
-YAZACAĞIN DOSYA: {path}
-AÇIKLAMA: {desc}
+DOSYA: {path}
+A\u00c7IKLAMA: {desc}
 
-PROJEDEKİ DİĞER DOSYALAR:
-{other_files}
-{dep_info}
+D\u0130\u011eER DOSYALAR:
+{other_files}{contract_info}{context}
 
-Sadece {os.path.basename(path)} dosyasını TAM olarak yaz. Başka dosya yazma."""
+Sadece {os.path.basename(path)} yaz."""
 
-    response = call_api(
-        args.provider, args.api_url, args.api_key, args.model,
-        args.max_tokens,
-        system, user
-    )
-    
-    return response
+    return call_api(args.provider, args.api_url, args.api_key, args.model, args.max_tokens, system, user)
 
 
 def phase3_build_gradle(args, plan):
-    """build.gradle'ı ŞABLON olarak oluştur (AI'a bırakmıyoruz, paket adı kesin)."""
-    deps = plan.get("dependencies", [])
-    
-    log(f"📝 Yazılıyor: app/build.gradle (şablon, paket={args.package})")
-    
-    dep_lines = ""
-    for d in deps:
-        dep_lines += f"    implementation '{d}'\n"
-    
-    # Sabit şablon — Groovy DSL (Kotlin DSL DEĞİL!)
-    gradle_content = f"""Dosya: app/build.gradle
+    log(f"\U0001f4dd app/build.gradle (\u015fablon, paket={args.package})")
+    dep_lines = "".join(f"    implementation '{d}'\n" for d in plan.get("dependencies", []))
+    return f"""Dosya: app/build.gradle
 ```groovy
 plugins {{
     id 'com.android.application'
@@ -270,7 +199,6 @@ plugins {{
 android {{
     namespace '{args.package}'
     compileSdk 35
-
     defaultConfig {{
         applicationId '{args.package}'
         minSdk 24
@@ -278,26 +206,11 @@ android {{
         versionCode 1
         versionName '1.0'
     }}
-
-    buildTypes {{
-        release {{
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }}
-    }}
-    compileOptions {{
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }}
-    kotlinOptions {{
-        jvmTarget = '1.8'
-    }}
-    buildFeatures {{
-        compose true
-    }}
-    composeOptions {{
-        kotlinCompilerExtensionVersion '1.5.8'
-    }}
+    buildTypes {{ release {{ minifyEnabled false; proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro' }} }}
+    compileOptions {{ sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }}
+    kotlinOptions {{ jvmTarget = '1.8' }}
+    buildFeatures {{ compose true }}
+    composeOptions {{ kotlinCompilerExtensionVersion '1.5.8' }}
 }}
 
 dependencies {{
@@ -307,7 +220,6 @@ dependencies {{
     implementation platform('androidx.compose:compose-bom:2023.10.01')
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
-    implementation 'androidx.compose.ui:ui-tooling-preview'
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.compose.material:material-icons-extended:1.5.4'
     implementation 'androidx.compose.foundation:foundation:1.5.4'
@@ -316,102 +228,39 @@ dependencies {{
 ```
 
 auto_continue: false"""
-    
-    return gradle_content
 
 
-def phase1_plan_retry(args, existing_files):
-    """Plan tekrar — tek dosya planını parçala."""
-    log("📐 Plan yeniden oluşturuluyor (dosya bölme zorunlu)...")
-    
-    system = """Sen bir Android/Kotlin proje planlayıcısın.
-SADECE JSON döndür, başka hiçbir şey yazma.
-!!! KRITIK: HER DOSYA MAKSIMUM 150 SATIR. TEK DOSYAYA HERSEYI KOYMA !!!
-
-JSON formatı:
-{
-  "files": [
-    {"path": "app/src/main/java/PKG/DosyaAdi.kt", "description": "...", "depends_on": [], "estimated_lines": 100}
-  ],
-  "dependencies": []
+IMPORT_TO_DEP = {
+    "androidx.room": "    implementation 'androidx.room:room-runtime:2.6.1'\n    implementation 'androidx.room:room-ktx:2.6.1'\n    kapt 'androidx.room:room-compiler:2.6.1'",
+    "androidx.navigation.compose": "    implementation 'androidx.navigation:navigation-compose:2.7.7'",
+    "kotlinx.coroutines": "    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'",
+    "coil.compose": "    implementation 'io.coil-kt:coil-compose:2.5.0'",
+    "retrofit2": "    implementation 'com.squareup.retrofit2:retrofit:2.9.0'\n    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'",
+    "androidx.datastore": "    implementation 'androidx.datastore:datastore-preferences:1.0.0'",
 }
 
-ZORUNLU: Minimum 4 Kotlin dosyası! MainActivity.kt MAX 60 satır!"""
-
-    pkg_path = args.package.replace(".", "/")
-    user = f"""GÖREV: {args.task}
-PAKET: {args.package}
-DOSYA YOLU: app/src/main/java/{pkg_path}/
-
-ÖNCEKİ PLAN TEK DOSYAYDII — REDDEDILDI.
-Şimdi minimum 4 Kotlin dosyası ile yeni plan ver.
-SADECE JSON döndür."""
-
-    response = call_api(
-        args.provider, args.api_url, args.api_key, args.model,
-        2000, system, user
-    )
-    
-    if not response:
-        return None
-    try:
-        clean = response.strip()
-        if clean.startswith("```"): clean = clean.split("\n", 1)[1]
-        if clean.endswith("```"): clean = clean[:-3]
-        return json.loads(clean.strip())
-    except:
-        return None
-
-
-def detect_missing_dependencies(all_content):
-    """Yazılan kodlardaki import'ları tarayıp eksik dependency'leri bulur."""
-    combined_code = "\n".join(all_content)
-    
-    IMPORT_TO_DEP = {
-        "androidx.room": "    implementation 'androidx.room:room-runtime:2.6.1'\n    implementation 'androidx.room:room-ktx:2.6.1'\n    kapt 'androidx.room:room-compiler:2.6.1'",
-        "androidx.navigation.compose": "    implementation 'androidx.navigation:navigation-compose:2.7.7'",
-        "kotlinx.coroutines": "    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'",
-        "kotlinx.serialization": "    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2'",
-        "coil.compose": "    implementation 'io.coil-kt:coil-compose:2.5.0'",
-        "retrofit2": "    implementation 'com.squareup.retrofit2:retrofit:2.9.0'\n    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'",
-        "com.google.gson": "    implementation 'com.google.code.gson:gson:2.10.1'",
-        "androidx.datastore": "    implementation 'androidx.datastore:datastore-preferences:1.0.0'",
-        "androidx.work": "    implementation 'androidx.work:work-runtime-ktx:2.9.0'",
-        "com.google.accompanist": "    implementation 'com.google.accompanist:accompanist-systemuicontroller:0.32.0'",
-    }
-    
-    needed = []
-    for import_prefix, dep_line in IMPORT_TO_DEP.items():
-        if f"import {import_prefix}" in combined_code:
-            needed.append((import_prefix, dep_line))
-    
-    return needed
-
-
-def inject_dependencies(all_content, needed_deps):
-    """build.gradle icindeki eksik dependency'leri ekler."""
-    if not needed_deps:
-        return all_content
-    
+def detect_and_inject_deps(all_content):
+    combined = "\n".join(all_content)
+    needed = [(p, d) for p, d in IMPORT_TO_DEP.items() if f"import {p}" in combined]
+    if not needed: return all_content
     new_content = []
     for content in all_content:
         if "app/build.gradle" in content and "dependencies {" in content:
-            needs_kapt = any("room" in dep for _, dep in needed_deps)
-            if needs_kapt and "kapt" not in content:
-                content = content.replace(
-                    "    id 'org.jetbrains.kotlin.android'",
-                    "    id 'org.jetbrains.kotlin.android'\n    id 'kotlin-kapt'"
-                )
-            dep_lines = "\n".join(dep for _, dep in needed_deps)
-            content = content.replace(
-                "    debugImplementation",
-                f"{dep_lines}\n    debugImplementation"
-            )
-            log(f"\U0001f4e6 Otomatik dependency eklendi: {', '.join(imp for imp, _ in needed_deps)}")
+            if any("room" in d for _, d in needed) and "kapt" not in content:
+                content = content.replace("    id 'org.jetbrains.kotlin.android'", "    id 'org.jetbrains.kotlin.android'\n    id 'kotlin-kapt'")
+            dep_lines = "\n".join(d for _, d in needed)
+            content = content.replace("    debugImplementation", f"{dep_lines}\n    debugImplementation")
+            log(f"\U0001f4e6 Dep eklendi: {', '.join(p for p, _ in needed)}")
         new_content.append(content)
-    
     return new_content
 
+
+def extract_kotlin_code(response):
+    import re
+    match = re.search(r'```\w*\n(.*?)```', response, re.DOTALL)
+    if match: return match.group(1).strip()
+    lines = response.split("\n")
+    return "\n".join(l for l in lines if not l.startswith("Dosya:") and not l.strip().startswith("```")).strip()
 
 
 def main():
@@ -428,121 +277,88 @@ def main():
     parser.add_argument("--collected", default="")
     args = parser.parse_args()
     
-    # Mevcut dosya listesi
-    existing = ""
-    if args.collected and os.path.exists(args.collected):
-        existing = open(args.collected, 'r', errors='replace').read()[:5000]
-    
     total_start = time.time()
     
-    # ═══ FAZ 1: PLAN ═══
-    faz1_start = time.time()
-    plan = phase1_plan(args, existing)
+    plan = phase1_plan(args, "")
     if not plan or "files" not in plan:
-        err("Plan oluşturulamadı! Tek-geçiş moduna düşülüyor.")
-        return 1
+        err("Plan olu\u015fturulamad\u0131!"); return 1
     
     files = plan["files"]
+    contracts = plan.get("shared_contracts", {})
+    faz1_end = time.time()
     
-    # Plan doğrulama: 200+ satır dosya varsa uyar
-    for f in files:
-        est = f.get("estimated_lines", 0)
-        if est > 300:
-            warn(f"{f['path']} çok büyük ({est} satır)! Bölünmeli ama devam ediliyor...")
-    
-    # Tek dosya planı varsa ve büyükse → zorlayarak böl
     kt_files = [f for f in files if f["path"].endswith(".kt")]
     if len(kt_files) == 1 and kt_files[0].get("estimated_lines", 0) > 250:
-        warn("Tek Kotlin dosyası planlandı — otomatik bölme uygulanıyor!")
-        # Plan yetersiz, tekrar iste ama daha zorla
-        plan2 = phase1_plan_retry(args, existing)
-        if plan2 and "files" in plan2:
-            kt2 = [f for f in plan2["files"] if f["path"].endswith(".kt")]
-            if len(kt2) > 1:
-                plan = plan2
-                files = plan["files"]
-                ok(f"Bölünmüş plan: {len(files)} dosya")
-    ok(f"Plan hazır: {len(files)} dosya ({time.time()-faz1_start:.1f}s)")
-    for f in files:
-        print(f"  📄 {f['path']} (~{f.get('estimated_lines','?')} satır) — {f.get('description','')}")
+        warn("Tek b\u00fcy\u00fck dosya \u2014 b\u00f6lme!")
+        plan2 = phase1_plan_retry(args)
+        if plan2 and len([f for f in plan2.get("files", []) if f["path"].endswith(".kt")]) > 1:
+            plan, files, contracts = plan2, plan2["files"], plan2.get("shared_contracts", {})
+            ok(f"B\u00f6l\u00fcnm\u00fc\u015f plan: {len(files)} dosya")
+    elif len(kt_files) > 5:
+        warn(f"{len(kt_files)} dosya \u2014 \u00e7ok fazla, yeniden planlama...")
+        plan2 = phase1_plan_retry(args)
+        if plan2:
+            kt2 = [f for f in plan2.get("files", []) if f["path"].endswith(".kt")]
+            if 2 <= len(kt2) <= 5:
+                plan, files, contracts = plan2, plan2["files"], plan2.get("shared_contracts", {})
+                ok(f"Azalt\u0131lm\u0131\u015f plan: {len(files)} dosya")
     
-    # ═══ FAZ 2: HER DOSYAYI YAZ ═══
+    ok(f"Plan haz\u0131r: {len(files)} dosya ({faz1_end-total_start:.1f}s)")
+    for f in files:
+        print(f"  \U0001f4c4 {f['path']} (~{f.get('estimated_lines','?')} sat\u0131r) \u2014 {f.get('description','')}")
+    if contracts:
+        log(f"\U0001f4cb S\u00f6zle\u015fmeler: {list(contracts.keys())}")
+    
     faz2_start = time.time()
     print(f"\n\033[1;34m{'='*50}\033[0m")
-    log(f"📝 FAZ 2: {len(files)} dosya yazılıyor (her biri ayrı API çağrısı)")
+    log(f"\U0001f4dd FAZ 2: {len(files)} dosya yaz\u0131l\u0131yor")
     print(f"\033[1;34m{'='*50}\033[0m\n")
     
     all_content = []
-    all_interfaces = {}  # dosya adı → arayüz bilgisi (sonraki dosyalar için)
+    written_files = {}
     
-    # Önce build.gradle
-    bg_response = phase3_build_gradle(args, plan)
-    if bg_response:
-        all_content.append(bg_response)
-        ok("app/build.gradle yazıldı")
+    bg = phase3_build_gradle(args, plan)
+    if bg: all_content.append(bg); ok("app/build.gradle yaz\u0131ld\u0131")
     
-    # Sonra her dosya
-    for i, file_info in enumerate(files):
-        path = file_info["path"]
+    type_order = {"data": 0, "util": 1, "screen": 2, "main": 3}
+    sorted_files = sorted(files, key=lambda f: type_order.get(f.get("type", "screen"), 2))
+    
+    for i, fi in enumerate(sorted_files):
+        path = fi["path"]
+        if "build.gradle" in path or "AndroidManifest" in path: continue
         
-        # build.gradle zaten yazıldı
-        if "build.gradle" in path:
-            continue
-        
-        file_start = time.time()
-        response = phase2_write_file(args, file_info, plan, all_interfaces)
-        file_elapsed = time.time() - file_start
+        t0 = time.time()
+        response = phase2_write_file(args, fi, plan, written_files, contracts)
+        elapsed = time.time() - t0
         
         if response:
             all_content.append(response)
-            # Arayüz bilgisini kaydet (data class, sealed class, fun signature)
-            iface_lines = []
-            for line in response.split("\n"):
-                stripped = line.strip()
-                if any(stripped.startswith(kw) for kw in ["data class", "sealed class", "fun ", "object ", "interface ", "enum class"]):
-                    iface_lines.append(stripped)
-            if iface_lines:
-                all_interfaces[os.path.basename(path)] = "\n".join(iface_lines)
-            
-            ok(f"{os.path.basename(path)} yazıldı ({i+1}/{len(files)}) [{file_elapsed:.1f}s]")
-            time.sleep(5)  # Rate limit koruması — 30s bekleme
+            code = extract_kotlin_code(response)
+            if code: written_files[path] = code
+            ok(f"{os.path.basename(path)} yaz\u0131ld\u0131 ({i+1}/{len(sorted_files)}) [{elapsed:.1f}s]")
+            time.sleep(5)
         else:
-            err(f"{os.path.basename(path)} yazılamadı! [{file_elapsed:.1f}s]")
+            err(f"{os.path.basename(path)} yaz\u0131lamad\u0131! [{elapsed:.1f}s]")
     
-    # ═══ FAZ 3: BİRLEŞTİR ═══
     if not all_content:
-        err("Hiçbir dosya yazılamadı!")
-        return 1
+        err("Hi\u00e7bir dosya yaz\u0131lamad\u0131!"); return 1
     
-    # Otomatik dependency tarama ve ekleme
-    needed = detect_missing_dependencies(all_content)
-    if needed:
-        all_content = inject_dependencies(all_content, needed)
-    
+    all_content = detect_and_inject_deps(all_content)
     combined = "\n\n".join(all_content)
     
-    # auto_continue: false ekle (tüm dosyalar yazıldı)
-    # AI'ın auto_continue:true satirlarini temizle (zincir tetiklemesin)
     import re as _re
     combined = _re.sub(r'auto_continue\s*:\s*true', 'auto_continue: false', combined)
     combined += "\n\nauto_continue: false\n"
     
-    # Çıktı dosyasına yaz
     with open(args.output, 'w', encoding='utf-8') as f:
         f.write(combined)
     
-    ok(f"Orkestratör tamamlandı: {len(all_content)} dosya → {args.output}")
-    
-    # İstatistik + Zamanlama
     total_elapsed = time.time() - total_start
-    faz2_elapsed = time.time() - faz2_start
-    total_lines = combined.count("\n")
-    log(f"Toplam: ~{total_lines} satır, {len(combined)} karakter")
-    log(f"API çağrıları: 1 plan + {len(all_content)} dosya = {1 + len(all_content)} çağrı")
-    log(f"⏱️  Süre: Plan {faz2_start-faz1_start:.0f}s + Dosyalar {faz2_elapsed:.0f}s = Toplam {total_elapsed:.0f}s ({total_elapsed/60:.1f}dk)")
-    
+    ok(f"Orkestrat\u00f6r tamamland\u0131: {len(all_content)} dosya")
+    log(f"Toplam: ~{combined.count(chr(10))} sat\u0131r, {len(combined)} karakter")
+    log(f"API: 1 plan + {len(all_content)} dosya = {1+len(all_content)} \u00e7a\u011fr\u0131")
+    log(f"\u23f1\ufe0f  Plan {faz1_end-total_start:.0f}s + Dosyalar {time.time()-faz2_start:.0f}s = Toplam {total_elapsed:.0f}s ({total_elapsed/60:.1f}dk)")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
