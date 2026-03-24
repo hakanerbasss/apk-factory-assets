@@ -1150,68 +1150,72 @@ class App : Application() {{
                             await ws.send(json.dumps({"type":"task_done","success":False,"text":f"❌ Freesound: {se}"}))
 
                 elif t == "setup_firebase":
-                    pname = d.get("project", "")
-                    pkg   = d.get("pkg", "")
-                    if not pkg:
-                        for pr in read_projeler():
-                            if pr["name"] == pname:
-                                pkg = pr.get("package", f"com.wizaicorp.{pname.replace('-', '_')}")
-                                break
-                        if not pkg: pkg = f"com.wizaicorp.{pname.replace('-', '_')}"
-
-                    pd2 = get_proj_dir(pname)
-                    try:
-                        await ws.send(json.dumps({"type":"log","text":"\uD83D\uDD25 Firebase placeholder kuruluyor..."}))
-
-                        # --- RACE CONDITION (PUSU) DÜZELTMESİ ---
-                        await ws.send(json.dumps({"type":"log","text":"⏳ Firebase: Proje inşası bekleniyor..."}))
+                    async def _bg_firebase(_d=d):
                         import asyncio
-                        for _ in range(60):
-                            if os.path.exists(f"{pd2}/app/build.gradle"):
-                                break
-                            await asyncio.sleep(1)
-                        # ----------------------------------------
-
-                        # 1. Placeholder google-services.json olustur
-                        placeholder = json.dumps({
-                            "project_info": {
-                                "project_number": "000000000000",
-                                "project_id": f"{pname}-placeholder",
-                                "storage_bucket": f"{pname}-placeholder.appspot.com"
-                            },
-                            "client": [{
-                                "client_info": {
-                                    "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
-                                    "android_client_info": {"package_name": pkg}
+                        pname = _d.get("project", "")
+                        pkg   = _d.get("pkg", "")
+                        if not pkg:
+                            for pr in read_projeler():
+                                if pr["name"] == pname:
+                                    pkg = pr.get("package", f"com.wizaicorp.{pname.replace('-', '_')}")
+                                    break
+                            if not pkg: pkg = f"com.wizaicorp.{pname.replace('-', '_')}"
+    
+                        pd2 = get_proj_dir(pname)
+                        try:
+                            await ws.send(json.dumps({"type":"log","text":"\uD83D\uDD25 Firebase placeholder kuruluyor..."}))
+    
+                            # --- RACE CONDITION (PUSU) DÜZELTMESİ ---
+                            await ws.send(json.dumps({"type":"log","text":"⏳ Firebase: Proje inşası bekleniyor..."}))
+                            import asyncio
+                            for _ in range(60):
+                                if os.path.exists(f"{pd2}/app/build.gradle"):
+                                    break
+                                await asyncio.sleep(1)
+                            # ----------------------------------------
+    
+                            # 1. Placeholder google-services.json olustur
+                            placeholder = json.dumps({
+                                "project_info": {
+                                    "project_number": "000000000000",
+                                    "project_id": f"{pname}-placeholder",
+                                    "storage_bucket": f"{pname}-placeholder.appspot.com"
                                 },
-                                "api_key": [{"current_key": "AIzaSyPlaceholderKeyForBuildOnly"}]
-                            }],
-                            "configuration_version": "1"
-                        }, indent=2)
-
-                        dest = f"{pd2}/app/google-services.json"
-                        os.makedirs(os.path.dirname(dest), exist_ok=True)
-                        open(dest, "w").write(placeholder)
-
-                        # 2. build.gradle guncelle
-                        for bg_path in [f"{pd2}/app/build.gradle", f"{pd2}/build.gradle"]:
-                            if os.path.exists(bg_path):
-                                bg = open(bg_path).read()
-                                if "google-services" not in bg:
-                                    if "app/build.gradle" in bg_path:
-                                        bg = bg.replace("id 'com.android.application'", "id 'com.android.application'\n    id 'com.google.gms.google-services'")
-                                        if "firebase-bom" not in bg:
-                                            fb_block = "    implementation platform('com.google.firebase:firebase-bom:32.7.0')\n    implementation 'com.google.firebase:firebase-firestore-ktx'\n    implementation 'com.google.firebase:firebase-auth-ktx'\n    implementation 'com.google.firebase:firebase-storage-ktx'\n    debugImplementation"
-                                            bg = bg.replace("    debugImplementation", fb_block)
-                                    else:
-                                        bg = bg.replace("dependencies {","dependencies {\n        classpath 'com.google.gms:google-services:4.4.0'")
-                                    open(bg_path,"w").write(bg)
-
-                        await ws.send(json.dumps({"type":"task_done","success":True,
-                            "text":"\u2705 Firebase placeholder kuruldu! Build gecebilir.\nGercek Firebase icin: 3-nokta menu \u2192 \uD83D\uDD25 Firebase Ekle"}))
-                    except Exception as e:
-                        await ws.send(json.dumps({"type":"task_done","success":False,
-                            "text":f"\u274C Firebase placeholder hatasi: {e}"}))
+                                "client": [{
+                                    "client_info": {
+                                        "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+                                        "android_client_info": {"package_name": pkg}
+                                    },
+                                    "api_key": [{"current_key": "AIzaSyPlaceholderKeyForBuildOnly"}]
+                                }],
+                                "configuration_version": "1"
+                            }, indent=2)
+    
+                            dest = f"{pd2}/app/google-services.json"
+                            os.makedirs(os.path.dirname(dest), exist_ok=True)
+                            open(dest, "w").write(placeholder)
+    
+                            # 2. build.gradle guncelle
+                            for bg_path in [f"{pd2}/app/build.gradle", f"{pd2}/build.gradle"]:
+                                if os.path.exists(bg_path):
+                                    bg = open(bg_path).read()
+                                    if "google-services" not in bg:
+                                        if "app/build.gradle" in bg_path:
+                                            bg = bg.replace("id 'com.android.application'", "id 'com.android.application'\n    id 'com.google.gms.google-services'")
+                                            if "firebase-bom" not in bg:
+                                                fb_block = "    implementation platform('com.google.firebase:firebase-bom:32.7.0')\n    implementation 'com.google.firebase:firebase-firestore-ktx'\n    implementation 'com.google.firebase:firebase-auth-ktx'\n    implementation 'com.google.firebase:firebase-storage-ktx'\n    debugImplementation"
+                                                bg = bg.replace("    debugImplementation", fb_block)
+                                        else:
+                                            bg = bg.replace("dependencies {","dependencies {\n        classpath 'com.google.gms:google-services:4.4.0'")
+                                        open(bg_path,"w").write(bg)
+    
+                            await ws.send(json.dumps({"type":"task_done","success":True,
+                                "text":"\u2705 Firebase placeholder kuruldu! Build gecebilir.\nGercek Firebase icin: 3-nokta menu \u2192 \uD83D\uDD25 Firebase Ekle"}))
+                        except Exception as e:
+                            await ws.send(json.dumps({"type":"task_done","success":False,
+                                "text":f"\u274C Firebase placeholder hatasi: {e}"}))
+    
+                    asyncio.create_task(_bg_firebase())
 
                 elif t == "upload_file":
                     proj    = d.get("project", "")
