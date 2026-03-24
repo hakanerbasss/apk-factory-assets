@@ -355,6 +355,114 @@ async def run_uix(ws, proj_name, proj_dir, complaint, start_fn=None):
         await ul(f"❌ UIX hata: {ex}\n{traceback.format_exc()[:400]}")
         await ws.send(_j.dumps({"type":"task_done","success":False,"text":f"❌ UIX: {ex}"}))
 
+async def auto_scan_sounds(proj_dir, ws):
+    """Build sonrasi R.raw.xxx referanslarini tarar, eksik sesleri Freesound'dan indirir."""
+    import re, glob
+    try:
+        settings = read_settings()
+        fs_key = settings.get("FREESOUND_KEY", "").strip()
+        if not fs_key:
+            return  # API key yoksa sessizce cik
+
+        raw_dir = f"{proj_dir}/app/src/main/res/raw"
+        # Mevcut ses dosyalarini bul
+        existing = set()
+        if os.path.isdir(raw_dir):
+            for f in os.listdir(raw_dir):
+                existing.add(os.path.splitext(f)[0].lower())
+
+        # Tum .kt dosyalarinda R.raw.xxx referanslarini tara
+        needed = {}  # {dosya_adi: arama_sorgusu}
+        workaround_files = {}  # {kt_path: [(old_line, sound_name)]}
+
+        src_dir = f"{proj_dir}/app/src/main/java"
+        if not os.path.isdir(src_dir):
+            return
+
+        for root, dirs, files in os.walk(src_dir):
+            for fname in files:
+                if not fname.endswith(".kt"):
+                    continue
+                fpath = os.path.join(root, fname)
+                try:
+                    content = open(fpath, 'r', encoding='utf-8').read()
+                except:
+                    continue
+
+                # Pattern 1: R.raw.xxx (dogrudan referans)
+                for m in re.finditer(r'R\.raw\.([a-z_][a-z0-9_]*)', content):
+                    snd = m.group(1)
+                    if snd not in existing:
+                        # Ses adindan arama sorgusu turet
+                        query = snd.replace("_", " ")
+                        needed[snd] = query
+
+                # Pattern 2: rawResourceId = 0 // R.raw.xxx (workaround)
+                for m in re.finditer(r'rawResourceId\s*=\s*0\s*//\s*R\.raw\.(\w+)', content):
+                    snd = m.group(1)
+                    if snd not in existing:
+                        query = snd.replace("_", " ")
+                        needed[snd] = query
+                        if fpath not in workaround_files:
+                            workaround_files[fpath] = []
+                        workaround_files[fpath].append((m.group(0), snd))
+
+        if not needed:
+            return  # Eksik ses yok
+
+        await ws.send(json.dumps({"type":"log","text":f"[SES] {len(needed)} eksik ses dosyasi tespit edildi, indiriliyor..."}))
+
+        import urllib.request as _ur, json as _j
+        os.makedirs(raw_dir, exist_ok=True)
+        downloaded = []
+
+        for snd_name, query in needed.items():
+            try:
+                su = f"https://freesound.org/apiv2/search/text/?query={query.replace(' ','+')}&fields=id,name,previews&token={fs_key}&page_size=1"
+                resp = _j.loads(_ur.urlopen(su, timeout=10).read())
+                results = resp.get("results", [])
+                if results:
+                    r = results[0]
+                    mp3_url = r["previews"]["preview-hq-mp3"] + f"?token={fs_key}"
+                    dest = f"{raw_dir}/{snd_name}.mp3"
+                    _ur.urlretrieve(mp3_url, dest)
+                    downloaded.append(snd_name)
+                    await ws.send(json.dumps({"type":"log","text":f"[SES] {snd_name}.mp3 indirildi"}))
+                else:
+                    await ws.send(json.dumps({"type":"log","text":f"[SES] '{query}' bulunamadi, {snd_name} atlanıyor"}))
+            except Exception as se:
+                await ws.send(json.dumps({"type":"log","text":f"[SES] {snd_name} indirilemedi: {se}"}))
+
+        # workaround satirlarini duzelt (rawResourceId = 0 -> R.raw.xxx)
+        if downloaded and workaround_files:
+            fixed_count = 0
+            for fpath, replacements in workaround_files.items():
+                try:
+                    content = open(fpath, 'r', encoding='utf-8').read()
+                    changed = False
+                    for old_text, snd in replacements:
+                        if snd in downloaded:
+                            new_text = f"rawResourceId = R.raw.{snd}"
+                            content = content.replace(old_text, new_text)
+                            changed = True
+                            fixed_count += 1
+                    if changed:
+                        open(fpath, 'w', encoding='utf-8').write(content)
+                except:
+                    pass
+            if fixed_count > 0:
+                await ws.send(json.dumps({"type":"log","text":f"[SES] {fixed_count} referans R.raw.xxx olarak duzeltildi"}))
+                await ws.send(json.dumps({"type":"log","text":"[SES] Rebuild gerekiyor, AutoFix devam edecek..."}))
+
+        if downloaded:
+            await ws.send(json.dumps({"type":"log","text":f"[SES] Toplam {len(downloaded)} ses indirildi: {', '.join(downloaded)}"}))
+
+    except Exception as e:
+        try:
+            await ws.send(json.dumps({"type":"log","text":f"[SES] Tarama hatasi: {e}"}))
+        except:
+            pass
+
 def copy_apk(proj_dir, proj_name):
     candidates = [
         (f"{proj_dir}/app/build/outputs/apk/debug/app-debug.apk",           "apk"),
@@ -871,6 +979,7 @@ async def handle(ws):
                     await ws.send(json.dumps({"type":"status","text":f"🤖 AutoFix: {p}"}))
                     async def af_done(rc, _p=p, _pd=pd):
                         apk = copy_apk(_pd, _p) if rc == 0 else None
+                        if rc == 0: await auto_scan_sounds(_pd, ws)
                         await ws.send(json.dumps({"type":"task_done","success":rc==0,
                             "text":"✅ AutoFix tamamlandı!" if rc==0 else "❌ AutoFix başarısız",
                             "apk_path":apk or ""}))
@@ -1347,6 +1456,7 @@ class App : Application() {{
                             break
                     async def tk_done(rc, _p=p, _pd=pd, _pkg=pkg):
                         apk = copy_apk(_pd, _p) if rc == 0 else None
+                        if rc == 0: await auto_scan_sounds(_pd, ws)
                         running["task"] = None
                         await ws.send(json.dumps({"type":"task_done","success":rc==0,
                             "text":"✅ Görev tamamlandı!" if rc==0 else "❌ Görev başarısız",
