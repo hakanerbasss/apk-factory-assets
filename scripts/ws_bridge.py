@@ -1099,6 +1099,82 @@ class App : Application() {{
                         except Exception as se:
                             await ws.send(json.dumps({"type":"task_done","success":False,"text":f"❌ Freesound: {se}"}))
 
+                elif t == "setup_firebase":
+                    token = d.get("token", "")
+                    pname = d.get("project", "")
+                    pkg   = d.get("pkg", "")
+                    if not pkg:
+                        for pr in read_projeler():
+                            if pr["name"] == pname:
+                                pkg = pr.get("package", f"com.wizaicorp.{pname.replace('-', '_')}")
+                                break
+                        if not pkg: pkg = f"com.wizaicorp.{pname.replace('-', '_')}"
+
+                    async def do_firebase_setup():
+                        import urllib.request, json, time, base64, os
+                        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+                        def _req(url, data=None, method="GET"):
+                            req = urllib.request.Request(url, data=json.dumps(data).encode() if data else None, headers=headers, method=method)
+                            with urllib.request.urlopen(req, timeout=30) as r: return json.loads(r.read().decode())
+                        
+                        try:
+                            await ws.send(json.dumps({"type":"status","text":"🔥 Firebase: Bulut altyapısı aranıyor..."}))
+                            gcp_projs = _req("https://cloudresourcemanager.googleapis.com/v1/projects")
+                            gcp_list = gcp_projs.get("projects", [])
+                            if not gcp_list:
+                                await ws.send(json.dumps({"type":"error","text":"❌ Google Cloud projesi bulunamadı!"}))
+                                return
+                                
+                            target_proj = gcp_list[0]["projectId"]
+                            
+                            try:
+                                _req(f"https://firebase.googleapis.com/v1beta1/projects/{target_proj}")
+                            except:
+                                await ws.send(json.dumps({"type":"status","text":f"🔥 Firebase: {target_proj} aktif ediliyor..."}))
+                                _req(f"https://firebase.googleapis.com/v1beta1/projects/{target_proj}:addFirebase", data={"timeZone":"Europe/Istanbul"}, method="POST")
+                                time.sleep(4)
+                                
+                            await ws.send(json.dumps({"type":"status","text":f"🔥 Firebase: App kaydediliyor ({pkg})..."}))
+                            _req(f"https://firebase.googleapis.com/v1beta1/projects/{target_proj}/androidApps", data={"displayName": pname, "packageName": pkg}, method="POST")
+                            time.sleep(4)
+                            
+                            apps = _req(f"https://firebase.googleapis.com/v1beta1/projects/{target_proj}/androidApps")
+                            app_id = next((a["appId"] for a in apps.get("apps",[]) if a.get("packageName") == pkg), None)
+                            
+                            if not app_id:
+                                await ws.send(json.dumps({"type":"error","text":"❌ App oluşturulamadı."}))
+                                return
+                                
+                            await ws.send(json.dumps({"type":"status","text":"🔥 Firebase: json indiriliyor..."}))
+                            config = _req(f"https://firebase.googleapis.com/v1beta1/projects/{target_proj}/androidApps/{app_id}/config")
+                            b64_config = config.get("configFileContents", "")
+                            
+                            pd2 = get_proj_dir(pname)
+                            raw = base64.b64decode(b64_config)
+                            dest = f"{pd2}/app/google-services.json"
+                            os.makedirs(os.path.dirname(dest), exist_ok=True)
+                            open(dest,"wb").write(raw)
+                            
+                            for bg_path in [f"{pd2}/app/build.gradle", f"{pd2}/build.gradle"]:
+                                if os.path.exists(bg_path):
+                                    bg = open(bg_path).read()
+                                    if "google-services" not in bg:
+                                        if "app/build.gradle" in bg_path:
+                                            bg = bg.replace("id 'com.android.application'", "id 'com.android.application'\n    id 'com.google.gms.google-services'")
+                                            if "firebase-bom" not in bg:
+                                                fb_block = "    implementation platform('com.google.firebase:firebase-bom:32.7.0')\n    implementation 'com.google.firebase:firebase-firestore-ktx'\n    implementation 'com.google.firebase:firebase-auth-ktx'\n    implementation 'com.google.firebase:firebase-storage-ktx'\n    debugImplementation"
+                                                bg = bg.replace("    debugImplementation", fb_block)
+                                        else:
+                                            bg = bg.replace("dependencies {","dependencies {\n        classpath 'com.google.gms:google-services:4.4.0'")
+                                        open(bg_path,"w").write(bg)
+                                        
+                            await ws.send(json.dumps({"type":"task_done","success":True,"text":"✅ Otonom Firebase Hazır!"}))
+                            
+                        except Exception as e:
+                            await ws.send(json.dumps({"type":"error","text":f"❌ Firebase Hata: {e}"}))
+                            
+                    asyncio.create_task(do_firebase_setup())
+
                 elif t == "upload_file":
                     proj    = d.get("project", "")
                     fname   = d.get("filename", "")
