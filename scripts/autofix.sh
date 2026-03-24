@@ -1070,6 +1070,19 @@ print(json.dumps({'model':'$s_model','max_tokens':8000,'system':sp,'messages':[{
         if ! apply_fixes; then
             err "Düzeltme başarısız — $((MAX_LOOPS - loop)) deneme kaldı"; sleep 2; continue
         fi
+
+        # Son denemede de build al — AI yazdı ama test edilmeden bitmesin
+        if [[ $loop -ge $MAX_LOOPS ]]; then
+            run_build
+            local final_result; final_result=$(cat "$TMP_DIR/build_result.txt" 2>/dev/null || echo "FAILED")
+            if [[ "$final_result" == "SUCCESS" ]]; then
+                ok "✅ Son deneme build başarılı!"
+                clean_agent_backups
+                exit 0
+            else
+                err "Son denemede de build başarısız"
+            fi
+        fi
     done
 
     err "BAŞARISIZ: $MAX_LOOPS denemede düzeltilemedi"
