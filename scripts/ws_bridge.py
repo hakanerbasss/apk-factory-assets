@@ -59,7 +59,8 @@ FACTORY_PROMPTS = [
 # ── Settings ──────────────────────────────────────────────────────────────────
 def read_settings():
     d = {"DEFAULT_PROVIDER":"Claude","DEFAULT_MODEL":"claude-haiku-4-5-20251001",
-         "MAX_LOOPS":"5","MAX_TOKENS":"8000","MAX_CHARS":"60000","KEYSTORE_PASS":"android123"}
+         "MAX_LOOPS":"5","MAX_TOKENS":"8000","MAX_CHARS":"60000","KEYSTORE_PASS":"android123",
+         "FREESOUND_KEY":""}
     if not os.path.exists(SETTINGS_FILE): return d
     for line in open(SETTINGS_FILE):
         line = line.strip()
@@ -1064,6 +1065,86 @@ class App : Application() {{
                     else:
                         await ws.send(json.dumps({"type":"task_done","success":True,
                             "text":f"↩ Yedeğe dönüldü ({restored} dosya)"}))
+
+                elif t == "search_sound":
+                    query   = d.get("query", "")
+                    proj    = d.get("project", "")
+                    fname   = d.get("filename", "")
+                    pd2     = get_proj_dir(proj)
+                    import urllib.request as _ur2, json as _js2
+                    settings2 = read_settings()
+                    fs_key = settings2.get("FREESOUND_KEY", "").strip()
+                    if not fs_key:
+                        await ws.send(json.dumps({"type":"task_done","success":False,"text":"❌ Freesound API key eksik. Ayarlar'dan ekleyin."}))
+                    elif not query:
+                        await ws.send(json.dumps({"type":"task_done","success":False,"text":"❌ Arama sorgusu boş"}))
+                    else:
+                        try:
+                            await ws.send(json.dumps({"type":"status","text":f"🔊 Freesound: {query}"}))
+                            su = f"https://freesound.org/apiv2/search/text/?query={query.replace(' ','+')}&fields=id,name,previews&token={fs_key}&page_size=1"
+                            resp = _js2.loads(_ur2.urlopen(su, timeout=10).read())
+                            results = resp.get("results", [])
+                            if not results:
+                                await ws.send(json.dumps({"type":"task_done","success":False,"text":f"❌ '{query}' bulunamadı"}))
+                            else:
+                                r = results[0]
+                                mp3_url = r["previews"]["preview-hq-mp3"] + f"?token={fs_key}"
+                                safe = (fname or r["name"].lower().replace(" ","_").replace("-","_")).split(".")[0] + ".mp3"
+                                safe = "".join(c if c.isalnum() or c == "_" else "_" for c in safe)
+                                dest_dir = f"{pd2}/app/src/main/res/raw"
+                                os.makedirs(dest_dir, exist_ok=True)
+                                _ur2.urlretrieve(mp3_url, f"{dest_dir}/{safe}")
+                                await ws.send(json.dumps({"type":"task_done","success":True,
+                                    "text":f"🔊 İndirildi: {r['name']}\nDosya: res/raw/{safe}\nKullanım: R.raw.{safe.replace('.mp3','')}"}))
+                        except Exception as se:
+                            await ws.send(json.dumps({"type":"task_done","success":False,"text":f"❌ Freesound: {se}"}))
+
+                elif t == "upload_file":
+                    proj    = d.get("project", "")
+                    fname   = d.get("filename", "")
+                    fdata   = d.get("data", "")
+                    pd2     = get_proj_dir(proj)
+                    import base64 as _b64
+                    if not fname or not fdata:
+                        await ws.send(json.dumps({"type":"task_done","success":False,"text":"❌ Dosya adı veya veri eksik"}))
+                    else:
+                        try:
+                            raw = _b64.b64decode(fdata)
+                            fl = fname.lower()
+                            if fname == "google-services.json":
+                                dest = f"{pd2}/app/{fname}"
+                                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                                open(dest,"wb").write(raw)
+                                for bg_path in [f"{pd2}/app/build.gradle", f"{pd2}/build.gradle"]:
+                                    if os.path.exists(bg_path):
+                                        bg = open(bg_path).read()
+                                        if "google-services" not in bg:
+                                            if "app/build.gradle" in bg_path:
+                                                bg = bg.replace("id 'com.android.application'","id 'com.android.application'\n    id 'com.google.gms.google-services'")
+                                                if "firebase-bom" not in bg:
+                                                    firebase_block = "    implementation platform('com.google.firebase:firebase-bom:32.7.0')\n    implementation 'com.google.firebase:firebase-firestore-ktx'\n    implementation 'com.google.firebase:firebase-auth-ktx'\n    implementation 'com.google.firebase:firebase-storage-ktx'\n    debugImplementation"
+                                                    bg = bg.replace("    debugImplementation", firebase_block)
+                                            else:
+                                                bg = bg.replace("dependencies {","dependencies {\n        classpath 'com.google.gms:google-services:4.4.0'")
+
+                                            open(bg_path,"w").write(bg)
+                                await ws.send(json.dumps({"type":"task_done","success":True,"text":"🔥 Firebase eklendi! google-services.json kopyalandı, build.gradle güncellendi."}))
+                            elif any(fl.endswith(e) for e in [".mp3",".wav",".ogg",".m4a"]):
+                                dest_dir = f"{pd2}/app/src/main/res/raw"
+                                os.makedirs(dest_dir, exist_ok=True)
+                                safe = "".join(c if c.isalnum() or c=="_" else "_" for c in fl)
+                                open(f"{dest_dir}/{safe}","wb").write(raw)
+                                await ws.send(json.dumps({"type":"task_done","success":True,"text":f"🔊 Ses eklendi: res/raw/{safe}"}))
+                            elif any(fl.endswith(e) for e in [".png",".jpg",".jpeg",".webp"]):
+                                dest_dir = f"{pd2}/app/src/main/res/drawable"
+                                os.makedirs(dest_dir, exist_ok=True)
+                                safe = "".join(c if c.isalnum() or c=="_" else "_" for c in fl)
+                                open(f"{dest_dir}/{safe}","wb").write(raw)
+                                await ws.send(json.dumps({"type":"task_done","success":True,"text":f"🖼️ Görsel eklendi: res/drawable/{safe}"}))
+                            else:
+                                await ws.send(json.dumps({"type":"task_done","success":False,"text":f"❌ Desteklenmeyen tür: {fname}"}))
+                        except Exception as ue:
+                            await ws.send(json.dumps({"type":"task_done","success":False,"text":f"❌ Yükleme hatası: {ue}"}))
 
                 elif t == "delete_chain_task":
                     import glob as _g
