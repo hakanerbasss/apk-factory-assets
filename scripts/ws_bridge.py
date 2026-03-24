@@ -398,7 +398,7 @@ async def auto_scan_sounds(proj_dir, ws):
                         needed[snd] = query
 
                 # Pattern 2: rawResourceId = 0 // R.raw.xxx (workaround)
-                for m in re.finditer(r'rawResourceId\s*=\s*0\s*//\s*R\.raw\.(\w+)', content):
+                for m in re.finditer(r'rawResourceId\s*=\s*0\s*//.*?R\.raw\.(\w+).*', content):
                     snd = m.group(1)
                     if snd not in existing:
                         query = snd.replace("_", " ")
