@@ -427,6 +427,22 @@ async def pty_run(cmd, cwd, ws, state, on_done):
                 elif text.startswith("USER_ACTION_REQUIRED:"):
                     action = text[len("USER_ACTION_REQUIRED:"):]
                     await ws.send(json.dumps({"type":"log","text":f"⚠️ KULLANICI AKSİYONU:\n{action}"}))
+                elif "[FREESOUND]" in text:
+                    try:
+                        import json
+                        fname = ""
+                        query = ""
+                        if "[FREESOUND:" in text:
+                            parts = text.split("] ", 1)
+                            fname = parts[0].split("[FREESOUND:")[1].strip()
+                            query = parts[1].strip()
+                        else:
+                            query = text.split("[FREESOUND]")[1].strip()
+                        p = state.get("_factory_name", "")
+                        if query and p:
+                            fake_msg = json.dumps({"type":"search_sound", "query":query, "project":p, "filename":fname})
+                            asyncio.create_task(handle(ws, fake_msg))
+                    except: pass
                 else:
                     await ws.send(json.dumps({"type":"log","text":text}))
             except: return False

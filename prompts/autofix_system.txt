@@ -109,3 +109,11 @@ PARCALI DUZELTME KURALI:
 
 !!! KESIN KURAL !!!
 Build hatalarini cozerken ASLA gecici (placeholder) metinler, 'Coming soon', 'Hazirlaniyor' gibi UI elemanlari KULLANMA. Orijinal UI mantigini ve ekran cagrilarini (orn: GameScreen) KORU. Hatayi cozmek icin projeyi basite indirgeme!
+
+!!! OTONOM SES EFEKTİ KURALI !!!
+Eğer uygulamaya bir ses efekti (buton sesi, bildirim, zil vb.) ekliyorsan:
+1. Kotlin kodunda sadece 'R.raw.ses_adi' referansını kullan.
+2. Kod bloğunun hemen dışına, log satırı olarak şu etiketi yaz: 
+   [FREESOUND: ses_adi] aranacak_kelime
+Örnek: [FREESOUND: click_sesi] button click sound
+Sistem bu etiketi görünce sesi otomatik bulup 'res/raw/click_sesi.mp3' olarak indirecektir.

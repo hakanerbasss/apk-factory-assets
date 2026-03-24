@@ -992,12 +992,16 @@ ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B
                     # ── Eksik dosya tespiti: Unresolved reference varsa Senior kodu yazar ──
                     local missing_refs
                     missing_refs=$(grep -oE "Unresolved reference: [A-Za-z0-9_]+" "$ef" | sort -u | head -10)
-                    if [[ -n "$missing_refs" ]]; then
+                    local build_errors
+                    build_errors=$(grep -E "Could not find|Could not resolve|AAPT: error|AAPT2 aapt2|Execution failed for task" "$ef" | sort -u | head -5)
+                    
+                    if [[ -n "$missing_refs" || -n "$build_errors" ]]; then
                         warn "🎓 Eksik referanslar tespit edildi — Senior dosya yazıyor..."
                         local senior_code_prompt
                         senior_code_prompt=$(cat "$PROMPTS_DIR/autofix_task.txt")
-                        local senior_code_user="Şu eksik referanslar var:
+                        local senior_code_user="Şu eksik referanslar veya Build/Gradle hataları var:
 $missing_refs
+$build_errors
 
 Mevcut proje kaynak kodları:
 $(cat "$src" | head -c 20000)
