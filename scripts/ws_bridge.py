@@ -1066,6 +1066,56 @@ class App : Application() {{
                         await ws.send(json.dumps({"type":"task_done","success":True,
                             "text":f"↩ Yedeğe dönüldü ({restored} dosya)"}))
 
+                elif t == "search_sound_list":
+                    query = d.get("query", "")
+                    import urllib.request as _ur3, json as _js3
+                    settings3 = read_settings()
+                    fs_key = settings3.get("FREESOUND_KEY", "").strip()
+                    if not fs_key:
+                        await ws.send(json.dumps({"type":"task_done","success":False,"text":"\u274C Freesound API key eksik. Ayarlar'dan ekleyin."}))
+                    elif not query:
+                        await ws.send(json.dumps({"type":"task_done","success":False,"text":"\u274C Arama sorgusu bo\u015F"}))
+                    else:
+                        try:
+                            su = f"https://freesound.org/apiv2/search/text/?query={query.replace(' ','+')}&fields=id,name,previews,duration,tags&token={fs_key}&page_size=10"
+                            resp = _js3.loads(_ur3.urlopen(su, timeout=10).read())
+                            sound_results = []
+                            for r in resp.get("results", []):
+                                sound_results.append({
+                                    "id": r["id"],
+                                    "name": r["name"],
+                                    "duration": round(r.get("duration", 0), 1),
+                                    "preview_url": r["previews"]["preview-hq-mp3"],
+                                    "tags": r.get("tags", [])[:5]
+                                })
+                            await ws.send(json.dumps({"type":"sound_results","results":sound_results,"query":query}))
+                        except Exception as se:
+                            await ws.send(json.dumps({"type":"task_done","success":False,"text":f"\u274C Freesound: {se}"}))
+
+                elif t == "download_sound":
+                    proj = d.get("project", "")
+                    preview_url = d.get("preview_url", "")
+                    fname = d.get("filename", "")
+                    sound_name = d.get("sound_name", "")
+                    pd2 = get_proj_dir(proj)
+                    import urllib.request as _ur4
+                    settings4 = read_settings()
+                    fs_key2 = settings4.get("FREESOUND_KEY", "").strip()
+                    if not preview_url:
+                        await ws.send(json.dumps({"type":"task_done","success":False,"text":"\u274C URL eksik"}))
+                    else:
+                        try:
+                            dl_url = preview_url + (f"?token={fs_key2}" if fs_key2 else "")
+                            safe = (fname or sound_name.lower().replace(" ","_").replace("-","_")).split(".")[0]
+                            safe = "".join(c if c.isalnum() or c == "_" else "_" for c in safe) + ".mp3"
+                            dest_dir = f"{pd2}/app/src/main/res/raw"
+                            os.makedirs(dest_dir, exist_ok=True)
+                            _ur4.urlretrieve(dl_url, f"{dest_dir}/{safe}")
+                            await ws.send(json.dumps({"type":"task_done","success":True,
+                                "text":f"\uD83D\uDD0A \u0130ndirildi: {sound_name}\nDosya: res/raw/{safe}\nKullan\u0131m: R.raw.{safe.replace('.mp3','')}"}))
+                        except Exception as se:
+                            await ws.send(json.dumps({"type":"task_done","success":False,"text":f"\u274C \u0130ndirme hatas\u0131: {se}"}))
+
                 elif t == "search_sound":
                     query   = d.get("query", "")
                     proj    = d.get("project", "")
