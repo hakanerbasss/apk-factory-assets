@@ -421,37 +421,59 @@ async def pty_run(cmd, cwd, ws, state, on_done):
         if not text or text == last_line: return True
         last_line = text
         try:
-            # --- OTONOM SES TETIKLEYICI ---
+            # --- OTONOM SES: AI [FREESOUND: dosya_adi] sorgu yazdiysa direkt indir ---
             if "[FREESOUND" in text:
-                try:
-                    import json
-                    fname, query = "", ""
-                    if "[FREESOUND:" in text:
-                        parts = text.split("] ", 1)
-                        fname = parts[0].split("[FREESOUND:")[1].strip()
-                        query = parts[1].strip() if len(parts) > 1 else ""
-                    else:
-                        query = text.split("[FREESOUND]")[1].strip()
-                    p = state.get("_factory_name", "")
-                    if query and p:
-                        # Hatalı handle(ws, msg) yerine direkt indirme motoruna (search_sound) emri gönderiyoruz
-                        ss_msg = json.dumps({"type":"search_sound", "query":query, "project":p, "filename":fname})
-                        asyncio.create_task(ws.send(ss_msg)) 
-                except: pass
+                async def _auto_download_sound(_text, _cwd):
+                    try:
+                        import urllib.request as _ur, json as _j
+                        _fname, _query = "", ""
+                        if "[FREESOUND:" in _text:
+                            _parts = _text.split("]", 1)
+                            _fname = _parts[0].split("[FREESOUND:")[1].strip()
+                            _query = _parts[1].strip() if len(_parts) > 1 else ""
+                        else:
+                            _query = _text.split("[FREESOUND]")[1].strip()
+                        if not _query:
+                            return
+                        _settings = read_settings()
+                        _fs_key = _settings.get("FREESOUND_KEY", "").strip()
+                        if not _fs_key:
+                            await ws.send(json.dumps({"type":"log","text":"[SES] API Key eksik, ses indirilemedi"}))
+                            return
+                        await ws.send(json.dumps({"type":"log","text":f"[SES] Araniyor: {_query}"}))
+                        _su = f"https://freesound.org/apiv2/search/text/?query={_query.replace(' ','+')}&fields=id,name,previews&token={_fs_key}&page_size=1"
+                        _resp = _j.loads(_ur.urlopen(_su, timeout=10).read())
+                        _results = _resp.get("results", [])
+                        if not _results:
+                            await ws.send(json.dumps({"type":"log","text":f"[SES] '{_query}' bulunamadi"}))
+                            return
+                        _r = _results[0]
+                        _mp3_url = _r["previews"]["preview-hq-mp3"] + f"?token={_fs_key}"
+                        _safe = (_fname or _r["name"].lower().replace(" ","_").replace("-","_")).split(".")[0]
+                        _safe = "".join(c if c.isalnum() or c == "_" else "_" for c in _safe) + ".mp3"
+                        _dest_dir = f"{_cwd}/app/src/main/res/raw"
+                        os.makedirs(_dest_dir, exist_ok=True)
+                        _ur.urlretrieve(_mp3_url, f"{_dest_dir}/{_safe}")
+                        await ws.send(json.dumps({"type":"log","text":f"[SES] Indirildi: {_r['name']} -> res/raw/{_safe}"}))
+                    except Exception as _se:
+                        try:
+                            await ws.send(json.dumps({"type":"log","text":f"[SES] Hata: {_se}"}))
+                        except: pass
+                asyncio.create_task(_auto_download_sound(text, cwd))
                 return True
 
-            # --- ÖZEL MESAJLAR ---
+            # --- OZEL MESAJLAR ---
             if text.startswith("POSTA_ICERIGI:"):
-                await ws.send(json.dumps({"type":"log","text":"📬 Posta içeriği alındı."}))
+                await ws.send(json.dumps({"type":"log","text":"Posta icerigi alindi."}))
             elif text.startswith("USER_ACTION_REQUIRED:"):
                 action = text[len("USER_ACTION_REQUIRED:"):].strip()
-                await ws.send(json.dumps({"type":"log","text":f"⚠️ AKSİYON: {action}"}))
+                await ws.send(json.dumps({"type":"user_action","text":action}))
             else:
-                # --- STANDART LOG (Kısa ve bozuk verileri filtrele) ---
-                if len(text) > 1 and not any(x in text for x in ["✨ Proje:", "✅ Proje:"]):
+                if len(text) > 1:
                     await ws.send(json.dumps({"type":"log","text":text}))
         except: return False
         return True
+
 
     try:
         while True:
