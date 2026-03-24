@@ -986,9 +986,65 @@ ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B
         if [[ $loop -ge $senior_threshold && -n "$senior_prov" ]]; then
             warn "🎓 $loop. denemede Senior AI devreye giriyor: $senior_prov / $senior_model"
             if call_senior_ai "$ef" "$src" "${TASK_DESCRIPTION:-}" "af" "$loop"; then
-                # Senior tavsiyesini bir sonraki call_ai'a ekle
                 local advice_file="$TMP_DIR/senior_advice.txt"
                 if [[ -f "$advice_file" ]]; then
+
+                    # ── Eksik dosya tespiti: Unresolved reference varsa Senior kodu yazar ──
+                    local missing_refs
+                    missing_refs=$(grep -oE "Unresolved reference: [A-Za-z0-9_]+" "$ef" | sort -u | head -10)
+                    if [[ -n "$missing_refs" ]]; then
+                        warn "🎓 Eksik referanslar tespit edildi — Senior dosya yazıyor..."
+                        local senior_code_prompt
+                        senior_code_prompt=$(cat "$PROMPTS_DIR/autofix_task.txt")
+                        local senior_code_user="Şu eksik referanslar var:
+$missing_refs
+
+Mevcut proje kaynak kodları:
+$(cat "$src" | head -c 20000)
+
+Hata logu:
+$(cat "$ef")
+
+Bu eksik sınıf/fonksiyonları içeren dosyaları yaz. Sadece eksik olanları oluştur, mevcut dosyalara dokunma.
+ÇIKIŞ FORMATI:
+Dosya: app/src/main/java/PKG/DosyaAdi.kt
+\`\`\`kotlin
+// kod
+\`\`\`"
+                        # Senior'dan eksik dosyaları yaz
+                        local senior_code_out="$TMP_DIR/senior_code.txt"
+                        local senior_prov_name; senior_prov_name=$(grep "^SENIOR_PROVIDER=" ~/.config/autofix.conf 2>/dev/null | cut -d'"' -f2)
+                        local senior_model_name; senior_model_name=$(grep "^SENIOR_MODEL=" ~/.config/autofix.conf 2>/dev/null | cut -d'"' -f2)
+                        for cf in "$APILER_DIR"/*.conf; do
+                            local pn; pn=$(grep "^NAME=" "$cf" 2>/dev/null | cut -d'"' -f2)
+                            [[ "${pn,,}" == "${senior_prov_name,,}" ]] && {
+                                local s_url; s_url=$(grep "^API_URL=" "$cf" | cut -d'"' -f2)
+                                local s_key; s_key=$(grep "^API_KEY=" "$cf" | cut -d'"' -f2)
+                                local s_model="$senior_model_name"
+                                break
+                            }
+                        done
+                        if [[ -n "$s_key" && -n "$s_url" ]]; then
+                            if [[ "$senior_prov_name" == "Claude" ]]; then
+                                local s_payload; s_payload=$(python3 -c "
+import json,sys
+sp=open('$PROMPTS_DIR/autofix_task.txt').read()
+um=open('/dev/stdin').read()
+print(json.dumps({'model':'$s_model','max_tokens':8000,'system':sp,'messages':[{'role':'user','content':um}]}))
+" <<< "$senior_code_user" 2>/dev/null)
+                                local s_hc; s_hc=$(curl -s -w "%{http_code}" -X POST "$s_url"                                     -H "Content-Type: application/json"                                     -H "x-api-key: $s_key"                                     -H "anthropic-version: 2023-06-01"                                     -d "$s_payload" -o "$senior_code_out"                                     --connect-timeout 30 --max-time 120 2>/dev/null)
+                                if [[ "$s_hc" == "200" ]]; then
+                                    local s_code; s_code=$(jq -r ".content[0].text" "$senior_code_out" 2>/dev/null)
+                                    if [[ -n "$s_code" ]]; then
+                                        echo "$s_code" >> "$TMP_DIR/ai_content.txt"
+                                        ok "🎓 Senior eksik dosyaları yazdı → apply_fixes devralıyor"
+                                        apply_fixes
+                                    fi
+                                fi
+                            fi
+                        fi
+                    fi
+                    # ── Senior tavsiyesini task prompt'una ekle ──────────────────────
                     local orig_task_prompt="$PROMPTS_DIR/autofix_task.txt"
                     local tmp_task="$TMP_DIR/task_with_senior.txt"
                     echo "=== SENIOR AI TAVSİYESİ ===" > "$tmp_task"
@@ -996,7 +1052,6 @@ ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B
                     echo "=========================" >> "$tmp_task"
                     echo "" >> "$tmp_task"
                     cat "$orig_task_prompt" >> "$tmp_task"
-                    # Geçici olarak task prompt'u değiştir
                     cp "$orig_task_prompt" "$TMP_DIR/autofix_task_backup.txt"
                     cp "$tmp_task" "$orig_task_prompt"
                     ok "Senior tavsiyesi task prompt'una eklendi"
