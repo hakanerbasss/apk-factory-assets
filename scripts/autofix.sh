@@ -1073,6 +1073,11 @@ print(json.dumps({'model':'$s_model','max_tokens':8000,'system':sp,'messages':[{
     done
 
     err "BAŞARISIZ: $MAX_LOOPS denemede düzeltilemedi"
+    # Otomatik snapshot geri yükle — projeyi bozuk bırakma
+    if [[ -f "$AGENT_YEDEK_DIR/full_snapshot.tar.gz" ]]; then
+        warn "🌀 Proje otomatik olarak işlem öncesi haline döndürülüyor..."
+        tar -xzf "$AGENT_YEDEK_DIR/full_snapshot.tar.gz" -C "$PROJECT_ROOT" 2>/dev/null &&             ok "↩ Proje eski haline döndürüldü" ||             err "Otomatik geri yükleme başarısız"
+    fi
     return 1
 }
 
