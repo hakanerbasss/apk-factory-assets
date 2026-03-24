@@ -418,34 +418,39 @@ async def pty_run(cmd, cwd, ws, state, on_done):
     async def send_log(text):
         nonlocal last_line
         text = text.strip()
-        if text and text != last_line:
-            last_line = text
-            try:
-                if text.startswith("POSTA_ICERIGI:"):
-                    posta = text[len("POSTA_ICERIGI:"):]
-                    await ws.send(json.dumps({"type":"log","text":f"📬 Posta: {posta[:100]}..."}))
-                elif text.startswith("USER_ACTION_REQUIRED:"):
-                    action = text[len("USER_ACTION_REQUIRED:"):]
-                    await ws.send(json.dumps({"type":"log","text":f"⚠️ KULLANICI AKSİYONU:\n{action}"}))
-                elif "[FREESOUND]" in text:
-                    try:
-                        import json
-                        fname = ""
-                        query = ""
-                        if "[FREESOUND:" in text:
-                            parts = text.split("] ", 1)
-                            fname = parts[0].split("[FREESOUND:")[1].strip()
-                            query = parts[1].strip()
-                        else:
-                            query = text.split("[FREESOUND]")[1].strip()
-                        p = state.get("_factory_name", "")
-                        if query and p:
-                            fake_msg = json.dumps({"type":"search_sound", "query":query, "project":p, "filename":fname})
-                            asyncio.create_task(handle(ws, fake_msg))
-                    except: pass
-                else:
+        if not text or text == last_line: return True
+        last_line = text
+        try:
+            # --- OTONOM SES TETIKLEYICI ---
+            if "[FREESOUND" in text:
+                try:
+                    import json
+                    fname, query = "", ""
+                    if "[FREESOUND:" in text:
+                        parts = text.split("] ", 1)
+                        fname = parts[0].split("[FREESOUND:")[1].strip()
+                        query = parts[1].strip() if len(parts) > 1 else ""
+                    else:
+                        query = text.split("[FREESOUND]")[1].strip()
+                    p = state.get("_factory_name", "")
+                    if query and p:
+                        # Hatalı handle(ws, msg) yerine direkt indirme motoruna (search_sound) emri gönderiyoruz
+                        ss_msg = json.dumps({"type":"search_sound", "query":query, "project":p, "filename":fname})
+                        asyncio.create_task(ws.send(ss_msg)) 
+                except: pass
+                return True
+
+            # --- ÖZEL MESAJLAR ---
+            if text.startswith("POSTA_ICERIGI:"):
+                await ws.send(json.dumps({"type":"log","text":"📬 Posta içeriği alındı."}))
+            elif text.startswith("USER_ACTION_REQUIRED:"):
+                action = text[len("USER_ACTION_REQUIRED:"):].strip()
+                await ws.send(json.dumps({"type":"log","text":f"⚠️ AKSİYON: {action}"}))
+            else:
+                # --- STANDART LOG (Kısa ve bozuk verileri filtrele) ---
+                if len(text) > 1 and not any(x in text for x in ["✨ Proje:", "✅ Proje:"]):
                     await ws.send(json.dumps({"type":"log","text":text}))
-            except: return False
+        except: return False
         return True
 
     try:
@@ -841,7 +846,7 @@ async def handle(ws):
 
                 elif t == "autofix":
                     p = d.get("project",""); pd = get_proj_dir(p)
-                    await ws.send(json.dumps({"type":"status","text":f"🤖 prj af: {p}"}))
+                    await ws.send(json.dumps({"type":"status","text":f"🤖 AutoFix: {p}"}))
                     async def af_done(rc, _p=p, _pd=pd):
                         apk = copy_apk(_pd, _p) if rc == 0 else None
                         await ws.send(json.dumps({"type":"task_done","success":rc==0,
@@ -1311,7 +1316,7 @@ class App : Application() {{
                         p    = d.get("project","")
                         task = d.get("task","").replace("'","'\\''")
                         pd   = get_proj_dir(p)
-                        await ws.send(json.dumps({"type":"status","text":f"✨ prj e: {p}"}))
+                        await ws.send(json.dumps({"type":"status","text":f"✨ Görev: {p}"}))
                     # Paket adini bul (proje adi yerine, degismez)
                     pkg = ""
                     for pr in read_projeler():
@@ -1352,7 +1357,7 @@ class App : Application() {{
 
                 elif t == "build_debug":
                     p = d.get("project",""); pd = get_proj_dir(p)
-                    await ws.send(json.dumps({"type":"status","text":f"🔨 prj d: {p}"}))
+                    await ws.send(json.dumps({"type":"status","text":f"🔨 Build: {p}"}))
                     async def bd_done(rc, _p=p, _pd=pd):
                         apk = copy_apk(_pd, _p) if rc == 0 else None
                         await ws.send(json.dumps({"type":"build_done","success":rc==0,
