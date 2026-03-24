@@ -1132,11 +1132,11 @@ class App : Application() {{
                             except:
                                 await ws.send(json.dumps({"type":"status","text":f"🔥 Firebase: {target_proj} aktif ediliyor..."}))
                                 _req(f"https://firebase.googleapis.com/v1beta1/projects/{target_proj}:addFirebase", data={"timeZone":"Europe/Istanbul"}, method="POST")
-                                time.sleep(4)
+                                await asyncio.sleep(4)
                                 
                             await ws.send(json.dumps({"type":"status","text":f"🔥 Firebase: App kaydediliyor ({pkg})..."}))
                             _req(f"https://firebase.googleapis.com/v1beta1/projects/{target_proj}/androidApps", data={"displayName": pname, "packageName": pkg}, method="POST")
-                            time.sleep(4)
+                            await asyncio.sleep(4)
                             
                             apps = _req(f"https://firebase.googleapis.com/v1beta1/projects/{target_proj}/androidApps")
                             app_id = next((a["appId"] for a in apps.get("apps",[]) if a.get("packageName") == pkg), None)
