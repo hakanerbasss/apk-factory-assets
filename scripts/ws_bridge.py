@@ -1163,6 +1163,15 @@ class App : Application() {{
                     try:
                         await ws.send(json.dumps({"type":"log","text":"\uD83D\uDD25 Firebase placeholder kuruluyor..."}))
 
+                        # --- RACE CONDITION (PUSU) DÜZELTMESİ ---
+                        await ws.send(json.dumps({"type":"log","text":"⏳ Firebase: Proje inşası bekleniyor..."}))
+                        import asyncio
+                        for _ in range(60):
+                            if os.path.exists(f"{pd2}/app/build.gradle"):
+                                break
+                            await asyncio.sleep(1)
+                        # ----------------------------------------
+
                         # 1. Placeholder google-services.json olustur
                         placeholder = json.dumps({
                             "project_info": {
