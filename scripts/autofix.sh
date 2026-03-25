@@ -1155,7 +1155,7 @@ print(json.dumps({'model':'$s_model','max_tokens':8000,'system':sp,'messages':[{
             fi
         fi
 
-        # ── SMART FIX: önce cerrahi düzeltme dene ──
+        # ── SMART FIX ──
         local sf="$SISTEM_DIR/smart_fix.sh"
         if [[ -f "$sf" ]]; then
             log "🔬 Smart Fix devreye giriyor..."
@@ -1164,9 +1164,9 @@ print(json.dumps({'model':'$s_model','max_tokens':8000,'system':sp,'messages':[{
                 [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
                 return 0
             fi
-            warn "Smart Fix yetersiz kaldı — klasik yönteme geçiliyor..."
+            err "Smart Fix başarısız — durduruldu"
+            return 1
         fi
-        # ── Klasik yöntem ──
         if ! call_ai "$ef" "$src"; then
             # Geçici prompt varsa geri yükle
             [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt"
