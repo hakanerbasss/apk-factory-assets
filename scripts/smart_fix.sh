@@ -299,8 +299,20 @@ AI: $ai_response"
 
         # ── DONE ───────────────────────────────────────────────────────────
         if echo "$ai_response" | grep -q "^DONE"; then
-            ok "Tamamlandı."
-            exit 0
+            log "DONE alındı — build kontrol ediliyor..."
+            if run_build; then
+                ok "✅ BUILD BAŞARILI"
+                exit 0
+            else
+                warn "DONE sonrası build başarısız — devam ediliyor"
+                local new_errors
+                new_errors=$(cat "$ERROR_LOG" | head -30)
+                user_msg="DONE dedin ama build başarısız.
+BUILD ÇIKTISI:
+$new_errors
+Devam et."
+                continue
+            fi
         fi
 
         # ── NEW_FILE ───────────────────────────────────────────────────────
