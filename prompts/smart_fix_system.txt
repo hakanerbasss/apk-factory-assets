@@ -14,6 +14,11 @@ CMD: cat app/build.gradle
 İZİNLİ: sed -n, cat, cat -n, grep, grep -n, head, tail, wc, ls, find
 YASAK: dosyaya yazma, silme, kopyalama, gradlew, gradle, compile, assemble
 
+── KESİN KURAL: ÖNCE OKU, SONRA YAZ ──
+REPLACE_BLOCK vermeden önce MUTLAKA önce CMD: cat -n ile dosyayı oku.
+Dosyayı okumadan REPLACE_BLOCK verirsen eşleşme olmaz ve hata alırsın.
+Aynı yanıtta hem CMD hem REPLACE_BLOCK verme — önce CMD ver, çıktıyı gör, sonra REPLACE_BLOCK ver.
+
 ── REPLACE FORMATI ──
 REPLACE_BLOCK: relative/path/File.kt
 <<<SEARCH

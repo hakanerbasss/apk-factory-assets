@@ -224,17 +224,17 @@ main() {
         user_msg="Proje: $PROJECT_ROOT
 GÖREV: $TASK
 
-BUILD ÇIKTISI:
+BUILD HATALARI:
 $error_text
 
-Önce ilgili dosyaları oku, sonra görevi uygula."
+ZORUNLU: Önce CMD: cat -n ile ilgili dosyaları oku, sonra REPLACE_BLOCK ver."
     else
         user_msg="Proje: $PROJECT_ROOT
 
 BUILD HATALARI:
 $error_text
 
-Hataları araştır ve düzelt."
+ZORUNLU: Önce CMD: cat -n ile hatalı dosyayı oku, sonra REPLACE_BLOCK ver."
     fi
 
     local round=0
@@ -370,8 +370,33 @@ CMD: cat -n $rp ile dosyayı tekrar oku."
             continue
         fi
 
+        # ── CMD + REPLACE_BLOCK aynı yanıtta ──────────────────────────────
+        # Önce CMD'yi çalıştır, sonra REPLACE_BLOCK varsa onu da işle
+        if echo "$ai_response" | grep -q "^CMD:" && echo "$ai_response" | grep -q "^REPLACE_BLOCK:"; then
+            local cmd
+            cmd=$(echo "$ai_response" | grep "^CMD:" | head -1 | sed 's/^CMD: *//')
+            if is_safe_cmd "$cmd"; then
+                sleep 1
+                log "Komut (önce): $cmd"
+                local cmd_out
+                cd "$PROJECT_ROOT"
+                cmd="${cmd//\~/$HOME}"
+                cmd_out=$(eval "$cmd" 2>&1) || true
+                log "Çıktı: $(echo "$cmd_out" | wc -l) satır"
+                # CMD çıktısını conversation'a ekle, sonra REPLACE_BLOCK işlensin
+                conversation="$full_msg
+
+AI: $ai_response
+
+KOMUT: $cmd
+ÇIKTI:
+$cmd_out"
+            fi
+            # REPLACE_BLOCK işlemeye devam et — aşağıda yakalanacak
+        fi
+
         # ── CMD ────────────────────────────────────────────────────────────
-        if echo "$ai_response" | grep -q "^CMD:"; then
+        if echo "$ai_response" | grep -q "^CMD:" && ! echo "$ai_response" | grep -q "^REPLACE_BLOCK:"; then
             local cmd
             cmd=$(echo "$ai_response" | grep "^CMD:" | head -1 | sed 's/^CMD: *//')
 
