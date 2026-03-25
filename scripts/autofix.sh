@@ -1311,7 +1311,7 @@ for p in set(paths):
         GOREV_KARMASIKLIK="karmasik"
     fi
 
-    if [[ -f "$ork_script" ]] && [[ "$GOREV_KARMASIKLIK" == "karmasik" || "$is_new_project" == "true" ]]; then  # AKILLI MOD: karmasik/yeni proje → orkestrator, basit → tek gecis
+    if [[ -f "$ork_script" ]] && [[ "$is_new_project" == "true" ]]; then  # Sadece YENİ proje → orkestratör
         echo -e "${YELLOW}🏗️ Orkestratör: Proje planlanıyor ve dosya dosya yazılıyor...${NC}"
         local ork_pkg="${P_PKG:-com.wizaicorp.$(basename $PROJECT_ROOT | tr '-' '_')}"
         
