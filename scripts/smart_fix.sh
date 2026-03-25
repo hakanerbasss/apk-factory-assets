@@ -7,6 +7,8 @@ set -euo pipefail
 PROJECT_ROOT="${1:-}"
 ERROR_LOG="${2:-}"
 TASK="${3:-}"
+LOOP="${4:-1}"
+MAX_LOOPS="${5:-5}"
 
 [[ -z "$PROJECT_ROOT" || ! -d "$PROJECT_ROOT" ]] && { echo "HATA: Proje dizini gerekli"; exit 1; }
 [[ -z "$ERROR_LOG"    || ! -f "$ERROR_LOG"    ]] && { echo "HATA: Hata log dosyası gerekli"; exit 1; }
@@ -241,6 +243,7 @@ main() {
     error_text=$(cat "$ERROR_LOG")
     log "Hata logu: $(wc -l < "$ERROR_LOG") satır"
     [[ -n "$TASK" ]] && log "Görev: ${TASK:0:60}..."
+    log "Autofix denemesi: $LOOP / $MAX_LOOPS"
 
     local SYSTEM_PROMPT
     SYSTEM_PROMPT=$(load_system_prompt)
