@@ -134,11 +134,28 @@ JSON: {"files": [{"path": "...", "type": "data|screen|main", "description": "...
     except: return None
 
 
-def phase2_write_file(args, file_info, plan, written_files, contracts):
+def build_skeletons(plan):
+    """Her dosya için sadece imza satırlarını çıkar — gövde yok, sadece fun/class/object tanımları.
+    Bu sayede sonraki dosyalar hangi ismi import edeceğini kesin olarak bilir."""
+    skeletons = {}
+    for f in plan.get("files", []):
+        fname = os.path.basename(f["path"])
+        lines = []
+        for cls in f.get("classes", []):
+            lines.append(f"class {cls}")
+        for fn in f.get("functions", []):
+            lines.append(f"fun {fn}")
+        if lines:
+            skeletons[fname] = "\n".join(lines)
+    return skeletons
+
+
+def phase2_write_file(args, file_info, plan, written_files, contracts, skeletons):
     path = file_info["path"]
     desc = file_info.get("description", "")
     log(f"\U0001f4dd Yaz\u0131l\u0131yor: {os.path.basename(path)} ({file_info.get('estimated_lines', '?')} sat\u0131r)")
     
+    # Önceki dosyaların TAM kodu — zaten yazılmış olanlar
     context = ""
     if written_files:
         context = "\n\n=== DAHA \u00d6NCE YAZILAN DOSYALAR (import edebilirsin, AYNI \u0130S\u0130MLER\u0130 KULLAN) ===\n"
@@ -146,6 +163,16 @@ def phase2_write_file(args, file_info, plan, written_files, contracts):
             context += f"\n--- {os.path.basename(wf_path)} ---\n{wf_code}\n"
         context += "=== DOSYALAR SONU ===\n"
     
+    # Henüz yazılmamış dosyaların skeleton'ları — import için kesin isimler
+    skeleton_info = ""
+    current_fname = os.path.basename(path)
+    pending_skeletons = {k: v for k, v in skeletons.items() if k != current_fname and k not in [os.path.basename(p) for p in written_files]}
+    if pending_skeletons:
+        skeleton_info = "\n\n=== HENÜZ YAZILMAMIS DOSYALARIN İMZALARI (bu isimleri import edeceksin, UYDURMA) ===\n"
+        for fname, sigs in pending_skeletons.items():
+            skeleton_info += f"\n-- {fname} --\n{sigs}\n"
+        skeleton_info += "=== İMZA SONU ===\n"
+
     contract_info = ""
     if contracts:
         contract_info = "\n\n=== ORTAK SINIF TANIMLARI (bunlar\u0131 kullan, yenisini uydurma) ===\n"
@@ -173,13 +200,13 @@ KURALLAR:
 - ASLA soru sorma
 - Paket: {args.package}
 - Navigation KULLANMA (sealed class Screen + mutableStateOf)
-- \u00d6NCEK\u0130 dosyalardaki s\u0131n\u0131f/fonksiyon isimlerini AYNEN kullan
+- \u00d6NCEK\u0130 dosyalardaki s\u0131n\u0131f/fonksiyon isimlerini AYNEN kullan — İMZA BÖLÜMÜNDE ne yazıyorsa ONU import et
 - Farkl\u0131 dosyadaki s\u0131n\u0131f\u0131 import et: import {args.package}.SinifAdi
 - isSystemInDarkTheme kullan (isSystemInDarkMode DEĞİL)
 - ui/theme/ klasörü OLUŞTURMA, XxxTheme fonksiyonu YAZMA
 - Sadece MaterialTheme {{ }} kullan
 - Ses efekti gerekiyorsa R.raw.ses_adi kullan, dosya otomatik olusturulur
-- rawResourceId = 0 veya placeholder YAZMA\u011e\u0130L)
+- rawResourceId = 0 veya placeholder YAZMA\u011e\u0130L
 - Modifier.systemBarsPadding() kullan"""
 
     user = f"""G\u00d6REV: {args.task}
@@ -188,7 +215,7 @@ DOSYA: {path}
 A\u00c7IKLAMA: {desc}
 
 D\u0130\u011eER DOSYALAR:
-{other_files}{contract_info}{context}
+{other_files}{contract_info}{skeleton_info}{context}
 
 Sadece {os.path.basename(path)} yaz."""
 
@@ -319,6 +346,11 @@ def main():
         print(f"  \U0001f4c4 {f['path']} (~{f.get('estimated_lines','?')} sat\u0131r) \u2014 {f.get('description','')}")
     if contracts:
         log(f"\U0001f4cb S\u00f6zle\u015fmeler: {list(contracts.keys())}")
+
+    # Tüm dosyaların skeleton imzalarını önceden üret
+    skeletons = build_skeletons(plan)
+    if skeletons:
+        log(f"\U0001f9f7 Skeleton imzalar hazır: {list(skeletons.keys())}")
     
     faz2_start = time.time()
     print(f"\n\033[1;34m{'='*50}\033[0m")
@@ -339,7 +371,7 @@ def main():
         if "build.gradle" in path or "AndroidManifest" in path: continue
         
         t0 = time.time()
-        response = phase2_write_file(args, fi, plan, written_files, contracts)
+        response = phase2_write_file(args, fi, plan, written_files, contracts, skeletons)
         elapsed = time.time() - t0
         
         if response:
