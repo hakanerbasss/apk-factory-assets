@@ -859,7 +859,7 @@ PYEOF
         count=$(wc -l < "$BACKUP_MAP" 2>/dev/null || echo 0)
     fi
     ok "$count dosya güncellendi, build testine geçiliyor..."
-    python3 /storage/emulated/0/termux-otonom-sistem/scan_sounds.py "$PROJECT_ROOT" 2>&1 || true
+    python3 /storage/emulated/0/termux-otonom-sistem/pre_build_validator.py "$PROJECT_ROOT" 2>&1 || true
     return 0
 }
 
@@ -957,6 +957,13 @@ ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B
         fi
 
         err "Build başarısız"
+
+        # --- HATA YOGUNLUK KONTROLU ---
+        HATALI_DOSYA_SAYISI=$(grep -c "^e:" "$TMP_DIR/build_output.txt" 2>/dev/null || echo 0)
+        if [[ "$HATALI_DOSYA_SAYISI" -gt 15 && "$loop" -le 2 ]]; then
+            warn "Cok fazla hata ($HATALI_DOSYA_SAYISI) — kod cok bozuk, sifirdan yazmak daha verimli"
+            warn "Orkestrator/tek gecis tekrar denenecek..."
+        fi
 
         # --- YENİ: Yedek varsa ve bot bozduysa iptal etme şansı ---
         if [[ -f "$BACKUP_MAP" && -s "$BACKUP_MAP" ]]; then
@@ -1200,6 +1207,14 @@ for p in set(paths):
         is_new_project=true
     fi
     
+    # --- AKILLI MOD SECIMI ---
+    local GOREV_KARMASIKLIK="basit"
+    local kelime_sayisi=$(echo "$user_task" | wc -w)
+    local karmasik_kelimeler="database|firebase|api|retrofit|room|navigation|multi|screen|sayfa|ekran|tab|fragment|recyclerview|viewmodel|repository|ağ|network|server|login|auth|register|harita|map"
+    if echo "$user_task" | grep -qiE "$karmasik_kelimeler" || [[ $kelime_sayisi -gt 20 ]]; then
+        GOREV_KARMASIKLIK="karmasik"
+    fi
+
     if [[ -f "$ork_script" ]] && [[ "$is_new_project" == true ]]; then
         echo -e "${YELLOW}🏗️ Orkestratör: Proje planlanıyor ve dosya dosya yazılıyor...${NC}"
         local ork_pkg="${P_PKG:-com.wizaicorp.$(basename $PROJECT_ROOT | tr '-' '_')}"

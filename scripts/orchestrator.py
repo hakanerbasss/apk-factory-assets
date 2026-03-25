@@ -84,6 +84,11 @@ JSON format\u0131:
 }
 
 !!! KURALLAR !!!
+- BASIT gorev (buton, hesap makinesi, timer, tek ekran) = MAKSIMUM 2 dosya (MainActivity.kt + 1 yardimci)
+- ORTA gorev (liste, form, ayarlar) = MAKSIMUM 3 dosya
+- KARMASIK gorev (database, API, coklu ekran) = MAKSIMUM 4 dosya
+- SADECE ihtiyac olan dosyalari olustur, gereksiz parcalama YAPMA
+- Tek dosyada yazilabilecek kodu 3 dosyaya bolme
 - MAKSIMUM 4 Kotlin dosyas\u0131
 - MainActivity.kt: SADECE Activity + setContent (MAX 50 sat\u0131r)
 - 1 Data dosyas\u0131: t\u00fcm data class + model + sabit veri (type: "data")
