@@ -1210,7 +1210,7 @@ for p in set(paths):
     # --- AKILLI MOD SECIMI ---
     local GOREV_KARMASIKLIK="basit"
     local kelime_sayisi=$(echo "$user_task" | wc -w)
-    local karmasik_kelimeler="database|firebase|api|retrofit|room|navigation|multi|screen|sayfa|ekran|tab|fragment|recyclerview|viewmodel|repository|ağ|network|server|login|auth|register|harita|map"
+    local karmasik_kelimeler="database|firebase|api|retrofit|room|navigation|multi|screen|sayfa|multi-screen|tab|fragment|recyclerview|viewmodel|repository|ağ|network|server|login|auth|register|harita|map"
     if echo "$user_task" | grep -qiE "$karmasik_kelimeler" || [[ $kelime_sayisi -gt 20 ]]; then
         GOREV_KARMASIKLIK="karmasik"
     fi
