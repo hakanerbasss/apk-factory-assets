@@ -732,6 +732,74 @@ def parse_markdown_files(text):
             results.append((m.group(1).strip(), m.group(2).rstrip('\n')))
     return results
 
+def is_file_healthy(content, path):
+    """Dosya saglam mi yoksa yarim mi kesilmis kontrol et"""
+    reasons = []
+    is_kt = path.endswith('.kt') or path.endswith('.java')
+    is_xml = path.endswith('.xml')
+    is_gradle = 'build.gradle' in path
+
+    # Bos veya cok kisa
+    stripped = content.strip()
+    if len(stripped) < 10:
+        reasons.append("cok kisa (<10 karakter)")
+        return False, reasons
+
+    if is_kt:
+        # Brace balance
+        opens = content.count('{')
+        closes = content.count('}')
+        if opens > closes + 2:
+            reasons.append(f"brace dengesiz: {opens} acik, {closes} kapali — token bitip kesilmis")
+            return False, reasons
+
+        # Package satiri var mi
+        if 'package ' not in content and 'fun ' not in content:
+            reasons.append("ne package ne fun var — bos veya bozuk")
+            return False, reasons
+
+        # En az bir class veya fun olmali
+        import re
+        has_body = re.search(r'(class |fun |object |interface )', content)
+        if not has_body:
+            reasons.append("class/fun/object tanimı yok — sadece import")
+            return False, reasons
+
+        # String literal acik kalmis mi (tek sayi tirnak)
+        single_quotes = content.count("'") 
+        double_quotes = content.count('"')
+        # Triple quote icermiyorsa ve tek sayidaysa sorunlu
+        triple_d = content.count('"""')
+        effective_doubles = double_quotes - (triple_d * 3)
+        if effective_doubles % 2 != 0:
+            # Belki string template icinde — tolerans goster
+            if content.rstrip().endswith('"') or content.rstrip().endswith("'"):
+                pass  # Son karakter tirnak, muhtemelen tamam
+            else:
+                reasons.append("string literal kapanmamis (tek sayi tirnak)")
+                return False, reasons
+
+        # Son satir yarim mi (ornegin "import andro" gibi)
+        last_line = stripped.split('\n')[-1].strip()
+        if last_line and not last_line.endswith(('}', ')', ';', ',', '{', '*/')) and \
+           not last_line.startswith(('import ', 'package ', '//', '*', '@', 'auto_continue', 'lesson', 'continue_prompt')):
+            if len(last_line) < 5 and opens > closes:
+                reasons.append(f"son satir yarim: '{last_line}'")
+                return False, reasons
+
+    if is_xml:
+        if '</' not in content and '/>' not in content:
+            reasons.append("XML kapanma tag'i yok")
+            return False, reasons
+
+    if is_gradle:
+        if 'dependencies' in content and content.count('{') != content.count('}'):
+            reasons.append("build.gradle brace dengesiz")
+            return False, reasons
+
+    return True, reasons
+
+
 def apply_markdown_fixes(content_file, project_root, backup_map_file):
     text = open(content_file, encoding='utf-8', errors='replace').read()
     files = parse_markdown_files(text)
@@ -739,9 +807,21 @@ def apply_markdown_fixes(content_file, project_root, backup_map_file):
         print("PARSE_ERROR: Markdown formatinda dosya bulunamadi")
         return False
     backup_map = {}
+    written = 0
+    skipped = 0
     for rel_path, new_content in files:
         rel_path = rel_path.lstrip('/')
         abs_path = os.path.join(project_root, rel_path)
+
+        # === KALITE KONTROLU ===
+        healthy, reasons = is_file_healthy(new_content, rel_path)
+        if not healthy:
+            reason_str = ", ".join(reasons)
+            print(f"SKIPPED:{rel_path}|CURUK: {reason_str}")
+            skipped += 1
+            continue  # Bu dosyayi YAZMA, eski halini koru
+        # ========================
+
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
         if os.path.exists(abs_path):
             bak = os.path.join('/storage/emulated/0/termux-otonom-sistem/agent_yedekler', rel_path.replace('/', '_') + '.bak_agent')
@@ -750,24 +830,28 @@ def apply_markdown_fixes(content_file, project_root, backup_map_file):
             old_lines = len(open(abs_path).readlines())
             if abs_path.endswith('build.gradle'):
                 from re import sub
-                # Versiyon satırlarını prj scriptinin okuyabileceği alt alta formata zorla
                 new_content = sub(r'([;{])\s*(versionCode|versionName)', r'\1\n        \2', new_content)
                 new_content = sub(r'(versionCode \d+|versionName ".*?")\s*([;}])', r'\1\n    \2', new_content)
             open(abs_path, 'w', encoding='utf-8').write(new_content + '\n')
             print(f"MODIFIED:{rel_path}|{old_lines}|{len(new_content.splitlines())}")
+            written += 1
         else:
             if abs_path.endswith('build.gradle'):
                 from re import sub
-                # Versiyon satırlarını prj scriptinin okuyabileceği alt alta formata zorla
                 new_content = sub(r'([;{])\s*(versionCode|versionName)', r'\1\n        \2', new_content)
                 new_content = sub(r'(versionCode \d+|versionName ".*?")\s*([;}])', r'\1\n    \2', new_content)
             open(abs_path, 'w', encoding='utf-8').write(new_content + '\n')
             print(f"CREATED:{rel_path}|0|{len(new_content.splitlines())}")
+            written += 1
+
+    if skipped > 0:
+        print(f"QUALITY_REPORT: {written} yazildi, {skipped} curuk atildi")
+
     if backup_map_file and backup_map:
         with open(backup_map_file, 'w') as f:
             for orig, bak in backup_map.items():
                 f.write(f"{orig}|{bak}\n")
-    return True
+    return written > 0
 
 def parse_auto_continue(text):
     """Yanitın sonundan auto_continue ve continue_prompt okur"""
