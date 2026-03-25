@@ -34,7 +34,8 @@ KRİTİK REPLACE KURALLARI:
 - Süslü parantez { } dengesini KESİNLİKLE koru — açtığın her { için } kapat
 - ... veya // diğer kodlar gibi kısaltma KULLANMA — tam kodu yaz
 - Bir seferde SADECE BİR REPLACE_BLOCK ver, build bekle
-- Build başarılıysa DONE yaz
+- DONE sadece build başarılı olduktan sonra yaz — build almadan DONE YAZMA
+- Build senin işin değil, sistem yapıyor — DONE yaz, sistem build alır
 
 ── YENİ DOSYA OLUŞTURMA ──
 Yeni dosya gerekiyorsa:
