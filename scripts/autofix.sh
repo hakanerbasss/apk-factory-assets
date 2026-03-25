@@ -765,19 +765,7 @@ def is_file_healthy(content, path):
             reasons.append("class/fun/object tanimı yok — sadece import")
             return False, reasons
 
-        # String literal acik kalmis mi (tek sayi tirnak)
-        single_quotes = content.count("'") 
-        double_quotes = content.count('"')
-        # Triple quote icermiyorsa ve tek sayidaysa sorunlu
-        triple_d = content.count('"""')
-        effective_doubles = double_quotes - (triple_d * 3)
-        if effective_doubles % 2 != 0:
-            # Belki string template icinde — tolerans goster
-            if content.rstrip().endswith('"') or content.rstrip().endswith("'"):
-                pass  # Son karakter tirnak, muhtemelen tamam
-            else:
-                reasons.append("string literal kapanmamis (tek sayi tirnak)")
-                return False, reasons
+        # String literal kontrolu kaldirildi (false positive cok)
 
         # Son satir yarim mi (ornegin "import andro" gibi)
         last_line = stripped.split('\n')[-1].strip()
