@@ -1215,7 +1215,7 @@ for p in set(paths):
         GOREV_KARMASIKLIK="karmasik"
     fi
 
-    if [[ -f "$ork_script" ]] && [[ "$is_new_project" == true ]] && [[ "$GOREV_KARMASIKLIK" == "karmasik" ]]; then
+    if false && [[ -f "$ork_script" ]]; then  # ORKESTRATOR DEVRE DISI — tek gecis varsayilan
         echo -e "${YELLOW}🏗️ Orkestratör: Proje planlanıyor ve dosya dosya yazılıyor...${NC}"
         local ork_pkg="${P_PKG:-com.wizaicorp.$(basename $PROJECT_ROOT | tr '-' '_')}"
         
