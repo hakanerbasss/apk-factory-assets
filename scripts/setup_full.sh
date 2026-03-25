@@ -126,7 +126,7 @@ log "Factory scriptler indiriliyor..."
 mkdir -p "$SISTEM_DIR/prompts" "$SISTEM_DIR/keystores" "$SISTEM_DIR/setup" "$SISTEM_DIR/apiler"
 
 # 1. Ana scriptleri indir
-for f in sistem.sh prj.sh autofix.sh factory.sh check_updates.sh; do
+for f in sistem.sh prj.sh autofix.sh factory.sh check_updates.sh smart_fix.sh; do
     curl -sf "$GITHUB_RAW/scripts/$f" -o "$SISTEM_DIR/$f" >> "$LOG_FILE" 2>&1 && chmod +x "$SISTEM_DIR/$f"
 done
 
@@ -142,7 +142,7 @@ else
 fi
 
 # 3. Promptları indir
-for f in autofix_system.txt autofix_task.txt; do
+for f in autofix_system.txt autofix_task.txt smart_fix_system.txt; do
     curl -sf "$GITHUB_RAW/prompts/$f" -o "$SISTEM_DIR/prompts/$f" >> "$LOG_FILE" 2>&1 || true
 done
 

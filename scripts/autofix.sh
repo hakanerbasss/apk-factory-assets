@@ -1159,7 +1159,7 @@ print(json.dumps({'model':'$s_model','max_tokens':8000,'system':sp,'messages':[{
         local sf="$SISTEM_DIR/smart_fix.sh"
         if [[ -f "$sf" ]]; then
             log "🔬 Smart Fix devreye giriyor..."
-            if bash "$sf" "$PROJECT_ROOT" "$ef"; then
+            if bash "$sf" "$PROJECT_ROOT" "$ef" "${TASK_DESCRIPTION:-}"; then
                 ok "✅ Smart Fix başarılı!"
                 [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
                 return 0
