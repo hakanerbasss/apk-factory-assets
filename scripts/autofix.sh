@@ -732,7 +732,8 @@ def parse_markdown_files(text):
             results.append((m.group(1).strip(), m.group(2).rstrip('\n')))
     return results
 
-def is_file_healthy(content, path):
+def is_file_healthy(content, path, new_content_holder=[None]):
+    new_content_holder[0] = None  # reset
     """Dosya saglam mi yoksa yarim mi kesilmis kontrol et"""
     reasons = []
     is_kt = path.endswith('.kt') or path.endswith('.java')
@@ -749,9 +750,16 @@ def is_file_healthy(content, path):
         # Brace balance
         opens = content.count('{')
         closes = content.count('}')
-        if opens > closes + 2:
-            reasons.append(f"brace dengesiz: {opens} acik, {closes} kapali — token bitip kesilmis")
-            return False, reasons
+        if opens > closes:
+            diff = opens - closes
+            if diff <= 10:
+                # Eksik kapanislari ekle — dosyayi kurtar
+                new_content_holder[0] = content.rstrip() + '\n' + ('}\n' * diff)
+                reasons.append(f"brace dengesiz: {diff} kapaniş eklenerek duzeltildi")
+                # SAGLIKLI say — duzeltildi
+            else:
+                reasons.append(f"brace dengesiz: {opens} acik, {closes} kapali — cok bozuk")
+                return False, reasons
 
         # Package satiri var mi
         if 'package ' not in content and 'fun ' not in content:
@@ -802,7 +810,11 @@ def apply_markdown_fixes(content_file, project_root, backup_map_file):
         abs_path = os.path.join(project_root, rel_path)
 
         # === KALITE KONTROLU ===
-        healthy, reasons = is_file_healthy(new_content, rel_path)
+        content_holder = [None]
+        healthy, reasons = is_file_healthy(new_content, rel_path, content_holder)
+        if content_holder[0] is not None:
+            new_content = content_holder[0]  # Duzeltilmis versiyonu kullan
+            print(f"REPAIRED:{rel_path}|{', '.join(reasons)}")
         if not healthy:
             reason_str = ", ".join(reasons)
             print(f"SKIPPED:{rel_path}|CURUK: {reason_str}")
