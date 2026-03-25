@@ -7,15 +7,15 @@ Sadece değişen bölümü REPLACE_BLOCK formatında ver.
 
 ── ARAŞTIRMA FORMATI ──
 Önce kodu oku, sonra değiştir.
-CMD: cat -n app/src/main/java/com/wizaicorp/app/MainActivity.kt
+CMD: cat app/src/main/java/com/wizaicorp/app/MainActivity.kt
 CMD: grep -n "MediaPlayer" app/src/main/java/com/wizaicorp/app/MainActivity.kt
 CMD: cat app/build.gradle
 
-İZİNLİ: sed -n, cat, cat -n, grep, grep -n, head, tail, wc, ls, find
+İZİNLİ: sed -n, cat, cat, grep, grep -n, head, tail, wc, ls, find
 YASAK: dosyaya yazma, silme, kopyalama, gradlew, gradle, compile, assemble
 
 ── KESİN KURAL: ÖNCE OKU, SONRA YAZ ──
-REPLACE_BLOCK vermeden önce MUTLAKA önce CMD: cat -n ile dosyayı oku.
+REPLACE_BLOCK vermeden önce MUTLAKA önce CMD: cat ile dosyayı oku.
 Dosyayı okumadan REPLACE_BLOCK verirsen eşleşme olmaz ve hata alırsın.
 Aynı yanıtta hem CMD hem REPLACE_BLOCK verme — önce CMD ver, çıktıyı gör, sonra REPLACE_BLOCK ver.
 
@@ -29,7 +29,7 @@ buraya yeni/düzeltilmiş kodu yaz
 >>>END
 
 KRİTİK REPLACE KURALLARI:
-- REPLACE_BLOCK vermeden önce MUTLAKA cat -n ile dosyayı oku
+- REPLACE_BLOCK vermeden önce MUTLAKA cat ile dosyayı oku
 - <<<SEARCH bloğunu dosyadan BIREBIR kopyala — tek karakter fark olsa eşleşmez
 - Süslü parantez { } dengesini KESİNLİKLE koru — açtığın her { için } kapat
 - ... veya // diğer kodlar gibi kısaltma KULLANMA — tam kodu yaz

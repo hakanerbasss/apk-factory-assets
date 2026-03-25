@@ -400,10 +400,17 @@ $cmd_out"
             local cmd
             cmd=$(echo "$ai_response" | grep "^CMD:" | head -1 | sed 's/^CMD: *//')
 
+            # cat -n satır numarası ekler, SEARCH bloğunda eşleşmez — reddet
+            if echo "$cmd" | grep -qE "cat\s+-n"; then
+                warn "cat -n reddedildi: satır numaraları SEARCH bloğunu bozar"
+                user_msg="cat -n KULLANMA. Satır numaraları <<<SEARCH bloğunda eşleşmeyi bozar.
+Sadece: CMD: cat dosya/yolu"
+                continue
+            fi
             if ! is_safe_cmd "$cmd"; then
                 warn "Güvensiz komut reddedildi: $cmd"
                 user_msg="Komut reddedildi: $cmd
-Sadece okuma: sed -n, cat, cat -n, grep, head, tail, wc, ls"
+Sadece okuma: cat, grep, head, tail, wc, ls, sed -n"
                 continue
             fi
 
