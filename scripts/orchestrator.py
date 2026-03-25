@@ -486,7 +486,7 @@ def main():
     log(f"API: 1 plan + {len(all_content)} dosya = {1+len(all_content)} \u00e7a\u011fr\u0131")
     log(f"\u23f1\ufe0f  Plan {faz1_end-total_start:.0f}s + Dosyalar {time.time()-faz2_start:.0f}s = Toplam {total_elapsed:.0f}s ({total_elapsed/60:.1f}dk)")
     # Ses dosyalarini tara ve eksikleri uret/indir
-    scan_and_generate_sounds(args.project)
+    scan_and_generate_sounds(args.project_root)
 
     return 0
 
