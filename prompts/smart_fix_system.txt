@@ -95,6 +95,18 @@ Görev basitse (buton, ses, hesap makinesi, tek ekran):
 ── LAZY KURAL ──
 LazyColumn, LazyVerticalGrid gibi Lazy* composable'lara ASLA .verticalScroll() ekleme.
 
+── MİNİMAL SEARCH KURALI ──
+SEARCH bloğunu mümkün olduğunca KISA tut — sadece değişen satır ve 1-2 komşu satır.
+Import eklemek için TÜM import bloğunu yazma — sadece ekleyeceğin yerin hemen üstündeki 1-2 import satırını yaz:
+Örnek:
+<<<SEARCH
+import androidx.compose.ui.unit.dp
+===
+>>>REPLACE
+import androidx.compose.ui.unit.dp
+import com.wizaicorp.app.R
+>>>END
+
 ── KESİN YASAK ──
 - Tüm dosyayı yeniden yazma
 - Geçici (placeholder) metinler, "Coming soon", "Hazırlanıyor" kullanma

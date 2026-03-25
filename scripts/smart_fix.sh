@@ -148,9 +148,38 @@ replace_text = sys.argv[3]
 content = open(path, encoding='utf-8').read()
 
 if search_text not in content:
+    # Girinti farkı olabilir — her satırın başındaki boşlukları normalize ederek ara
+    def normalize(s):
+        return "\n".join(line.strip() for line in s.splitlines())
+    norm_content = normalize(content)
+    norm_search = normalize(search_text)
+    if norm_search in norm_content:
+        # Normalize eşleşti — orijinal içerikte karşılığını bul
+        lines = content.splitlines()
+        search_lines = [l.strip() for l in search_text.splitlines()]
+        for i in range(len(lines)):
+            if lines[i].strip() == search_lines[0]:
+                # Başlangıç satırını bul
+                match = True
+                for j, sl in enumerate(search_lines):
+                    if i+j >= len(lines) or lines[i+j].strip() != sl:
+                        match = False; break
+                if match:
+                    # Gerçek search_text'i dosyadan al
+                    search_text = "\n".join(lines[i:i+len(search_lines)])
+                    content_updated = content.replace(search_text, replace_text, 1)
+                    if content_updated != content:
+                        old_bal = search_text.count("{") - search_text.count("}")
+                        new_bal = replace_text.count("{") - replace_text.count("}")
+                        if old_bal != new_bal:
+                            print(f"HATA: Parantez dengesizligi! Eski: {old_bal:+d}, Yeni: {new_bal:+d}")
+                            sys.exit(1)
+                        open(path, "w", encoding="utf-8").write(content_updated)
+                        print(f"REPLACE uygulandi (girinti normalize): {len(content.splitlines())} -> {len(content_updated.splitlines())} satir")
+                        sys.exit(0)
     print("HATA: Aranan kod dosyada bulunamadi. Tam esleme yok.")
-    print("Aranan:")
-    print(search_text[:300])
+    print("Aranan (ilk 200 karakter):")
+    print(search_text[:200])
     sys.exit(1)
 
 count = content.count(search_text)
