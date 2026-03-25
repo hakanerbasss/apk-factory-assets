@@ -859,6 +859,7 @@ PYEOF
         count=$(wc -l < "$BACKUP_MAP" 2>/dev/null || echo 0)
     fi
     ok "$count dosya güncellendi, build testine geçiliyor..."
+    python3 /storage/emulated/0/termux-otonom-sistem/scan_sounds.py "$PROJECT_ROOT" 2>&1 || true
     return 0
 }
 
