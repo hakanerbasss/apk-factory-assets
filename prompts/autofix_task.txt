@@ -51,3 +51,25 @@ Yeni fonksiyon ekleyeceksen mevcut Composable fonksiyonları silme.
 Tasarım degisikligi istenmedikce renkleri, layout yapısını ve animasyonları bozma.
 ZORUNLU UI KURALI (TÜM PROJELER İÇİN):
 Jetpack Compose kullanırken UI elemanlarının telefonun Status Bar (üst saat/pil) ve Navigation Bar (alt butonlar) kısımlarının altında kalması KESİNLİKLE YASAKTIR. Ana kapsayıcıda (Surface, Scaffold veya dış Column) daima 'Modifier.systemBarsPadding()' veya 'Modifier.safeDrawingPadding()' kullan. Ayrıca, uzun metinlerin veya listelerin ekrandan taşmasını önlemek için gerekli Scroll (Modifier.verticalScroll veya LazyColumn) işlemlerini mutlaka ekle.
+
+!!! SES DOSYASI KURALI !!!
+Ses efekti gerekiyorsa R.raw.ses_adi kullan (R.raw.beep, R.raw.click vb.).
+Ses dosyalari sistem tarafindan otomatik olusturulur.
+ASLA rawResourceId = 0 yazma, ASLA placeholder kullanma.
+
+!!! BASIT GOREV KURALI !!!
+Gorev basitse (buton, ses, hesap makinesi, tek ekran):
+- Her seyi tek dosyaya yaz, gereksiz parcalama yapma
+- SoundManager, SoundPlayer, SoundService gibi ayri siniflar OLUSTURMA
+- MediaPlayer veya ToneGenerator'i direkt Activity/Screen icinde kullan
+
+!!! UI/THEME YASAGI !!!
+- ui/theme/ klasoru OLUSTURMA
+- XxxTheme fonksiyonu YAZMA (AppTheme, SecreenTheme vb.)
+- Sadece MaterialTheme { } kullan
+- darkColorScheme(), lightColorScheme() KULLANMA
+
+!!! IMPORT KURALI !!!
+- Yazmadigin sinifi import etme
+- utils, service, helper paketi UYDURMA
+- Tek dosyada her sey sigiyorsa proje-ici import GEREKSIZ

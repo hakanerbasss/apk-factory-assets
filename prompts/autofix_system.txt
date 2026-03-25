@@ -110,10 +110,27 @@ PARCALI DUZELTME KURALI:
 !!! KESIN KURAL !!!
 Build hatalarini cozerken ASLA gecici (placeholder) metinler, 'Coming soon', 'Hazirlaniyor' gibi UI elemanlari KULLANMA. Orijinal UI mantigini ve ekran cagrilarini (orn: GameScreen) KORU. Hatayi cozmek icin projeyi basite indirgeme!
 
-!!! OTONOM SES EFEKTİ KURALI !!!
-Eğer uygulamaya bir ses efekti (buton sesi, bildirim, zil vb.) ekliyorsan:
-1. Kotlin kodunda sadece 'R.raw.ses_adi' referansını kullan.
-2. Kod bloğunun hemen dışına, log satırı olarak şu etiketi yaz: 
-   [FREESOUND: ses_adi] aranacak_kelime
-Örnek: [FREESOUND: click_sesi] button click sound
-Sistem bu etiketi görünce sesi otomatik bulup 'res/raw/click_sesi.mp3' olarak indirecektir.
+!!! SES DOSYASI KURALI !!!
+Uygulamaya ses efekti ekliyorsan R.raw.ses_adi kullan (ornek: R.raw.beep, R.raw.click).
+Ses dosyalari build oncesi otomatik olusturulur, sen sadece kodu yaz.
+ASLA rawResourceId = 0 yazma, ASLA "gecici" veya "placeholder" yorum ekleme.
+Direkt R.raw.isim yaz, gerisini sistem halleder.
+
+!!! BASIT GOREV KURALI !!!
+Gorev basitse (buton, hesap makinesi, timer, tek ekranlik uygulama):
+- Her seyi tek MainActivity.kt icine yaz
+- Ayri dosya olusturma (SoundManager.kt, SoundData.kt vb. GEREKSIZ)
+- data class gerekiyorsa ayni dosyanin ALTINA yaz
+- 200 satiri gecmiyorsa parcalama
+
+!!! UI/THEME YASAGI !!!
+- ui/theme/ klasoru OLUSTURMA
+- XxxTheme composable YAZMA
+- AppTheme, TestTheme, SecreenTheme gibi ozel tema fonksiyonu YAZMA
+- Sadece MaterialTheme { } kullan, dark/light icin isSystemInDarkTheme() yeterli
+- darkColorScheme() veya lightColorScheme() KULLANMA, MaterialTheme tek basina yeterli
+
+!!! IMPORT KURALI !!!
+- Var olmayan sinifi import etme (utils.SoundPlayer, service.SoundManager vb.)
+- Ayri dosyada yazmadigin sinifi import etme
+- Tek dosyaya her sey sigiyorsa HICBIR proje-ici import gerekmez

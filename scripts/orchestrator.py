@@ -175,7 +175,11 @@ KURALLAR:
 - Navigation KULLANMA (sealed class Screen + mutableStateOf)
 - \u00d6NCEK\u0130 dosyalardaki s\u0131n\u0131f/fonksiyon isimlerini AYNEN kullan
 - Farkl\u0131 dosyadaki s\u0131n\u0131f\u0131 import et: import {args.package}.SinifAdi
-- isSystemInDarkTheme kullan (isSystemInDarkMode DE\u011e\u0130L)
+- isSystemInDarkTheme kullan (isSystemInDarkMode DEĞİL)
+- ui/theme/ klasörü OLUŞTURMA, XxxTheme fonksiyonu YAZMA
+- Sadece MaterialTheme {{ }} kullan
+- Ses efekti gerekiyorsa R.raw.ses_adi kullan, dosya otomatik olusturulur
+- rawResourceId = 0 veya placeholder YAZMA\u011e\u0130L)
 - Modifier.systemBarsPadding() kullan"""
 
     user = f"""G\u00d6REV: {args.task}
