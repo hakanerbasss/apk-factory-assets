@@ -1485,6 +1485,7 @@ class App : Application() {{
                                     await start(f"bash {PRJ_SH} ef '{task_file}'", _pd, chain_done)
                             except Exception as ex:
                                 await ws.send(json.dumps({"type":"error","text":f"Zincir hatası: {ex}"}))
+                    await auto_scan_sounds(pd, ws)
                     await start(f"bash {PRJ_SH} e '{task}'", pd, tk_done)
 
                 elif t == "build_debug":
