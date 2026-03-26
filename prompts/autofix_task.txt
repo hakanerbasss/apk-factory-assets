@@ -1,6 +1,58 @@
 === SENIOR AI TAVSİYESİ ===
 **ANALİZ SONUCU:**
 
+1. **Junior AI 2. denemede döngüde (AF modu - hata düzeltme).** Aynı hatayı tekrarlıyor çünkü Senior AI'ın verdiği talimatı tamamlamadı. Talimatta `ControlButtons` fonksiyonunun tamamını değiştirmesi istenmişti, ancak Junior AI kodu yarım bıraktı.
+
+2. **Somut hata:** `GameScreen.kt` dosyasının **877. satırında** `Row(` ifadesi başladı ama fonksiyon gövdesi ve kapanış parantezi eksik. Bu nedenle "Unresolved reference" hatası alınıyor.
+
+3. **Çözüm:** Junior AI, Senior AI'ın verdiği **tam kodu** kopyalayıp `ControlButtons` fonksiyonunun sonuna eklemeli. Mevcut kodu silip yeniden yazmaya çalışmamalı.
+
+---
+
+**JUNIOR AI'A NET TALİMATLAR (3 MADDE):**
+
+1.  **Dosya:** `GameScreen.kt`'yi aç. **877. satırdan itibaren** (yani `Row(` satırından başlayarak) `ControlButtons` fonksiyonunun **tamamını** aşağıdaki kodla **DEĞİŞTİR**:
+
+    ```kotlin
+    ) {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Button(
+                onClick = onReset,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isDarkTheme) GameColors.secondaryLight else GameColors.secondaryDark
+                )
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Sıfırla")
+            }
+    
+            Button(
+                onClick = onNextWord,
+                enabled = isCompleted,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isDarkTheme) GameColors.primaryLight else GameColors.primaryDark
+                )
+            ) {
+                Icon(Icons.Default.ArrowForward, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Sonraki Kelime")
+            }
+        }
+    }
+    ```
+
+2.  **Kontrol et:** Fonksiyonun tamamlandığından emin ol. Fonksiyonun sonunda `}` olmalı ve 877. satırdaki `Row(` ifadesi artık hata vermemeli.
+
+3.  **Başka bir şey yapma.** Sadece bu değişikliği yap ve derlemeyi tekrar dene. Kodu genişletmeye veya başka dosyalara dokunmaya çalışma.
+=========================
+
+=== SENIOR AI TAVSİYESİ ===
+**ANALİZ SONUCU:**
+
 1. **Junior AI 5. denemede döngüde (AF modu - hata düzeltme).** Aynı hatayı tekrarlıyor çünkü Senior AI'ın verdiği talimatı tamamlamadı. Talimatın 2. maddesinde `ControlButtons` fonksiyonunu tamamlaması istenmişti, ancak Junior AI kodu yarım bıraktı.
 
 2. **Somut hata:** `GameScreen.kt` dosyasının **877. satırında** `Row(` ifadesi başladı ama fonksiyon gövdesi ve kapanış parantezi eksik. Bu nedenle "Unresolved reference" hatası alınıyor.
