@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# smart_fix.sh v6
+# smart_fix.sh v7
 # Kullanım: bash smart_fix.sh <proje_dizini> <hata_log> [görev] [loop] [max_loops]
 
 set -euo pipefail
@@ -72,8 +72,31 @@ load_system_prompt() {
     if [[ -f "$prompt_file" ]]; then
         cat "$prompt_file"
     else
-        echo "HATA: Prompt dosyası bulunamadı: $prompt_file" >&2
-        exit 1
+        # Fallback: dosya yoksa yerleşik prompt kullan
+        cat << 'PROMPT'
+Sen nokta atışı Kotlin/Android hata düzelten bir uzmansın.
+
+ZORUNLU AKIŞ — BU SIRAYA UY:
+1. İLK ADIM DAIMA CMD'dir. Önce dosyayı oku.
+2. CMD ile cat/grep/sed kullan (okuma). Build sayılmaz, sınırsız.
+3. Dosyayı okuduktan sonra REPLACE_BLOCK ver.
+4. <<<SEARCH bloğu: dosyada AYNEN olan satırları yaz — boşluk ve indent dahil birebir kopyala.
+5. REPLACE başarısız olursa: CMD ile o satır aralığını tekrar oku, tam kopyala, sonra tekrar REPLACE_BLOCK ver.
+6. Tüm dosyayı ASLA yazma.
+
+FORMAT — sadece bunlardan birini yaz:
+
+CMD: cat app/src/main/java/.../Dosya.kt
+
+veya:
+
+REPLACE_BLOCK: app/src/main/java/.../Dosya.kt
+<<<SEARCH
+[dosyada AYNEN olan satırlar]
+===
+[yeni hali]
+>>>END
+PROMPT
     fi
 }
 
@@ -288,7 +311,7 @@ main() {
     local last_cmd=""                 # Tekrar eden CMD tespiti
     local api_fail_streak=0           # <--- YENİ: API çökme sayacı
 
-        while [[ $build_attempts -lt $MAX_BUILD_ATTEMPTS && $api_calls -lt $MAX_API_CALLS ]]; do
+    while [[ $build_attempts -lt $MAX_BUILD_ATTEMPTS && $api_calls -lt $MAX_API_CALLS ]]; do
         api_calls=$((api_calls + 1))
 
         if [[ $build_attempts -eq 0 ]]; then
@@ -319,7 +342,7 @@ main() {
 
         # --- ŞEFFAFLIK 1: AI'IN DÜŞÜNCESİNİ GÖSTER ---
         local ai_reasoning
-        ai_reasoning=$(echo "$ai_response" | grep -vE "^CMD:|^REPLACE_BLOCK:|^<<<SEARCH|^===|^>>>END" | grep -v '^\s*$' | head -n 3 | xargs)
+        ai_reasoning=$(echo "$ai_response" | grep -vE "^CMD:|^REPLACE_BLOCK:|^<<<SEARCH|^===|^>>>END" | grep -v '^\s*$' | head -n 3 | xargs || true)
         if [[ -n "$ai_reasoning" ]]; then
             echo -e "\033[2m🤖 AI:\033[0m \033[36m${ai_reasoning:0:150}...\033[0m"
         fi
@@ -382,7 +405,7 @@ main() {
 
                 # --- ŞEFFAFLIK 2: KOMUT ÇIKTISINI GÖSTER ---
                 local clean_out
-                clean_out=$(echo "$cmd_out" | grep -v '^\s*$' | head -n 2 | xargs)
+                clean_out=$(echo "$cmd_out" | grep -v '^\s*$' | head -n 2 | xargs || true)
                 [[ -z "$clean_out" ]] && clean_out="(Çıktı boş veya hata)"
                 echo -e "\033[2m   ↳ Çıktı: ${clean_out:0:100}...\033[0m"
                 # -------------------------------------------
@@ -438,9 +461,9 @@ main() {
 
             # --- ŞEFFAFLIK 3: DEĞİŞECEK KODU ÖNİZLE ---
             local s_head
-            s_head=$(echo "$search_text"  | grep -v '^\s*$' | head -1 | xargs)
+            s_head=$(echo "$search_text"  | grep -v '^\s*$' | head -1 | xargs || true)
             local r_head
-            r_head=$(echo "$replace_text" | grep -v '^\s*$' | head -1 | xargs)
+            r_head=$(echo "$replace_text" | grep -v '^\s*$' | head -1 | xargs || true)
             echo -e "\033[0;31m   - ${s_head:0:80}...\033[0m"
             echo -e "\033[0;32m   + ${r_head:0:80}...\033[0m"
             # ------------------------------------------
