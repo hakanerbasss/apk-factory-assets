@@ -296,16 +296,19 @@ main() {
 
     local MAX_BUILD_ATTEMPTS=5
     local MAX_API_CALLS=35
+    local MAX_CMD_WITHOUT_REPLACE=5   # Art arda bu kadar CMD sonrası REPLACE zorla
     local build_attempts=0
     local api_calls=0
     local replace_fail_streak=0
-    local has_read_file=0   # AI en az bir CMD verdiyse 1 olur
+    local has_read_file=0             # AI en az bir CMD verdiyse 1
+    local cmd_streak=0                # Build olmadan art arda kaç CMD verildi
+    local last_cmd=""                 # Tekrar eden CMD tespiti
 
     while [[ $build_attempts -lt $MAX_BUILD_ATTEMPTS && $api_calls -lt $MAX_API_CALLS ]]; do
         api_calls=$((api_calls + 1))
 
         if [[ $build_attempts -eq 0 ]]; then
-            log "AI dosyaları tarıyor... (API: $api_calls)"
+            log "AI dosyaları tarıyor... (API: $api_calls | CMD streak: $cmd_streak/$MAX_CMD_WITHOUT_REPLACE)"
         else
             log "AI'ya gönderiliyor... (Build: $build_attempts/$MAX_BUILD_ATTEMPTS | API: $api_calls)"
         fi
@@ -337,15 +340,50 @@ main() {
         if echo "$ai_response" | grep -q "^CMD:" && ! echo "$ai_response" | grep -q "^REPLACE_BLOCK:"; then
             local cmd
             cmd=$(echo "$ai_response" | grep "^CMD:" | head -1 | sed 's/^CMD: *//')
+
+            # Aynı komutu tekrar veriyor mu? → engelle + tüm dosyayı gönder
+            if [[ -n "$last_cmd" && "$cmd" == "$last_cmd" ]]; then
+                warn "Tekrar eden CMD engellendi: '$cmd'"
+                local dup_file
+                dup_file=$(echo "$cmd" | grep -oE '[a-zA-Z0-9_./-]+\.kt' | head -1 || echo "")
+                local dup_content=""
+                if [[ -n "$dup_file" && -f "$PROJECT_ROOT/$dup_file" ]]; then
+                    dup_content=$(cat "$PROJECT_ROOT/$dup_file" | head -n 200 | cat -n)
+                fi
+                user_msg="TEKRAR EDEN CMD ENGELLENDİ: Bu komutu zaten çalıştırdın, aynı çıktıyı alırsın.\n\nDOSYA TAM İÇERİK (satır numaralı):\n${dup_content}\n\nARTIK REPLACE_BLOCK ver. Daha fazla CMD verme."
+                cmd_streak=$((cmd_streak + 1))
+                continue
+            fi
+
+            # CMD streak limiti aşıldı → tüm hatalı dosyaları gönder, REPLACE zorla
+            if [[ $cmd_streak -ge $MAX_CMD_WITHOUT_REPLACE ]]; then
+                warn "CMD limiti aşıldı ($cmd_streak/$MAX_CMD_WITHOUT_REPLACE) — REPLACE_BLOCK zorlanıyor."
+                local forced_contents
+                forced_contents=$(collect_error_file_contents "$ERROR_LOG")
+                user_msg="CMD LİMİTİ AŞILDI: $cmd_streak komut çalıştırdın, hâlâ REPLACE_BLOCK vermedin.\n\nTÜM HATALI DOSYALAR (satır numaralı):\n${forced_contents}\n\nARTIK SADECE REPLACE_BLOCK ver. CMD yasak bu turda."
+                cmd_streak=0
+                last_cmd=""
+                continue
+            fi
+
             if is_safe_cmd "$cmd"; then
-                log "Komut çalıştırılıyor (Build sayılmaz): $cmd"
+                last_cmd="$cmd"
+                cmd_streak=$((cmd_streak + 1))
+                log "Komut çalıştırılıyor (Build sayılmaz, streak: $cmd_streak/$MAX_CMD_WITHOUT_REPLACE): $cmd"
                 cd "$PROJECT_ROOT"
                 local cmd_out
                 cmd_out=$(eval "$cmd" 2>&1 || true)
-                cmd_out=$(echo "$cmd_out" | head -n 300)
+                # Satır numarası ekle — AI dosyadaki pozisyonu anlasın
+                cmd_out=$(echo "$cmd_out" | head -n 300 | cat -n)
                 has_read_file=1
                 replace_fail_streak=0
-                user_msg="KOMUT ÇIKTISI:\n${cmd_out}\n\nBu çıktıdan <<<SEARCH için AYNEN kopyala (boşluk/indent dahil). REPLACE_BLOCK ver."
+
+                # Streak 3+ olunca baskı mesajı ekle
+                local cmd_pressure=""
+                if [[ $cmd_streak -ge 3 ]]; then
+                    cmd_pressure="\n\n⚠️ UYARI: $cmd_streak CMD kullandın (limit: $MAX_CMD_WITHOUT_REPLACE). Bir sonraki adımın REPLACE_BLOCK OLMALI."
+                fi
+                user_msg="KOMUT ÇIKTISI (satır numaralı):\n${cmd_out}\n\nBu çıktıdan <<<SEARCH için AYNEN kopyala (boşluk/indent dahil). REPLACE_BLOCK ver.${cmd_pressure}"
             else
                 user_msg="Güvensiz komut engellendi: '${cmd}'\nSadece cat, grep, sed (okuma), find kullan."
             fi
@@ -383,6 +421,10 @@ main() {
             search_text=$(echo "$ai_response" | awk '/^<<<SEARCH/{f=1;next} /^===/{f=0} f{print}')
             local replace_text
             replace_text=$(echo "$ai_response" | awk '/^===/{f=1;next} /^>>>END/{f=0} f{print}')
+
+            # CMD streak + last_cmd sıfırla — REPLACE denendi
+            cmd_streak=0
+            last_cmd=""
 
             log "REPLACE deneniyor: $rp"
             local replace_output
