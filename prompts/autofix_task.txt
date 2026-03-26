@@ -1,41 +1,63 @@
 === SENIOR AI TAVSİYESİ ===
-**Analiz:**
-Junior AI 4. denemede döngüye girmiş. Mod `af` (hata düzeltme) ama AI yeni dosya listesi verip duruyor. Hata satırı 867'de `Button` composable'ı kapatılmamış ve `GameColors` unresolved. AI bunu görmeyip proje yapısını tekrarlıyor.
+**Analiz Sonucu:**
 
-**Junior AI'a Net Talimatlar:**
+1. **Junior AI döngüde (6. deneme) ve mod AF (hata düzeltme).** Aynı import hatalarını tekrarlıyor çünkü her seferinde tüm projeyi yeniden yazmaya çalışıyor, somut hata satırlarını düzeltmiyor.
 
-1. **Hata satırı 867'ye odaklan:** `Button` composable'ı yarım kalmış. `)` parantezini kapat ve `modifier` ekle:
-   ```kotlin
-   modifier = Modifier.size(120.dp, 48.dp)
-   ```
+2. **Ana hata:** `GameScreen.kt` dosyasında **yanlış import yolu** kullanılmış. Satır 37-45'teki `com.wizaicorp.scrolling.ui.theme`, `com.wizaicorp.scrolling.model`, `com.wizaicorp.scrolling.viewmodel` importları **mevcut değil**. Proje yapısına göre bu sınıflar doğrudan `com.wizaicorp.scrolling` paketinde olmalı.
 
-2. **GameColors unresolved reference:** `GameScreen.kt` dosyasına şu import'u ekle:
-   ```kotlin
-   import com.wizaicorp.scrolling.ui.theme.GameColors
-   ```
-   Eğer tema dosyası farklı paketteyse (örneğin `com.wizaicorp.scrolling.theme`), import'u ona göre düzelt.
+3. **Ek hata:** Satır 876'da `ControlButtons` composable'ının kapanış parantezi ve fonksiyon gövdesi eksik. Bu derleme hatasına neden oluyor.
 
-3. **Eksik import'ları kontrol et:** `Balloon`, `ConfettiParticle`, `CelebrationMessage` composable'ları için gerekli import'ları ekle. Muhtemelen aynı pakette oldukları için import gerekmez ama eğer farklı dosyadaysa:
-   ```kotlin
-   import com.wizaicorp.scrolling.components.Balloon
-   ```
+---
 
-4. **calculateDropSlot fonksiyonu tanımlı değil:** Aynı dosyaya bu fonksiyonu ekle:
-   ```kotlin
-   private fun calculateDropSlot(offset: Offset, slotCount: Int): Int {
-       // Basit implementasyon
-       val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-       val slotWidth = screenWidth / slotCount
-       val index = (offset.x / slotWidth.value).toInt()
-       return if (index in 0 until slotCount) index else -1
-   }
-   ```
-   Bunun için `LocalConfiguration` import'u gerek:
-   ```kotlin
-   import androidx.compose.ui.platform.LocalConfiguration
-   ```
+**Junior AI'a Net Talimatlar (3 Madde):**
 
-5. **Dosya listesi vermeyi bırak:** Hata düzeltme modundasın, yeni dosya oluşturma. Sadece verilen `GameScreen.kt` dosyasındaki hataları düzelt.
+1.  **Dosya:** `GameScreen.kt`'deki yanlış importları **SİL** ve aşağıdaki doğru import satırlarını **EKLE**:
+    ```kotlin
+    import com.wizaicorp.scrolling.GameColors
+    import com.wizaicorp.scrolling.GameConstants
+    import com.wizaicorp.scrolling.BalloonData
+    import com.wizaicorp.scrolling.ConfettiParticle
+    import com.wizaicorp.scrolling.DropSlot
+    import com.wizaicorp.scrolling.LetterCard
+    import com.wizaicorp.scrolling.WordData
+    import com.wizaicorp.scrolling.GameEvent
+    import com.wizaicorp.scrolling.GameViewModel
+    ```
+
+2.  **Dosya:** `GameScreen.kt`'nin **en sonunda**, `ControlButtons` composable fonksiyonunu tamamla. Eksik kapanış parantezini ve fonksiyon gövdesini şu kodla **TAMAMLA**:
+    ```kotlin
+    ) {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Button(
+                onClick = onReset,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isDarkTheme) GameColors.secondaryLight else GameColors.secondaryDark
+                )
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Sıfırla")
+            }
+    
+            Button(
+                onClick = onNextWord,
+                enabled = isCompleted,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = GameColors.accent
+                )
+            ) {
+                Icon(Icons.Default.ArrowForward, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Sonraki Kelime")
+            }
+        }
+    }
+    ```
+
+3.  **DUR:** Başka dosya yazma veya değiştirme. Sadece bu iki somut düzeltmeyi yap ve derlemeyi dene.
 =========================
 
 !!! MUTLAK TASARIM KORUMA KURALI — EN YÜKSEK ÖNCELİK !!!

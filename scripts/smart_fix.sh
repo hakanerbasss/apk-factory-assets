@@ -473,13 +473,46 @@ main() {
                     new_file_contents=$(collect_error_file_contents "$TMP_DIR/sf_build.txt")
                     has_read_file=0
                     user_msg="Hatalar azaldı ($new_errors kaldı).\nYENİ HATALAR:\n${new_err_text}\n\nHATALI DOSYALAR:\n${new_file_contents}\n\nİLK ADIMIN CMD OLMALI."
+
+                # --- YENİ: AKILLI MİKRO-ROLLBACK (HATA İMZASI KONTROLÜ) ---
+                elif [[ "$new_errors" -gt "$INITIAL_ERRORS" ]]; then
+                    # Eski hatanın "imzasını" al (Dosya yolu ve satır numarasını silip sadece saf hata mesajını alıyoruz)
+                    local old_error_sig
+                    old_error_sig=$(grep -E "^e:|error:" "$ERROR_LOG" | head -1 | sed -E 's/.*:[0-9]+:?[0-9]* //g' | cut -c1-60)
+
+                    # Bu eski hata mesajı, yeni aldığımız build logunun içinde HÂLÂ var mı?
+                    if [[ -n "$old_error_sig" ]] && grep -Fq "$old_error_sig" "$TMP_DIR/sf_build.txt"; then
+                        warn "Hata ARTTI ($INITIAL_ERRORS → $new_errors) VE asıl hata ÇÖZÜLEMEDİ! Geri alınıyor..."
+                        restore_snapshot
+                        has_read_file=0
+                        local build_err_short
+                        build_err_short=$(grep -E "^e:|error:|Unresolved" "$ERROR_LOG" | head -20)
+                        user_msg="SİSTEM UYARISI: Yazdığın kod asıl hatayı ÇÖZMEDİĞİ gibi, toplam hatayı $INITIAL_ERRORS'ten $new_errors'e ÇIKARDI!\nBu yüzden düzeltmen REDDEDİLDİ ve dosya anında eski haline (geri) alındı.\n\nMEVCUT HATALAR:\n${build_err_short}\n\nAYNI KODU TEKRAR YAZMA. Önce CMD ile dosyayı oku ve mantığını tamamen değiştir."
+                    else
+                        # Eski hata logdan silinmiş, ama derleyici yeni hatalar bulmuş (Sistem İlerledi!)
+                        ok "Hata arttı ($INITIAL_ERRORS → $new_errors) AMA asıl hata çözülmüş! (Derleyici körlüğü kalktı)"
+                        cp "$TMP_DIR/sf_build.txt" "$ERROR_LOG"
+                        INITIAL_ERRORS=$new_errors
+                        take_snapshot  # <--- Hata artsa bile İLERLEME olduğu için yedeği alıyoruz!
+                        build_attempts=0
+                        local new_err_text
+                        new_err_text=$(grep -E "^e:|error:|Unresolved|AAPT|Exception" "$TMP_DIR/sf_build.txt" | head -30)
+                        local new_file_contents
+                        new_file_contents=$(collect_error_file_contents "$TMP_DIR/sf_build.txt")
+                        has_read_file=0
+                        user_msg="DİKKAT: Önceki hatayı başarıyla ÇÖZDÜN ama altında yatan gizli hatalar ($new_errors adet) ortaya çıktı. İlerleme kaydedildi!\n\nYENİ HATALAR:\n${new_err_text}\n\nHATALI DOSYALAR:\n${new_file_contents}\n\nŞimdi bu yeni hatalara odaklan. İLK ADIMIN CMD OLMALI."
+                    fi
+
+                # --- HATA SAYISI VE TİPİ AYNI KALIRSA ---
                 else
-                    warn "Build başarısız ($INITIAL_ERRORS → $new_errors)."
+                    warn "Build başarısız (Hata sayısı sabit: $INITIAL_ERRORS)."
+                    cp "$TMP_DIR/sf_build.txt" "$ERROR_LOG"
                     local build_err_short
                     build_err_short=$(grep -E "^e:|error:|Unresolved" "$TMP_DIR/sf_build.txt" | head -20)
                     has_read_file=0
-                    user_msg="BUILD BAŞARISIZ ($build_attempts/$MAX_BUILD_ATTEMPTS hak).\nHatalar: $INITIAL_ERRORS → $new_errors\n${build_err_short}\n\nFarklı yaklaşım dene. Önce CMD ile dosyayı oku."
+                    user_msg="BUILD BAŞARISIZ ($build_attempts/$MAX_BUILD_ATTEMPTS hak).\nHatalar azalmadı ($INITIAL_ERRORS).\n${build_err_short}\n\nFarklı yaklaşım dene. Önce CMD ile dosyayı oku."
                 fi
+
             else
                 # REPLACE başarısız — build alınmaz, hak eksilmez
                 replace_fail_streak=$((replace_fail_streak + 1))
