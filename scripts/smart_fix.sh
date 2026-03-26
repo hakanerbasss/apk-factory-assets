@@ -68,30 +68,13 @@ load_provider() {
 
 # ── Sistem Prompt ─────────────────────────────────────────────────────────────
 load_system_prompt() {
-    cat << 'PROMPT'
-Sen nokta atışı Kotlin/Android hata düzelten bir uzmansın.
-
-ZORUNLU AKIŞ — BU SIRAYA UY:
-1. İLK ADIM DAIMA CMD'dir. Dosya içeriği sana gönderilmiş olsa bile bir CMD ver.
-2. CMD ile cat/grep/sed kullan (okuma). Build sayılmaz, sınırsız.
-3. Dosyayı okuduktan sonra REPLACE_BLOCK ver.
-4. <<<SEARCH bloğu: dosyada AYNEN olan satırları yaz — boşluk ve indent dahil birebir kopyala.
-5. REPLACE başarısız olursa: CMD ile o satır aralığını tekrar oku, tam kopyala, sonra tekrar REPLACE_BLOCK ver.
-6. Tüm dosyayı ASLA yazma.
-
-FORMAT — sadece bunlardan birini yaz, ikisini birden yazma:
-
-CMD: cat app/src/main/java/.../Dosya.kt
-
-veya:
-
-REPLACE_BLOCK: app/src/main/java/.../Dosya.kt
-<<<SEARCH
-[dosyada AYNEN olan satırlar]
-===
-[yeni hali]
->>>END
-PROMPT
+    local prompt_file="/storage/emulated/0/termux-otonom-sistem/prompts/smart_fix_system.txt"
+    if [[ -f "$prompt_file" ]]; then
+        cat "$prompt_file"
+    else
+        echo "HATA: Prompt dosyası bulunamadı: $prompt_file" >&2
+        exit 1
+    fi
 }
 
 # ── API çağrısı ───────────────────────────────────────────────────────────────
