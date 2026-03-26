@@ -461,6 +461,16 @@ main() {
             last_cmd=""
 
             log "REPLACE deneniyor: $rp"
+
+            # --- YENİ: YAPAY ZEKA AYNI KODU MU YAZIYOR KONTROLÜ ---
+            if [[ "$search_text" == "$replace_text" ]]; then
+                warn "AI hiçbir şeyi değiştirmedi (eski kod = yeni kod)."
+                replace_fail_streak=$((replace_fail_streak + 1))
+                user_msg="HATA: Sildiğin kod (SEARCH) ile yazdığın kod (REPLACE) tamamen aynı! Hiçbir değişiklik yapmadın. Senior AI'ın tavsiyesini YANLIŞ SATIRLARDA arıyor olabilirsin. Hatanın asıl kaynağını bulmak için grep kullan ve KODU GERÇEKTEN DEĞİŞTİR."
+                continue
+            fi
+            # -----------------------------------------------------
+
             local replace_output
             if replace_output=$(apply_search_replace "$rp" "$search_text" "$replace_text" 2>&1); then
                 ok "Kod değiştirildi: $replace_output"
