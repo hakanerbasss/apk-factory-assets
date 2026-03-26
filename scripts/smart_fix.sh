@@ -170,7 +170,7 @@ main() {
     log "Smart Fix başlatıldı. Toplam hata: $INITIAL_ERRORS"
 
     while [[ $build_attempts -lt $MAX_BUILD_ATTEMPTS && $api_calls -lt $MAX_API_CALLS ]]; do
-        ((api_calls++))
+        api_calls=$((api_calls + 1))
         
         # Sadece komut atıyorsa kullanıcıyı gereksiz uyarılarla boğma, sadece build yapılınca ekrana vur
         if [[ $build_attempts -eq 0 ]]; then
@@ -198,13 +198,13 @@ main() {
             else
                 user_msg="Güvensiz komut engellendi. cat, grep, find kullan."
             fi
-            # NOT: ((build_attempts++)) YAPILMAZ!
+            # NOT: build_attempts=$((build_attempts + 1)) YAPILMAZ!
             continue
         fi
 
         # ── REPLACE_BLOCK ──────────────────────────────────────────────────
         if echo "$ai_response" | grep -q "^REPLACE_BLOCK:"; then
-            ((build_attempts++)) # BURADA SAYACI ARTTIRIYORUZ (Sadece kod değiştiğinde)
+            build_attempts=$((build_attempts + 1)) # BURADA SAYACI ARTTIRIYORUZ (Sadece kod değiştiğinde)
             
             local rp=$(echo "$ai_response" | grep "^REPLACE_BLOCK:" | head -1 | cut -d: -f2- | xargs)
             local search_text=$(echo "$ai_response" | awk '/^<<<SEARCH/{found=1; next} /^===/{found=0} found{print}')
