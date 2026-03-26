@@ -317,6 +317,14 @@ main() {
         conversation="${full_msg}\n\nAI: ${ai_response}"
         api_fail_streak=0
 
+        # --- ŞEFFAFLIK 1: AI'IN DÜŞÜNCESİNİ GÖSTER ---
+        local ai_reasoning
+        ai_reasoning=$(echo "$ai_response" | grep -vE "^CMD:|^REPLACE_BLOCK:|^<<<SEARCH|^===|^>>>END" | grep -v '^\s*$' | head -n 3 | xargs)
+        if [[ -n "$ai_reasoning" ]]; then
+            echo -e "\033[2m🤖 AI:\033[0m \033[36m${ai_reasoning:0:150}...\033[0m"
+        fi
+        # ---------------------------------------------
+
 
         # ── REPLACE_BLOCK, hiç dosya okumadan geldi → reddet + otomatik oku ──
         if echo "$ai_response" | grep -q "^REPLACE_BLOCK:" && [[ $has_read_file -eq 0 ]]; then
@@ -371,6 +379,14 @@ main() {
                 cd "$PROJECT_ROOT"
                 local cmd_out
                 cmd_out=$(eval "$cmd" 2>&1 || true)
+
+                # --- ŞEFFAFLIK 2: KOMUT ÇIKTISINI GÖSTER ---
+                local clean_out
+                clean_out=$(echo "$cmd_out" | grep -v '^\s*$' | head -n 2 | xargs)
+                [[ -z "$clean_out" ]] && clean_out="(Çıktı boş veya hata)"
+                echo -e "\033[2m   ↳ Çıktı: ${clean_out:0:100}...\033[0m"
+                # -------------------------------------------
+
                 # Satır numarası ekle — AI dosyadaki pozisyonu anlasın
                 cmd_out=$(echo "$cmd_out" | head -n 300 | cat -n)
                 has_read_file=1
@@ -419,6 +435,16 @@ main() {
             search_text=$(echo "$ai_response" | awk '/^<<<SEARCH/{f=1;next} /^===/{f=0} f{print}')
             local replace_text
             replace_text=$(echo "$ai_response" | awk '/^===/{f=1;next} /^>>>END/{f=0} f{print}')
+
+            # --- ŞEFFAFLIK 3: DEĞİŞECEK KODU ÖNİZLE ---
+            local s_head
+            s_head=$(echo "$search_text"  | grep -v '^\s*$' | head -1 | xargs)
+            local r_head
+            r_head=$(echo "$replace_text" | grep -v '^\s*$' | head -1 | xargs)
+            echo -e "\033[0;31m   - ${s_head:0:80}...\033[0m"
+            echo -e "\033[0;32m   + ${r_head:0:80}...\033[0m"
+            # ------------------------------------------
+
 
             # CMD streak + last_cmd sıfırla — REPLACE denendi
             cmd_streak=0
