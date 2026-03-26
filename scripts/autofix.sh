@@ -1164,8 +1164,10 @@ print(json.dumps({'model':'$s_model','max_tokens':8000,'system':sp,'messages':[{
                 [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
                 return 0
             fi
-            err "Smart Fix başarısız — durduruldu"
-            return 1
+            # Smart Fix başarısız → döngü DEVAM ETSİN (return 1 değil continue)
+            warn "Smart Fix başarısız — Autofix döngüsü devam ediyor ($loop/$MAX_LOOPS)..."
+            [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
+            continue
         fi
         if ! call_ai "$ef" "$src"; then
             # Geçici prompt varsa geri yükle
