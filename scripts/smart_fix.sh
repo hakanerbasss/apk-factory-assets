@@ -149,8 +149,16 @@ PYEOF
 main() {
     load_provider
     local SYSTEM_PROMPT=$(load_system_prompt)
+    log "Autofix'in eksik logu reddediliyor. Otonom taze build alınıyor..."
+    cd "$PROJECT_ROOT"
+    ./gradlew assembleDebug --no-daemon > "$TMP_DIR/sf_initial_build.txt" 2>&1 || true
+    ERROR_LOG="$TMP_DIR/sf_initial_build.txt"
+    INITIAL_ERRORS=$(count_all_errors "$ERROR_LOG")
+
     local error_text=$(cat "$ERROR_LOG")
-    local user_msg="Proje: $PROJECT_ROOT\n\nBUILD HATALARI ($INITIAL_ERRORS adet):\n$error_text\n\nZORUNLU: Önce CMD: cat ile dosyayı oku, sonra REPLACE_BLOCK ver."
+    local task_context=""
+    [[ -n "$TASK" ]] && task_context="GÖREV: $TASK\n\n"
+    local user_msg="Proje: $PROJECT_ROOT\n\n${task_context}BUILD HATALARI ($INITIAL_ERRORS adet):\n$error_text\n\nZORUNLU: Önce CMD: cat ile dosyayı oku, sonra REPLACE_BLOCK ver."
     local conversation=""
     local MAX_ATTEMPTS=5
 
