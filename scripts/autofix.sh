@@ -1069,9 +1069,9 @@ ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B
 
         local src; src=$(collect_source_files)
         
-        # Senior AI devreye girme noktası (MAX_LOOPS/2)
-        local senior_threshold=$(( (MAX_LOOPS + 1) / 2 ))
-        [[ $senior_threshold -lt 2 ]] && senior_threshold=2
+        # Senior AI devreye girme noktası:
+        # Smart Fix içeride zaten 5 deneme yaptığı için 2. ana döngüde direkt Senior devreye girmeli!
+        local senior_threshold=2
         local senior_prov; senior_prov=$(grep "^SENIOR_PROVIDER=" ~/.config/autofix.conf 2>/dev/null | cut -d'"' -f2)
         local senior_model; senior_model=$(grep "^SENIOR_MODEL=" ~/.config/autofix.conf 2>/dev/null | cut -d'"' -f2)
 
@@ -1159,7 +1159,13 @@ print(json.dumps({'model':'$s_model','max_tokens':8000,'system':sp,'messages':[{
         local sf="$SISTEM_DIR/smart_fix.sh"
         if [[ -f "$sf" ]]; then
             log "🔬 Smart Fix devreye giriyor..."
-            if bash "$sf" "$PROJECT_ROOT" "$ef" "${TASK_DESCRIPTION:-}" "$loop" "$MAX_LOOPS"; then
+            # Senior AI tavsiyesi varsa Smart Fix'e Task olarak aktar
+            local sf_task="${TASK_DESCRIPTION:-}"
+            if [[ -f "$TMP_DIR/senior_advice.txt" ]]; then
+                sf_task="=== SENIOR AI TAVSİYESİ (BUNU KESİNLİKLE UYGULA) ===\n$(cat "$TMP_DIR/senior_advice.txt")\n\n$sf_task"
+            fi
+
+            if bash "$sf" "$PROJECT_ROOT" "$ef" "$sf_task" "$loop" "$MAX_LOOPS"; then
                 ok "✅ Smart Fix başarılı!"
                 [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
                 return 0
