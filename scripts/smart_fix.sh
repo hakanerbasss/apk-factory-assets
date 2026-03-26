@@ -143,7 +143,7 @@ is_safe_cmd() {
     echo "$1" | grep -qE '(>>|\brm\b|\bmv\b|\bchmod\b|\bsed\s.*-i\b|gradlew)' && return 1 || return 0
 }
 
-# ── Build logundaki hatalı dosyaların içeriklerini topla ─────────────────────
+# ── Build logundaki hatalı dosyaların içeriklerini topla (SMART CONTEXT) ──────
 collect_error_file_contents() {
     local build_log="$1"
     local output=""
@@ -159,12 +159,30 @@ collect_error_file_contents() {
         local line_count
         line_count=$(wc -l < "$fpath" 2>/dev/null || echo 0)
         output+="\n=== DOSYA: ${fpath#$PROJECT_ROOT/} ($line_count satır) ===\n"
+        
         if [[ $line_count -le 150 ]]; then
+            # Dosya küçükse tamamını gönder
             output+=$(cat "$fpath")
         else
-            output+=$(head -n 80 "$fpath")
-            output+="\n... (orta atlandı) ...\n"
-            output+=$(tail -n 20 "$fpath")
+            # SMART CONTEXT: Dosya büyükse, hata logundan bu dosyaya ait satır numaralarını çek
+            local error_lines
+            error_lines=$(grep -oE "${fpath##*/}:[0-9]+" "$build_log" 2>/dev/null | cut -d: -f2 | sort -un | head -5)
+
+            if [[ -z "$error_lines" ]]; then
+                # Satır numarası bulunamazsa eski yönteme (fallback) dön
+                output+=$(head -n 80 "$fpath")
+                output+="\n... (orta atlandı) ...\n"
+                output+=$(tail -n 20 "$fpath")
+            else
+                output+="// NOT: Dosya büyük olduğu için sadece hatalı satırların çevresi (±15 satır) gösteriliyor.\n"
+                for eline in $error_lines; do
+                    local start_line=$(( eline > 15 ? eline - 15 : 1 ))
+                    local end_line=$(( eline + 15 ))
+                    output+="\n// --- Satır $start_line ile $end_line arası ---\n"
+                    # Sadece hatanın olduğu kısmı (örneğin 540-570 arası) al
+                    output+=$(sed -n "${start_line},${end_line}p" "$fpath" 2>/dev/null)
+                done
+            fi
         fi
         output+="\n"
     done < <(grep -oE 'file:///[^ :]+\.(kt|java|xml)' "$build_log" 2>/dev/null \
@@ -172,6 +190,7 @@ collect_error_file_contents() {
 
     echo -e "$output"
 }
+
 
 # ── SEARCH/REPLACE Python motoru ─────────────────────────────────────────────
 apply_search_replace() {
