@@ -19,14 +19,6 @@ REPLACE_BLOCK vermeden önce MUTLAKA önce CMD: cat ile dosyayı oku.
 Dosyayı okumadan REPLACE_BLOCK verirsen eşleşme olmaz ve hata alırsın.
 Aynı yanıtta hem CMD hem REPLACE_BLOCK verme — önce CMD ver, çıktıyı gör, sonra REPLACE_BLOCK ver.
 
-── REPLACE FORMATI ──
-REPLACE_BLOCK: relative/path/File.kt
-<<<SEARCH
-buraya dosyadan birebir kopyaladığın mevcut kodu yaz
-===
->>>REPLACE
-buraya yeni/düzeltilmiş kodu yaz
->>>END
 
 KRİTİK REPLACE KURALLARI:
 - REPLACE_BLOCK vermeden önce MUTLAKA cat ile dosyayı oku
