@@ -361,9 +361,8 @@ _call_active_ai() {
 # ─── SENIOR (GÖZLEMCI) AI ───────────────────────────────────────────────────
 call_senior_ai() {
     local errors="$1" sources="$2"
-    # Senior'a sadece ^e: satirlari gonder, --info gurultusu degil
-    local error_text; error_text=$(grep "^e:" "$errors" 2>/dev/null)
-    [[ -z "$error_text" ]] && error_text=$(cat "$errors")
+    # Tüm temizlenmiş hata logunu Senior'a gönder (AAPT, Java, Gradle dahil)
+    local error_text; error_text=$(cat "$errors")
     local source_text; source_text=$(cat "$sources")
     local original_task="${3:-}"
     local next_task_content=""
