@@ -1165,9 +1165,11 @@ print(json.dumps({'model':'$s_model','max_tokens':8000,'system':sp,'messages':[{
             fi
 
             if bash "$sf" "$PROJECT_ROOT" "$ef" "$sf_task" "$loop" "$MAX_LOOPS"; then
-                ok "✅ Smart Fix başarılı!"
+                ok "✅ Smart Fix başarılı! Son kontrol için döngü başa sarılıyor..."
                 [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
-                return 0
+                # Sistemi sessizce kapatma! Döngünün başına (run_build aşamasına) gönder ki 
+                # başarıyı onaylayıp kullanıcıya "Kalıcı Yap / Yedeğe Dön" sorusunu sorsun.
+                continue
             fi
             # Smart Fix başarısız → döngü DEVAM ETSİN (return 1 değil continue)
             warn "Smart Fix başarısız — Autofix döngüsü devam ediyor ($loop/$MAX_LOOPS)..."
