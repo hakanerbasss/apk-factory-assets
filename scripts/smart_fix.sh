@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# smart_fix.sh v3 — Nokta Atışı Düzeltme & Doğrulama & Rollback
+# smart_fix.sh v4 — Akıllı Döngü (Sadece Build Testleri Denemeden Sayılır)
 # Kullanım: bash smart_fix.sh <proje_dizini> <hata_log> [görev]
 
 set -euo pipefail
@@ -29,8 +29,6 @@ count_all_errors() {
     local log_file="$1"
     grep -cE "(^e: |error:|Exception|What went wrong|Could not find|AAPT|Unresolved reference)" "$log_file" 2>/dev/null || echo 0
 }
-
-INITIAL_ERRORS=$(count_all_errors "$ERROR_LOG")
 
 # ── Rollback (Yedekleme) Sistemi ──────────────────────────────────────────────
 RESTORE_LIST="$TMP_DIR/sf_restore_list.txt"
@@ -101,7 +99,8 @@ else:
 }
 
 is_safe_cmd() {
-    echo "$1" | grep -qE '(>(?!&)|>>|\brm\b|\bmv\b|\bcp\b|\bchmod\b|\bsed\s.*-i\b|gradlew)' && return 1 || return 0
+    # Termux grep uyumlu güvenli regex (Önceki hataya sebep olan kısım temizlendi)
+    echo "$1" | grep -qE '(>>|\brm\b|\bmv\b|\bcp\b|\bchmod\b|\bsed\s.*-i\b|gradlew)' && return 1 || return 0
 }
 
 # ── SEARCH/REPLACE Uygula ve DOĞRULA ──────────────────────────────────────────
@@ -145,10 +144,11 @@ print(f"REPLACE uygulandi ve DOGRULANDI: {len(content.splitlines())} -> {len(new
 PYEOF
 }
 
-# ── Ana Döngü (Maksimum 5 Deneme) ─────────────────────────────────────────────
+# ── Ana Döngü ─────────────────────────────────────────────────────────────────
 main() {
     load_provider
     local SYSTEM_PROMPT=$(load_system_prompt)
+    
     log "Autofix'in eksik logu reddediliyor. Otonom taze build alınıyor..."
     cd "$PROJECT_ROOT"
     ./gradlew assembleDebug --no-daemon > "$TMP_DIR/sf_initial_build.txt" 2>&1 || true
@@ -158,14 +158,26 @@ main() {
     local error_text=$(cat "$ERROR_LOG")
     local task_context=""
     [[ -n "$TASK" ]] && task_context="GÖREV: $TASK\n\n"
+    
     local user_msg="Proje: $PROJECT_ROOT\n\n${task_context}BUILD HATALARI ($INITIAL_ERRORS adet):\n$error_text\n\nZORUNLU: Önce CMD: cat ile dosyayı oku, sonra REPLACE_BLOCK ver."
     local conversation=""
-    local MAX_ATTEMPTS=5
+    
+    local MAX_BUILD_ATTEMPTS=5
+    local MAX_API_CALLS=30 # Sonsuz döngü kilidi (Sadece okuma yapsa bile takılı kalmasın diye)
+    local build_attempts=0
+    local api_calls=0
 
     log "Smart Fix başlatıldı. Toplam hata: $INITIAL_ERRORS"
 
-    for (( round=1; round<=MAX_ATTEMPTS; round++ )); do
-        log "Deneme $round / $MAX_ATTEMPTS — AI'ya gönderiliyor..."
+    while [[ $build_attempts -lt $MAX_BUILD_ATTEMPTS && $api_calls -lt $MAX_API_CALLS ]]; do
+        ((api_calls++))
+        
+        # Sadece komut atıyorsa kullanıcıyı gereksiz uyarılarla boğma, sadece build yapılınca ekrana vur
+        if [[ $build_attempts -eq 0 ]]; then
+            log "AI dosyaları tarıyor... (Sorgu: $api_calls)"
+        else
+            log "AI'ya gönderiliyor... (Build Denemesi: $build_attempts / $MAX_BUILD_ATTEMPTS | API İsteği: $api_calls)"
+        fi
 
         local full_msg="$user_msg"
         [[ -n "$conversation" ]] && full_msg="$conversation\n\n---\n$user_msg"
@@ -178,27 +190,31 @@ main() {
         if echo "$ai_response" | grep -q "^CMD:" && ! echo "$ai_response" | grep -q "^REPLACE_BLOCK:"; then
             local cmd=$(echo "$ai_response" | grep "^CMD:" | head -1 | sed 's/^CMD: *//')
             if is_safe_cmd "$cmd"; then
-                log "Komut çalıştırılıyor: $cmd"
+                log "Komut çalıştırılıyor (Build sayılmaz): $cmd"
                 cd "$PROJECT_ROOT"; local cmd_out=$(eval "$cmd" 2>&1 || true)
+                # Token taşmasını önlemek için çok uzun log çıktılarını kırp
+                cmd_out=$(echo "$cmd_out" | head -n 300)
                 user_msg="KOMUT ÇIKTISI:\n$cmd_out\nDevam et ve REPLACE_BLOCK üret."
             else
-                user_msg="Güvensiz komut engellendi. cat, grep kullan."
+                user_msg="Güvensiz komut engellendi. cat, grep, find kullan."
             fi
+            # NOT: ((build_attempts++)) YAPILMAZ!
             continue
         fi
 
         # ── REPLACE_BLOCK ──────────────────────────────────────────────────
         if echo "$ai_response" | grep -q "^REPLACE_BLOCK:"; then
+            ((build_attempts++)) # BURADA SAYACI ARTTIRIYORUZ (Sadece kod değiştiğinde)
+            
             local rp=$(echo "$ai_response" | grep "^REPLACE_BLOCK:" | head -1 | cut -d: -f2- | xargs)
             local search_text=$(echo "$ai_response" | awk '/^<<<SEARCH/{found=1; next} /^===/{found=0} found{print}')
             local replace_text=$(echo "$ai_response" | awk '/^>>>REPLACE/{found=1; next} /^>>>END/{found=0} found{print}')
 
-            log "REPLACE deneniyor: $rp"
+            log "REPLACE deneniyor (Build Testi $build_attempts): $rp"
             local replace_output
             if replace_output=$(apply_search_replace "$rp" "$search_text" "$replace_text" 2>&1); then
                 ok "Kod doğrulandı ve değiştirildi."
                 
-                # Çözüm uygulandı, gerçek build al ve test et
                 log "Build alınıyor ve test ediliyor..."
                 cd "$PROJECT_ROOT"
                 ./gradlew assembleDebug --no-daemon > "$TMP_DIR/sf_build.txt" 2>&1 || true
@@ -212,7 +228,7 @@ main() {
                 else
                     warn "Kod değişti ama hata sayısı artmış veya aynı kalmış ($INITIAL_ERRORS -> $new_errors)."
                     rollback_all # İşe yaramayan çözümü geri al
-                    user_msg="Yazdığın kod hataları azaltmadı. Rollback yapıldı. Farklı bir çözüm düşün.\nYENİ BUILD ÇIKTISI:\n$(head -60 "$TMP_DIR/sf_build.txt")"
+                    user_msg="Yazdığın kod hataları azaltmadı. Rollback yapıldı. Farklı bir çözüm düşün.\nYENİ BUILD ÇIKTISI:\n$(head -n 60 "$TMP_DIR/sf_build.txt")"
                 fi
             else
                 warn "Replace uygulanamadı veya doğrulanamadı."
@@ -224,7 +240,7 @@ main() {
         user_msg="Geçerli bir CMD veya REPLACE_BLOCK formatı bulunamadı. Lütfen kurallara uy."
     done
 
-    err "$MAX_ATTEMPTS denemede hata çözülemedi."
+    err "$MAX_BUILD_ATTEMPTS build denemesi aşıldı ve hata çözülemedi."
     rollback_all
     exit 1 # Başarısız, Autofix'e orijinal haliyle teslim et
 }
