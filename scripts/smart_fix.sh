@@ -286,8 +286,9 @@ main() {
     local has_read_file=0             # AI en az bir CMD verdiyse 1
     local cmd_streak=0                # Build olmadan art arda kaç CMD verildi
     local last_cmd=""                 # Tekrar eden CMD tespiti
+    local api_fail_streak=0           # <--- YENİ: API çökme sayacı
 
-    while [[ $build_attempts -lt $MAX_BUILD_ATTEMPTS && $api_calls -lt $MAX_API_CALLS ]]; do
+        while [[ $build_attempts -lt $MAX_BUILD_ATTEMPTS && $api_calls -lt $MAX_API_CALLS ]]; do
         api_calls=$((api_calls + 1))
 
         if [[ $build_attempts -eq 0 ]]; then
@@ -300,9 +301,22 @@ main() {
         [[ -n "$conversation" ]] && full_msg="${conversation}\n\n---\n${user_msg}"
 
         local ai_response
-        ai_response=$(call_ai "$SYSTEM_PROMPT" "$full_msg") || { err "API yanıt vermedi."; sleep 2; continue; }
+        if ! ai_response=$(call_ai "$SYSTEM_PROMPT" "$full_msg"); then
+            err "API yanıt vermedi."
+            api_fail_streak=$((api_fail_streak + 1))
+            if [[ $api_fail_streak -ge 2 ]]; then
+                warn "Hafıza şişti, geçmiş temizleniyor..."
+                conversation=""
+                user_msg="SİSTEM: API limiti aşıldı. Geçmiş silindi. Lütfen doğrudan REPLACE_BLOCK ver."
+                api_fail_streak=0
+            fi
+            sleep 2
+            continue
+        fi
         [[ -z "$ai_response" ]] && { err "API boş yanıt döndü."; continue; }
         conversation="${full_msg}\n\nAI: ${ai_response}"
+        api_fail_streak=0
+
 
         # ── REPLACE_BLOCK, hiç dosya okumadan geldi → reddet + otomatik oku ──
         if echo "$ai_response" | grep -q "^REPLACE_BLOCK:" && [[ $has_read_file -eq 0 ]]; then
@@ -324,7 +338,19 @@ main() {
             local cmd
             cmd=$(echo "$ai_response" | grep "^CMD:" | head -1 | sed 's/^CMD: *//')
 
-            # Aynı komutu tekrar veriyor mu? → engelle + tüm dosyayı gönder
+            # 1. KONTROL: LİMİT AŞILDI MI? (BU KESİNLİKLE EN ÜSTTE OLMALI)
+            if [[ $cmd_streak -ge $MAX_CMD_WITHOUT_REPLACE ]]; then
+                warn "CMD limiti aşıldı ($cmd_streak/$MAX_CMD_WITHOUT_REPLACE) — REPLACE_BLOCK zorlanıyor."
+                local forced_contents
+                forced_contents=$(collect_error_file_contents "$ERROR_LOG")
+                user_msg="CMD LİMİTİ AŞILDI: $cmd_streak komut çalıştırdın, hâlâ REPLACE_BLOCK vermedin.\n\nTÜM HATALI DOSYALAR (satır numaralı):\n${forced_contents}\n\nARTIK SADECE REPLACE_BLOCK ver. CMD yasak bu turda."
+                cmd_streak=0
+                last_cmd=""
+                conversation=""  # <--- ÖNEMLİ: Kısır döngüyü kırmak için hafızayı temizle
+                continue
+            fi
+
+            # 2. KONTROL: TEKRAR EDEN KOMUT MU?
             if [[ -n "$last_cmd" && "$cmd" == "$last_cmd" ]]; then
                 warn "Tekrar eden CMD engellendi: '$cmd'"
                 local dup_file
@@ -335,17 +361,6 @@ main() {
                 fi
                 user_msg="TEKRAR EDEN CMD ENGELLENDİ: Bu komutu zaten çalıştırdın, aynı çıktıyı alırsın.\n\nDOSYA TAM İÇERİK (satır numaralı):\n${dup_content}\n\nARTIK REPLACE_BLOCK ver. Daha fazla CMD verme."
                 cmd_streak=$((cmd_streak + 1))
-                continue
-            fi
-
-            # CMD streak limiti aşıldı → tüm hatalı dosyaları gönder, REPLACE zorla
-            if [[ $cmd_streak -ge $MAX_CMD_WITHOUT_REPLACE ]]; then
-                warn "CMD limiti aşıldı ($cmd_streak/$MAX_CMD_WITHOUT_REPLACE) — REPLACE_BLOCK zorlanıyor."
-                local forced_contents
-                forced_contents=$(collect_error_file_contents "$ERROR_LOG")
-                user_msg="CMD LİMİTİ AŞILDI: $cmd_streak komut çalıştırdın, hâlâ REPLACE_BLOCK vermedin.\n\nTÜM HATALI DOSYALAR (satır numaralı):\n${forced_contents}\n\nARTIK SADECE REPLACE_BLOCK ver. CMD yasak bu turda."
-                cmd_streak=0
-                last_cmd=""
                 continue
             fi
 
