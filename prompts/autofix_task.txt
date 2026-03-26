@@ -1,3 +1,43 @@
+=== SENIOR AI TAVSİYESİ ===
+**Analiz:**
+Junior AI 4. denemede döngüye girmiş. Mod `af` (hata düzeltme) ama AI yeni dosya listesi verip duruyor. Hata satırı 867'de `Button` composable'ı kapatılmamış ve `GameColors` unresolved. AI bunu görmeyip proje yapısını tekrarlıyor.
+
+**Junior AI'a Net Talimatlar:**
+
+1. **Hata satırı 867'ye odaklan:** `Button` composable'ı yarım kalmış. `)` parantezini kapat ve `modifier` ekle:
+   ```kotlin
+   modifier = Modifier.size(120.dp, 48.dp)
+   ```
+
+2. **GameColors unresolved reference:** `GameScreen.kt` dosyasına şu import'u ekle:
+   ```kotlin
+   import com.wizaicorp.scrolling.ui.theme.GameColors
+   ```
+   Eğer tema dosyası farklı paketteyse (örneğin `com.wizaicorp.scrolling.theme`), import'u ona göre düzelt.
+
+3. **Eksik import'ları kontrol et:** `Balloon`, `ConfettiParticle`, `CelebrationMessage` composable'ları için gerekli import'ları ekle. Muhtemelen aynı pakette oldukları için import gerekmez ama eğer farklı dosyadaysa:
+   ```kotlin
+   import com.wizaicorp.scrolling.components.Balloon
+   ```
+
+4. **calculateDropSlot fonksiyonu tanımlı değil:** Aynı dosyaya bu fonksiyonu ekle:
+   ```kotlin
+   private fun calculateDropSlot(offset: Offset, slotCount: Int): Int {
+       // Basit implementasyon
+       val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+       val slotWidth = screenWidth / slotCount
+       val index = (offset.x / slotWidth.value).toInt()
+       return if (index in 0 until slotCount) index else -1
+   }
+   ```
+   Bunun için `LocalConfiguration` import'u gerek:
+   ```kotlin
+   import androidx.compose.ui.platform.LocalConfiguration
+   ```
+
+5. **Dosya listesi vermeyi bırak:** Hata düzeltme modundasın, yeni dosya oluşturma. Sadece verilen `GameScreen.kt` dosyasındaki hataları düzelt.
+=========================
+
 !!! MUTLAK TASARIM KORUMA KURALI — EN YÜKSEK ÖNCELİK !!!
 Kullanıcı yeni özellik veya değişiklik istiyorsa:
 - Mevcut renkleri (Color değerlerini) KESİNLİKLE DEĞIŞTIRME

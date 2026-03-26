@@ -433,7 +433,7 @@ main() {
                 # Kontrol: yeni kod dosyada var mı?
                 local check_line
                 check_line=$(echo "$replace_text" | grep -v '^\s*$' | head -1 \
-                                | sed 's/^[[:space:]]*//' | cut -c1-60)
+                                | sed 's/^[[:space:]]*//' | cut -c1-60 || true)
                 if [[ -n "$check_line" ]]; then
                     local verify_out
                     verify_out=$(grep -Fn "$check_line" "$PROJECT_ROOT/$rp" 2>/dev/null | head -3 || echo "")
