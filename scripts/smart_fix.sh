@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# smart_fix.sh v7
+# smart_fix.sh v6
 # Kullanım: bash smart_fix.sh <proje_dizini> <hata_log> [görev] [loop] [max_loops]
 
 set -euo pipefail
@@ -72,31 +72,8 @@ load_system_prompt() {
     if [[ -f "$prompt_file" ]]; then
         cat "$prompt_file"
     else
-        # Fallback: dosya yoksa yerleşik prompt kullan
-        cat << 'PROMPT'
-Sen nokta atışı Kotlin/Android hata düzelten bir uzmansın.
-
-ZORUNLU AKIŞ — BU SIRAYA UY:
-1. İLK ADIM DAIMA CMD'dir. Önce dosyayı oku.
-2. CMD ile cat/grep/sed kullan (okuma). Build sayılmaz, sınırsız.
-3. Dosyayı okuduktan sonra REPLACE_BLOCK ver.
-4. <<<SEARCH bloğu: dosyada AYNEN olan satırları yaz — boşluk ve indent dahil birebir kopyala.
-5. REPLACE başarısız olursa: CMD ile o satır aralığını tekrar oku, tam kopyala, sonra tekrar REPLACE_BLOCK ver.
-6. Tüm dosyayı ASLA yazma.
-
-FORMAT — sadece bunlardan birini yaz:
-
-CMD: cat app/src/main/java/.../Dosya.kt
-
-veya:
-
-REPLACE_BLOCK: app/src/main/java/.../Dosya.kt
-<<<SEARCH
-[dosyada AYNEN olan satırlar]
-===
-[yeni hali]
->>>END
-PROMPT
+        echo "HATA: Prompt dosyası bulunamadı: $prompt_file" >&2
+        exit 1
     fi
 }
 
@@ -311,7 +288,7 @@ main() {
     local last_cmd=""                 # Tekrar eden CMD tespiti
     local api_fail_streak=0           # <--- YENİ: API çökme sayacı
 
-    while [[ $build_attempts -lt $MAX_BUILD_ATTEMPTS && $api_calls -lt $MAX_API_CALLS ]]; do
+        while [[ $build_attempts -lt $MAX_BUILD_ATTEMPTS && $api_calls -lt $MAX_API_CALLS ]]; do
         api_calls=$((api_calls + 1))
 
         if [[ $build_attempts -eq 0 ]]; then
@@ -384,13 +361,23 @@ main() {
             # 2. KONTROL: TEKRAR EDEN KOMUT MU?
             if [[ -n "$last_cmd" && "$cmd" == "$last_cmd" ]]; then
                 warn "Tekrar eden CMD engellendi: '$cmd'"
+                last_cmd=""
                 local dup_file
                 dup_file=$(echo "$cmd" | grep -oE '[a-zA-Z0-9_./-]+\.kt' | head -1 || echo "")
                 local dup_content=""
                 if [[ -n "$dup_file" && -f "$PROJECT_ROOT/$dup_file" ]]; then
-                    dup_content=$(cat "$PROJECT_ROOT/$dup_file" | head -n 200 | cat -n)
+                    local dup_err_line
+                    dup_err_line=$(grep -oE "${dup_file##*/}:[0-9]+" "$ERROR_LOG" 2>/dev/null | head -1 | cut -d: -f2 || echo "")
+                    if [[ -n "$dup_err_line" ]]; then
+                        local dfrom=$(( dup_err_line > 25 ? dup_err_line - 25 : 1 ))
+                        local dto=$(( dup_err_line + 25 ))
+                        dup_content=$(sed -n "${dfrom},${dto}p" "$PROJECT_ROOT/$dup_file" | cat -n)
+                        log "Hata çevresi otomatik okundu: satır $dfrom-$dto"
+                    else
+                        dup_content=$(cat "$PROJECT_ROOT/$dup_file" | head -n 200 | cat -n)
+                    fi
                 fi
-                user_msg="TEKRAR EDEN CMD ENGELLENDİ: Bu komutu zaten çalıştırdın, aynı çıktıyı alırsın.\n\nDOSYA TAM İÇERİK (satır numaralı):\n${dup_content}\n\nARTIK REPLACE_BLOCK ver. Daha fazla CMD verme."
+                user_msg="TEKRAR EDEN CMD ENGELLENDİ: '${cmd}'\nBu komutu zaten çalıştırdın.\n\nHATA SATIRI ÇEVRESİ (satır numaralı):\n${dup_content}\n\nBu kodu esas alarak REPLACE_BLOCK ver."
                 cmd_streak=$((cmd_streak + 1))
                 continue
             fi
@@ -533,10 +520,15 @@ main() {
                     if [[ -n "$old_error_sig" ]] && grep -Fq "$old_error_sig" "$TMP_DIR/sf_build.txt"; then
                         warn "Hata ARTTI ($INITIAL_ERRORS → $new_errors) VE asıl hata ÇÖZÜLEMEDİ! Geri alınıyor..."
                         restore_snapshot
+                        # Rollback sonrası tüm sayaçları sıfırla — temiz tur başlasın
+                        build_attempts=0
                         has_read_file=0
+                        cmd_streak=0
+                        last_cmd=""
+                        conversation=""
                         local build_err_short
                         build_err_short=$(grep -E "^e:|error:|Unresolved" "$ERROR_LOG" | head -20)
-                        user_msg="SİSTEM UYARISI: Yazdığın kod asıl hatayı ÇÖZMEDİĞİ gibi, toplam hatayı $INITIAL_ERRORS'ten $new_errors'e ÇIKARDI!\nBu yüzden düzeltmen REDDEDİLDİ ve dosya anında eski haline (geri) alındı.\n\nMEVCUT HATALAR:\n${build_err_short}\n\nAYNI KODU TEKRAR YAZMA. Önce CMD ile dosyayı oku ve mantığını tamamen değiştir."
+                        user_msg="SİSTEM UYARISI: Yazdığın kod asıl hatayı ÇÖZMEDİĞİ gibi, toplam hatayı $INITIAL_ERRORS'ten $new_errors'e ÇIKARDI!\nBu yüzden düzeltmen REDDEDİLDİ ve dosya eski haline alındı.\n\nMEVCUT HATALAR:\n${build_err_short}\n\nAYNI KODU TEKRAR YAZMA. Önce CMD ile dosyayı oku."
                     else
                         # Eski hata logdan silinmiş, ama derleyici yeni hatalar bulmuş (Sistem İlerledi!)
                         ok "Hata arttı ($INITIAL_ERRORS → $new_errors) AMA asıl hata çözülmüş! (Derleyici körlüğü kalktı)"

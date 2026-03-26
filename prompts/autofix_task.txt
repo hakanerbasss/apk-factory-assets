@@ -1,4 +1,56 @@
 === SENIOR AI TAVSİYESİ ===
+**ANALİZ SONUCU:**
+
+1. **Junior AI 5. denemede döngüde (AF modu - hata düzeltme).** Aynı hatayı tekrarlıyor çünkü Senior AI'ın verdiği talimatı tamamlamadı. Talimatın 2. maddesinde `ControlButtons` fonksiyonunu tamamlaması istenmişti, ancak Junior AI kodu yarım bıraktı.
+
+2. **Somut hata:** `GameScreen.kt` dosyasının **877. satırında** `Row(` ifadesi başladı ama fonksiyon gövdesi ve kapanış parantezi eksik. Bu nedenle "Unresolved reference" hatası alınıyor.
+
+3. **Çözüm:** Junior AI, Senior AI'ın verdiği **tam kodu** kopyalayıp `ControlButtons` fonksiyonunun sonuna eklemeli. Mevcut kodu silip yeniden yazmaya çalışmamalı.
+
+---
+
+**JUNIOR AI'A NET TALİMATLAR (3 MADDE):**
+
+1.  **Dosya:** `GameScreen.kt`'yi aç. **877. satırdan itibaren** (yani `Row(` satırından başlayarak) `ControlButtons` fonksiyonunun **tamamını** aşağıdaki kodla **DEĞİŞTİR**:
+
+    ```kotlin
+    ) {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Button(
+                onClick = onReset,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isDarkTheme) GameColors.secondaryLight else GameColors.secondaryDark
+                )
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Sıfırla")
+            }
+    
+            Button(
+                onClick = onNextWord,
+                enabled = isCompleted,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isDarkTheme) GameColors.primaryLight else GameColors.primaryDark
+                )
+            ) {
+                Icon(Icons.Default.ArrowForward, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Sonraki Kelime")
+            }
+        }
+    }
+    ```
+
+2.  **Kontrol et:** Fonksiyonun tamamlandığından emin ol. `ControlButtons(` ile başlayıp en sonunda `}` ile bitmeli. Eksik parantez veya süslü parantez bırakma.
+
+3.  **Başka bir şey yapma:** Sadece bu fonksiyonu düzelt. Importları veya projenin diğer kısımlarını değiştirmeye çalışma. Senior AI'ın ilk talimatı zaten importları düzeltmişti.
+=========================
+
+=== SENIOR AI TAVSİYESİ ===
 **Analiz Sonucu:**
 
 1. **Junior AI döngüde (6. deneme) ve mod AF (hata düzeltme).** Aynı import hatalarını tekrarlıyor çünkü her seferinde tüm projeyi yeniden yazmaya çalışıyor, somut hata satırlarını düzeltmiyor.
