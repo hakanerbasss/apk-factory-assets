@@ -278,7 +278,7 @@ main() {
     local conversation=""
 
     local MAX_BUILD_ATTEMPTS=5
-    local MAX_API_CALLS=35
+    local MAX_API_CALLS=80
     local MAX_CMD_WITHOUT_REPLACE=5   # Art arda bu kadar CMD sonrası REPLACE zorla
     local build_attempts=0
     local api_calls=0
@@ -505,9 +505,16 @@ main() {
         user_msg="Geçersiz format. Sadece 'CMD: <komut>' veya 'REPLACE_BLOCK: ...' yaz."
     done
 
-    err "$MAX_BUILD_ATTEMPTS build denemesi tükendi, hata çözülemedi."
+    # Döngü kırıldı. Sebebi API limiti mi yoksa Build limiti mi?
+    if [[ $api_calls -ge $MAX_API_CALLS ]]; then
+        err "API çağrı limiti ($MAX_API_CALLS) doldu, işlem zorunlu kesildi."
+    else
+        err "Maksimum build denemesi ($MAX_BUILD_ATTEMPTS) tükendi, hata çözümsüz kaldı."
+    fi
+
     restore_snapshot
     exit 1
+
 }
 
 main
