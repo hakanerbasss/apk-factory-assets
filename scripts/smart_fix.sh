@@ -352,7 +352,7 @@ main() {
             if is_safe_cmd "$cmd"; then
                 last_cmd="$cmd"
                 cmd_streak=$((cmd_streak + 1))
-                log "Komut çalıştırılıyor (Build sayılmaz, streak: $cmd_streak/$MAX_CMD_WITHOUT_REPLACE): $cmd"
+                log "Komut çalıştırılıyor (Sonuç bekleniyor, streak: $cmd_streak/$MAX_CMD_WITHOUT_REPLACE): $cmd"
                 cd "$PROJECT_ROOT"
                 local cmd_out
                 cmd_out=$(eval "$cmd" 2>&1 || true)
@@ -449,6 +449,8 @@ main() {
                     ok "Hatalar azaldı ($INITIAL_ERRORS → $new_errors). Devam..."
                     cp "$TMP_DIR/sf_build.txt" "$ERROR_LOG"
                     INITIAL_ERRORS=$new_errors
+                    take_snapshot
+                    build_attempts=0
                     local new_err_text
                     new_err_text=$(grep -E "^e:|error:|Unresolved|AAPT|Exception" \
                                     "$TMP_DIR/sf_build.txt" | head -30)
