@@ -1166,7 +1166,6 @@ print(json.dumps({'model':'$s_model','max_tokens':8000,'system':sp,'messages':[{
             fi
             # Smart Fix başarısız → döngü DEVAM ETSİN (return 1 değil continue)
             warn "Smart Fix başarısız — Autofix döngüsü devam ediyor ($loop/$MAX_LOOPS)..."
-            continue
         fi
         if ! call_ai "$ef" "$src"; then
             # Geçici prompt varsa geri yükle
@@ -1380,7 +1379,8 @@ for p in set(paths):
             exit 0
         else
             err "Smart Fix görevi tamamlayamadı."
-            exit 1
+            run_autofix "$user_task"
+            exit $?
         fi
     else
         # --- YENİ EKLENEN KISIM: ORKESTRATÖR BAŞARILIYSA ---
