@@ -1298,7 +1298,7 @@ for p in set(paths):
         is_new_project=true
     fi
     
-    # --- AKILLI MOD SECIMI ---
+        # --- AKILLI MOD SECIMI ---
     local GOREV_KARMASIKLIK="basit"
     local kelime_sayisi=$(echo "$user_task" | wc -w)
     local karmasik_kelimeler="database|firebase|api|retrofit|room|navigation|multi|screen|sayfa|multi-screen|tab|fragment|recyclerview|viewmodel|repository|ağ|network|server|login|auth|register|harita|map"
@@ -1306,7 +1306,8 @@ for p in set(paths):
         GOREV_KARMASIKLIK="karmasik"
     fi
 
-    if [[ -f "$ork_script" ]] && [[ "$is_new_project" == "true" ]]; then  # Sadece YENİ proje → orkestratör
+    # 1. YENİ PROJE VE KARMAŞIK GÖREV -> ORKESTRATÖR
+    if [[ -f "$ork_script" ]] && [[ "$is_new_project" == "true" ]] && [[ "$GOREV_KARMASIKLIK" == "karmasik" ]]; then
         echo -e "${YELLOW}🏗️ Orkestratör: Proje planlanıyor ve dosya dosya yazılıyor...${NC}"
         local ork_pkg="${P_PKG:-com.wizaicorp.$(basename $PROJECT_ROOT | tr '-' '_')}"
         
@@ -1327,9 +1328,27 @@ for p in set(paths):
         else
             warn "Orkestratör başarısız — eski yönteme düşülüyor..."
         fi
+
+    # 2. YENİ PROJE AMA BASİT GÖREV -> TEK GEÇİŞ (Single Pass)
+    elif [[ "$is_new_project" == "true" ]] && [[ "$GOREV_KARMASIKLIK" == "basit" ]]; then
+        echo -e "${YELLOW}⚡ Basit Görev: Tek geçiş (Single Pass) ile hızlıca yazılıyor...${NC}"
+        local dummy_errors="$TMP_DIR/dummy_errors.txt"
+        echo "GÖREV MODU" > "$dummy_errors"
+        if call_ai "$dummy_errors" "$collected"; then
+            if apply_fixes; then
+                ok "Kodlar başarıyla yazıldı! Test ediliyor..."
+                run_autofix "$user_task"
+                exit $?
+            fi
+        fi
+        err "Tek geçiş başarısız oldu."
+        exit 1
+
+    # 3. MEVCUT ESKİ PROJE VEYA ORKESTRATÖR YOKSA
     else
-        warn "Eski proje tespit edildi — Smart Fix moduna geçiliyor..."
+        warn "Mevcut proje tespit edildi — Smart Fix moduna geçiliyor..."
     fi
+
 
     # Eski proje: direkt Smart Fix'e devret
     if [[ "$ork_success" != "true" ]]; then
