@@ -2,7 +2,7 @@
 # smart_fix.sh v6
 # Kullanım: bash smart_fix.sh <proje_dizini> <hata_log> [görev] [loop] [max_loops]
 
-set -euo pipefail
+set +e
 
 PROJECT_ROOT="${1:-}"
 ERROR_LOG="${2:-}"

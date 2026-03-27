@@ -1042,7 +1042,7 @@ ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B
         err "Build başarısız"
 
         # --- HATA YOGUNLUK KONTROLU ---
-        HATALI_DOSYA_SAYISI=$(grep -c "^e:" "$TMP_DIR/build_output.txt" 2>/dev/null || echo 0)
+        HATALI_DOSYA_SAYISI=$(grep -c "^e:" "$TMP_DIR/build_output.txt" 2>/dev/null)
         if [[ "$HATALI_DOSYA_SAYISI" -gt 15 && "$loop" -le 2 ]]; then
             warn "Cok fazla hata ($HATALI_DOSYA_SAYISI) — kod cok bozuk, sifirdan yazmak daha verimli"
             warn "Orkestrator/tek gecis tekrar denenecek..."
