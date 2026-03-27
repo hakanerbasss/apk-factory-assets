@@ -160,7 +160,8 @@ collect_error_file_contents() {
 # ── SEARCH/REPLACE Python motoru ─────────────────────────────────────────────
 apply_search_replace() {
     local rel_path="$1" search_text="$2" replace_text="$3"
-    local abs_path="$PROJECT_ROOT/$rel_path"
+    local abs_path="$rel_path"
+    [[ "$rel_path" != /* ]] && abs_path="$PROJECT_ROOT/$rel_path"
     [[ ! -f "$abs_path" ]] && { echo "HATA: Dosya yok: $abs_path"; return 1; }
 
     python3 - "$abs_path" "$search_text" "$replace_text" << 'PYEOF'
