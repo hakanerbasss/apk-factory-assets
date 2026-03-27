@@ -53,8 +53,8 @@ read -p "$(echo -e "${Y}Yapay Zekaya Görevi Ver (Örn: Bilimsel hesap makinesi 
 if [ -z "$AI_PROMPT" ]; then echo -e "${R}Görev boş olamaz!${NC}"; exit 1; fi
 
 # 2. OTOMATİK DEĞİŞKENLER (Arka planda uydurulur)
-# Tireleri alt çizgiye çevirerek wizaicorp paket adını oluştur
-P_PKG="${PKG_OVERRIDE:-com.wizaicorp.$(echo $P_NAME | tr '-' '_' | sed 's/^[0-9]/app&/')}"
+# Tireleri tamamen silerek wizaicorp paket adını oluştur (Sıfır Hata)
+P_PKG="${PKG_OVERRIDE:-com.wizaicorp.$(echo $P_NAME | tr -d '-' | tr -d '_' | sed 's/^[0-9]/app&/')}"
 
 # --- YENİ: KEYSTORE ŞİFRESİNİ AYARLARDAN ÇEK ---
 SAVED_PASS=$(grep "^KEYSTORE_PASS=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 | tr -d '"')
