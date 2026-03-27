@@ -272,8 +272,8 @@ main() {
 
     # 3. İlk mesaj: hata + hatalı dosya içerikleri birlikte
     local error_text
-    error_text=$(grep -E "^e:|error:|Unresolved|AAPT|Exception" "$ERROR_LOG" | head -40 \
-                    || tail -40 "$ERROR_LOG")
+    error_text=$(tail -n 60 "$ERROR_LOG")
+
     local file_contents
     file_contents=$(collect_error_file_contents "$ERROR_LOG")
     local task_context=""
@@ -525,8 +525,7 @@ main() {
                     take_snapshot
                     build_attempts=0
                     local new_err_text
-                    new_err_text=$(grep -E "^e:|error:|Unresolved|AAPT|Exception" \
-                                    "$TMP_DIR/sf_build.txt" | head -30)
+                    new_err_text=$(tail -n 60 "$TMP_DIR/sf_build.txt")
                     local new_file_contents
                     new_file_contents=$(collect_error_file_contents "$TMP_DIR/sf_build.txt")
                     has_read_file=0
@@ -559,7 +558,7 @@ main() {
                         take_snapshot  # <--- Hata artsa bile İLERLEME olduğu için yedeği alıyoruz!
                         build_attempts=0
                         local new_err_text
-                        new_err_text=$(grep -E "^e:|error:|Unresolved|AAPT|Exception" "$TMP_DIR/sf_build.txt" | head -30)
+                        new_err_text=$(tail -n 60 "$TMP_DIR/sf_build.txt")
                         local new_file_contents
                         new_file_contents=$(collect_error_file_contents "$TMP_DIR/sf_build.txt")
                         has_read_file=0
