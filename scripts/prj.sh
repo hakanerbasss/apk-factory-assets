@@ -51,14 +51,38 @@ detect_project() {
 
 # ── Versiyon oku ────────────────────────────────────────────────────────────
 get_version() {
-    # Sadece rakamları yakala (aradaki = veya { işaretlerini yoksayar)
-    V_CODE=$(grep "versionCode" "$GRADLE_FILE" | grep -v "//" | head -1 | grep -oP '\d+' | head -1)
-    V_NAME=$(grep "versionName" "$GRADLE_FILE" | grep -v "//" | head -1 | tr -d '"\n\r ' | grep -oP '[\d\.]+' | head -1)
+    # 1. V_CODE: Rakamı bul ve boruyu izle
+    V_CODE_RAW=$(grep "versionCode" "$GRADLE_FILE" | \
+                 grep -v "//" | \
+                 head -1 | \
+                 grep -oP '\d+' | \
+                 head -1; \
+                 exit ${PIPESTATUS[0]})
     
-    # Boş dönme ihtimaline karşı varsayılan değer koruması
+    if [ $? -eq 141 ]; then
+        echo -e "${Y}[DEBUG] 🛠️ Boru [PRJ-VCode] hattında kesildi.${NC}"
+    fi
+    V_CODE=$V_CODE_RAW
+
+    # 2. V_NAME: Metni temizle ve boruyu izle
+    V_NAME_RAW=$(grep "versionName" "$GRADLE_FILE" | \
+                 grep -v "//" | \
+                 head -1 | \
+                 tr -d '"\n\r ' | \
+                 grep -oP '[\d\.]+' | \
+                 head -1; \
+                 exit ${PIPESTATUS[0]})
+
+    if [ $? -eq 141 ]; then
+        echo -e "${Y}[DEBUG] 🛠️ Boru [PRJ-VName] hattında kesildi.${NC}"
+    fi
+    V_NAME=$V_NAME_RAW
+
+    # Varsayılan değerler
     [ -z "$V_CODE" ] && V_CODE=1
     [ -z "$V_NAME" ] && V_NAME="1.0"
 }
+
 
 # ── Versiyon arttır ─────────────────────────────────────────────────────────
 bump_version() {
