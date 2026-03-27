@@ -1374,10 +1374,11 @@ for p in set(paths):
         # Icerigi goreve dahil et ki Smart Fix kör kalmasin
         local task_with_context="$user_task\n\n=== İLGİLİ DOSYALAR ===\n$(cat "$collected")"
         if SMART_FIX_PROMPT="$sf_prompt_file" bash "$sf" "$PROJECT_ROOT" "$dummy_log" "$task_with_context" "1" "$MAX_LOOPS"; then
-
-            ok "✅ Smart Fix görevi tamamladı!"
-            exit 0
+            ok "✅ Smart Fix görevi tamamladı! Son bir kontrol için AutoFix döngüsü başlatılıyor..."
+            run_autofix "$user_task"
+            exit $?
         else
+            warn "⚠️ Smart Fix (Mimar) tıkandı veya hata verdi. Bayrak Hata Düzeltme Moduna (Cerrah) devrediliyor..."
             err "Smart Fix görevi tamamlayamadı."
             run_autofix "$user_task"
             exit $?
