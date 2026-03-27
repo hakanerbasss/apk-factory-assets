@@ -130,6 +130,9 @@ for f in sistem.sh prj.sh autofix.sh factory.sh check_updates.sh smart_fix.sh; d
     curl -sf "$GITHUB_RAW/scripts/$f" -o "$SISTEM_DIR/$f" >> "$LOG_FILE" 2>&1 && chmod +x "$SISTEM_DIR/$f"
 done
 
+# Pre-build Validator (Ses ve Hata Kontrolcüsü) indiriliyor
+curl -sf "$GITHUB_RAW/scripts/pre_build_validator.py" -o "$SISTEM_DIR/pre_build_validator.py" >> "$LOG_FILE" 2>&1
+
 # 2. PROJE TASLAKLARINI (GRADLEW VB.) İNDİR VE AÇ
 log "setup.zip indiriliyor..."
 curl -sf "$GITHUB_RAW/setup.zip" -o "$SISTEM_DIR/setup.zip" >> "$LOG_FILE" 2>&1
