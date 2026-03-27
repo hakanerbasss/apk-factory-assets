@@ -1140,16 +1140,6 @@ print(json.dumps({'model':'$s_model','max_tokens':8000,'system':sp,'messages':[{
                         fi
                     fi
                     # ── Senior tavsiyesini task prompt'una ekle ──────────────────────
-                    local orig_task_prompt="$PROMPTS_DIR/autofix_task.txt"
-                    local tmp_task="$TMP_DIR/task_with_senior.txt"
-                    echo "=== SENIOR AI TAVSİYESİ ===" > "$tmp_task"
-                    cat "$advice_file" >> "$tmp_task"
-                    echo "=========================" >> "$tmp_task"
-                    echo "" >> "$tmp_task"
-                    cat "$orig_task_prompt" >> "$tmp_task"
-                    cp "$orig_task_prompt" "$TMP_DIR/autofix_task_backup.txt"
-                    cp "$tmp_task" "$orig_task_prompt"
-                    ok "Senior tavsiyesi task prompt'una eklendi"
                 fi
             fi
         fi
@@ -1166,23 +1156,19 @@ print(json.dumps({'model':'$s_model','max_tokens':8000,'system':sp,'messages':[{
 
             if bash "$sf" "$PROJECT_ROOT" "$ef" "$sf_task" "$loop" "$MAX_LOOPS"; then
                 ok "✅ Smart Fix başarılı! Son kontrol için döngü başa sarılıyor..."
-                [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
                 # Sistemi sessizce kapatma! Döngünün başına (run_build aşamasına) gönder ki 
                 # başarıyı onaylayıp kullanıcıya "Kalıcı Yap / Yedeğe Dön" sorusunu sorsun.
                 continue
             fi
             # Smart Fix başarısız → döngü DEVAM ETSİN (return 1 değil continue)
             warn "Smart Fix başarısız — Autofix döngüsü devam ediyor ($loop/$MAX_LOOPS)..."
-            [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
             continue
         fi
         if ! call_ai "$ef" "$src"; then
             # Geçici prompt varsa geri yükle
-            [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt"
             err "API hatası — $((MAX_LOOPS - loop)) deneme kaldı"; sleep 3; continue
         fi
         # Geçici prompt varsa geri yükle
-        [[ -f "$TMP_DIR/autofix_task_backup.txt" ]] && cp "$TMP_DIR/autofix_task_backup.txt" "$PROMPTS_DIR/autofix_task.txt" && rm "$TMP_DIR/autofix_task_backup.txt"
 
         if ! apply_fixes; then
             err "Düzeltme başarısız — $((MAX_LOOPS - loop)) deneme kaldı"; sleep 2; continue
