@@ -493,6 +493,15 @@ main() {
                 ok "Kod değiştirildi: $replace_output"
                 replace_fail_streak=0
 
+                # --- OYUN KURUCU: CHECKPOINT (KAYIT NOKTASI) ---
+                # Eğer Görev Modundaysak ve henüz Checkpoint almadıysak:
+                if [[ -n "$TASK" && ${TASK_CHECKPOINT_TAKEN:-0} -eq 0 ]]; then
+                    warn "Görev dosyaya yazıldı! Bu an 'Kayıt Noktası' (Checkpoint) olarak yedekleniyor..."
+                    take_snapshot
+                    TASK_CHECKPOINT_TAKEN=1
+                fi
+                # -----------------------------------------------
+
                 # Kontrol: yeni kod dosyada var mı?
                 local check_line
                 check_line=$(echo "$replace_text" | grep -v '^\s*$' | head -1 \
