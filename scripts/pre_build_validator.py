@@ -239,8 +239,11 @@ def check_resources(kt_files):
                         urllib.request.urlretrieve(mp3, f"{RAW_DIR}/{snd}.mp3")
                         downloaded.add(snd)
                         fix(f"{snd}.mp3 indirildi (Freesound)")
-                except:
+
+                except Exception as e:
+                    warn(f"Freesound API limit doldu veya hata olustu: {e}")
                     break  # API limit veya hata
+
         except ImportError:
             pass
 
