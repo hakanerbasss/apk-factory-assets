@@ -1361,16 +1361,11 @@ for p in set(paths):
             err "Smart Fix bulunamadı: $sf"; exit 1
         fi
 
-        # Görev varsa autofix_system.txt + smart_fix_system.txt birleşik prompt yaz
-        local sf_prompt_file="$TMP_DIR/sf_combined_prompt.txt"
-        local sf_sys="$PROMPTS_DIR/smart_fix_system.txt"
-        local af_sys="$PROMPTS_DIR/autofix_task.txt"
-        if [[ ! -f "$sf_sys" ]]; then err "HATA: smart_fix_system.txt bulunamadı!"; exit 1; fi
-        cat "$sf_sys" > "$sf_prompt_file"
-        if [[ -f "$af_sys" ]]; then
-            echo "" >> "$sf_prompt_file"
-            echo "── GÖREV MODU EK KURALLARI ──" >> "$sf_prompt_file"
-            cat "$af_sys" >> "$sf_prompt_file"
+        # GÖREV MODU — ARTIK BİRLEŞTİRME YOK, TEK SÜPER PROMPT KULLANIYORUZ
+        local sf_prompt_file="$PROMPTS_DIR/smart_fix_system.txt"
+        if [[ ! -f "$sf_prompt_file" ]]; then
+            err "HATA: smart_fix_system.txt bulunamadı!"
+            exit 1
         fi
 
         log "🔬 Görev Smart Fix'e aktarılıyor: $user_task"
