@@ -61,7 +61,8 @@ SAVED_PASS=$(grep "^KEYSTORE_PASS=" ~/.config/autofix.conf 2>/dev/null | cut -d=
 if [[ -n "$SAVED_PASS" ]]; then
     KS_PASS="$SAVED_PASS"
 else
-    KS_PASS=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 12)
+    KS_PASS=$(tr -dc 'a-zA-Z0-9' < /dev/urandom 2>/dev/null | head -c 12)
+#    KS_PASS="KumsalTest123"
 fi
 # ------------------------------------------------
 KS_ALIAS=$(python3 -c "import sys; s=sys.argv[1].replace('-',''); s=('app'+s) if s and s[0].isdigit() else s; print(s[:12])" "$P_NAME")
