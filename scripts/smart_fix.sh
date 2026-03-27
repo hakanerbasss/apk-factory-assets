@@ -68,7 +68,8 @@ load_provider() {
 
 # ── Sistem Prompt ─────────────────────────────────────────────────────────────
 load_system_prompt() {
-    local prompt_file="/storage/emulated/0/termux-otonom-sistem/prompts/smart_fix_system.txt"
+    # Görev modunda autofix birleşik prompt dosyası gönderir
+    local prompt_file="${SMART_FIX_PROMPT:-/storage/emulated/0/termux-otonom-sistem/prompts/smart_fix_system.txt}"
     if [[ -f "$prompt_file" ]]; then
         cat "$prompt_file"
     else
@@ -491,6 +492,13 @@ main() {
                     else
                         log "Kontrol OK → satır $(echo "$verify_out" | head -1 | cut -d: -f1)"
                     fi
+                fi
+
+                # Validator — build öncesi asset kontrolü
+                local validator="$SISTEM_DIR/pre_build_validator.py"
+                if [[ -f "$validator" ]]; then
+                    log "🔍 Validator çalışıyor..."
+                    python3 "$validator" "$PROJECT_ROOT" 2>&1 || true
                 fi
 
                 # Build al

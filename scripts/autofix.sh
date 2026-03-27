@@ -1328,30 +1328,40 @@ for p in set(paths):
             warn "Orkestratör başarısız — eski yönteme düşülüyor..."
         fi
     else
-        warn "orchestrator.py bulunamadı — eski yöntem kullanılıyor..."
+        warn "Eski proje tespit edildi — Smart Fix moduna geçiliyor..."
     fi
-    
-    # Fallback: Eski tek-geçiş modu
+
+    # Eski proje: direkt Smart Fix'e devret
     if [[ "$ork_success" != "true" ]]; then
-        echo -e "${YELLOW}⚙️ Yapay Zeka kod yazıyor (Tek geçiş)...${NC}"
-        local task_sp_file="$PROMPTS_DIR/autofix_task.txt"
-        if [[ ! -f "$task_sp_file" ]]; then err "HATA: autofix_task.txt bulunamadı!"; exit 1; fi
-        local patch_sp=$(cat "$task_sp_file")
-        local patch_um="GÖREV: $user_task\n\nKAYNAK DOSYALAR:\n$(cat "$collected")"
-        if ! _call_active_ai "$patch_sp" "$patch_um"; then
-             err "Kod üretilemedi."; return 1
+        local sf="$SISTEM_DIR/smart_fix.sh"
+        if [[ ! -f "$sf" ]]; then
+            err "Smart Fix bulunamadı: $sf"; exit 1
+        fi
+
+        # Görev varsa autofix_system.txt + smart_fix_system.txt birleşik prompt yaz
+        local sf_prompt_file="$TMP_DIR/sf_combined_prompt.txt"
+        local sf_sys="$PROMPTS_DIR/smart_fix_system.txt"
+        local af_sys="$PROMPTS_DIR/autofix_system.txt"
+        if [[ ! -f "$sf_sys" ]]; then err "HATA: smart_fix_system.txt bulunamadı!"; exit 1; fi
+        cat "$sf_sys" > "$sf_prompt_file"
+        if [[ -f "$af_sys" ]]; then
+            echo "" >> "$sf_prompt_file"
+            echo "── GÖREV MODU EK KURALLARI ──" >> "$sf_prompt_file"
+            cat "$af_sys" >> "$sf_prompt_file"
+        fi
+
+        log "🔬 Görev Smart Fix'e aktarılıyor: $user_task"
+        local dummy_log="$TMP_DIR/dummy_errors.txt"
+        echo "GÖREV MODU — hata yok, yeni özellik eklenecek" > "$dummy_log"
+
+        if SMART_FIX_PROMPT="$sf_prompt_file" bash "$sf" "$PROJECT_ROOT" "$dummy_log" "$user_task" "1" "$MAX_LOOPS"; then
+            ok "✅ Smart Fix görevi tamamladı!"
+            exit 0
+        else
+            err "Smart Fix görevi tamamlayamadı."
+            exit 1
         fi
     fi
-
-    if ! apply_fixes; then
-         err "Görev koda uygulanamadı."; return 1
-    fi
-
-    echo -e "\n${BOLD}${BLUE}🚀 Görev koda entegre edildi, otomatik derleme (Build & Fix) devralınıyor...${NC}"
-    if ! run_autofix "$user_task"; then
-        exit 1
-    fi
-    exit 0
 }
 
 main() {
