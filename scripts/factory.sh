@@ -61,15 +61,14 @@ SAVED_PASS=$(grep "^KEYSTORE_PASS=" ~/.config/autofix.conf 2>/dev/null | cut -d=
 if [[ -n "$SAVED_PASS" ]]; then
     KS_PASS="$SAVED_PASS"
 else
-    # Hata kanalını (stderr) yakalayıp üzerine 'Keystore' etiketini basıyoruz
-    KS_PASS_RAW=$( (tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 12) 2> >(sed "s/^/${R}[SUÇLU: Keystore-Üretimi] ${NC}/") )
-    
-    # Durum kodunu kontrol et
-    STATUS=${PIPESTATUS[0]}
+    # 1. Komutu bir alt kabukta çalıştırıp durumu dışarı sızdırıyoruz
+    KS_PASS_RAW=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 12; exit ${PIPESTATUS[0]})
+    STATUS=$? # tr komutunun (ilk boğumun) çıkış kodunu yakaladık
 
     if [ "$STATUS" -eq 141 ]; then
-        echo -e "${G}[BİLGİ] 🔍 Boru kontrollü kesildi, şifre başarıyla alındı.${NC}"
+        echo -e "${Y}[DEBUG] 🛠️ Boru [FACTORY-Keystore] hattında kırıldı (Beklenen durum).${NC}"
     fi
+
     KS_PASS=$KS_PASS_RAW
 
 #    KS_PASS=$(tr -dc 'a-zA-Z0-9' < /dev/urandom 2>/dev/null | head -c 12)
