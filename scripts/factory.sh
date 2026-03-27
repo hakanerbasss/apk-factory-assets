@@ -61,7 +61,17 @@ SAVED_PASS=$(grep "^KEYSTORE_PASS=" ~/.config/autofix.conf 2>/dev/null | cut -d=
 if [[ -n "$SAVED_PASS" ]]; then
     KS_PASS="$SAVED_PASS"
 else
-    KS_PASS=$(tr -dc 'a-zA-Z0-9' < /dev/urandom 2>/dev/null | head -c 12)
+    # 1. Komutu bir alt kabukta çalıştırıp durumu manuel dışarı sızdırıyoruz
+    KS_PASS_RAW=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 12; exit ${PIPESTATUS[0]})
+    STATUS=$? # tr komutunun (ilk komut) durumunu yakaladık
+
+    if [ "$STATUS" -eq 141 ]; then
+        echo -e "${Y}[DEBUG] 🛠️ Boru [FACTORY-Keystore] hattında kırıldı (Beklenen durum).${NC}"
+    fi
+
+    KS_PASS=$KS_PASS_RAW
+
+#    KS_PASS=$(tr -dc 'a-zA-Z0-9' < /dev/urandom 2>/dev/null | head -c 12)
 #    KS_PASS="KumsalTest123"
 fi
 # ------------------------------------------------
