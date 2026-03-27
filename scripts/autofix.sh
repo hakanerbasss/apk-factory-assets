@@ -1364,8 +1364,20 @@ for p in set(paths):
             err "Smart Fix görevi tamamlayamadı."
             exit 1
         fi
+    else
+        # --- YENİ EKLENEN KISIM: ORKESTRATÖR BAŞARILIYSA ---
+        log "Orkestratör çıktıları projeye uygulanıyor..."
+        if apply_fixes; then
+            ok "Dosyalar uygulandı! Test ve hata çözümü için AutoFix döngüsü başlatılıyor..."
+            run_autofix "$user_task"
+            exit $?
+        else
+            err "Orkestratör dosyaları uygulanamadı."
+            exit 1
+        fi
     fi
 }
+
 
 main() {
     check_deps
