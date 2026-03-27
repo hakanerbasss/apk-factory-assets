@@ -1042,11 +1042,14 @@ ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B
         err "Build başarısız"
 
         # --- HATA YOGUNLUK KONTROLU ---
+        local tek_gecis_zorla="false"
         HATALI_DOSYA_SAYISI=$(grep -c "^e:" "$TMP_DIR/build_output.txt" 2>/dev/null)
         if [[ "$HATALI_DOSYA_SAYISI" -gt 15 && "$loop" -le 2 ]]; then
             warn "Cok fazla hata ($HATALI_DOSYA_SAYISI) — kod cok bozuk, sifirdan yazmak daha verimli"
             warn "Orkestrator/tek gecis tekrar denenecek..."
+            tek_gecis_zorla="true"
         fi
+
 
         # --- YENİ: Yedek varsa ve bot bozduysa iptal etme şansı ---
         if [[ -f "$BACKUP_MAP" && -s "$BACKUP_MAP" ]]; then
@@ -1146,8 +1149,9 @@ print(json.dumps({'model':'$s_model','max_tokens':8000,'system':sp,'messages':[{
 
         # ── SMART FIX ──
         local sf="$SISTEM_DIR/smart_fix.sh"
-        if [[ -f "$sf" ]]; then
+        if [[ -f "$sf" && "$tek_gecis_zorla" != "true" ]]; then
             log "🔬 Smart Fix devreye giriyor..."
+
             # Senior AI tavsiyesi varsa Smart Fix'e Task olarak aktar
             local sf_task="${TASK_DESCRIPTION:-}"
             if [[ -f "$TMP_DIR/senior_advice.txt" ]]; then
