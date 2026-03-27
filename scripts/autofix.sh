@@ -1364,7 +1364,7 @@ for p in set(paths):
         # Görev varsa autofix_system.txt + smart_fix_system.txt birleşik prompt yaz
         local sf_prompt_file="$TMP_DIR/sf_combined_prompt.txt"
         local sf_sys="$PROMPTS_DIR/smart_fix_system.txt"
-        local af_sys="$PROMPTS_DIR/autofix_system.txt"
+        local af_sys="$PROMPTS_DIR/autofix_task.txt"
         if [[ ! -f "$sf_sys" ]]; then err "HATA: smart_fix_system.txt bulunamadı!"; exit 1; fi
         cat "$sf_sys" > "$sf_prompt_file"
         if [[ -f "$af_sys" ]]; then

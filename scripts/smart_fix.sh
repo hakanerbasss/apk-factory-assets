@@ -266,6 +266,15 @@ main() {
         ERROR_LOG="$TMP_DIR/sf_initial_build.txt"
         INITIAL_ERRORS=$(count_errors "$ERROR_LOG")
         log "Smart Fix başlatıldı. Toplam hata: $INITIAL_ERRORS"
+        # Hata 0 olsa bile GÖREV varsa AI'yı çalışmaya zorla!
+        if [[ $INITIAL_ERRORS -eq 0 ]]; then
+            if [[ -n "$TASK" ]]; then
+                warn "Build hatası yok ama GÖREV (Task) var. Mimar modunda devam ediliyor..."
+            else
+                ok "Build başarılı ve görev yok. İşlem tamam."
+                exit 0
+            fi
+        fi
     fi
 
     # 2. Snapshot
