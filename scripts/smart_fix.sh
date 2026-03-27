@@ -151,8 +151,8 @@ collect_error_file_contents() {
             output+=$(tail -n 20 "$fpath")
         fi
         output+="\n"
-    done < <(grep -oE 'file:///[^ :]+\.(kt|java|xml)' "$build_log" 2>/dev/null \
-                | sed 's|file:///||' | sort -u | head -4)
+    # Termux'ta gradle 'e: /storage/...' ciktisi verir, file:/// sarti kör ediyordu!
+    done < <(grep -oE '/[^ :]+\.(kt|java|xml)' "$build_log" 2>/dev/null | sort -u | head -4)
 
     echo -e "$output"
 }
@@ -254,14 +254,18 @@ main() {
     local SYSTEM_PROMPT
     SYSTEM_PROMPT=$(load_system_prompt)
 
-    # 1. Taze build → güncel hata logu
-    log "Taze build alınıyor..."
-    cd "$PROJECT_ROOT"
-    ./gradlew assembleDebug --no-daemon > "$TMP_DIR/sf_initial_build.txt" 2>&1 || true
-    ERROR_LOG="$TMP_DIR/sf_initial_build.txt"
-    local INITIAL_ERRORS
-    INITIAL_ERRORS=$(count_errors "$ERROR_LOG")
-    log "Smart Fix başlatıldı. Toplam hata: $INITIAL_ERRORS"
+    # 1. Taze build (Eğer GÖREV MODU ise buildi atla ve logu ezme!)
+    local INITIAL_ERRORS=0
+    if grep -q "GÖREV MODU" "$ERROR_LOG" 2>/dev/null; then
+        log "Görev Modu algılandı, gereksiz ilk build atlanıyor..."
+    else
+        log "Taze build alınıyor..."
+        cd "$PROJECT_ROOT"
+        ./gradlew assembleDebug --no-daemon > "$TMP_DIR/sf_initial_build.txt" 2>&1 || true
+        ERROR_LOG="$TMP_DIR/sf_initial_build.txt"
+        INITIAL_ERRORS=$(count_errors "$ERROR_LOG")
+        log "Smart Fix başlatıldı. Toplam hata: $INITIAL_ERRORS"
+    fi
 
     # 2. Snapshot
     take_snapshot

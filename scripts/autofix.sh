@@ -1354,7 +1354,10 @@ for p in set(paths):
         local dummy_log="$TMP_DIR/dummy_errors.txt"
         echo "GÖREV MODU — hata yok, yeni özellik eklenecek" > "$dummy_log"
 
-        if SMART_FIX_PROMPT="$sf_prompt_file" bash "$sf" "$PROJECT_ROOT" "$dummy_log" "$user_task" "1" "$MAX_LOOPS"; then
+        # Icerigi goreve dahil et ki Smart Fix kör kalmasin
+        local task_with_context="$user_task\n\n=== İLGİLİ DOSYALAR ===\n$(cat "$collected")"
+        if SMART_FIX_PROMPT="$sf_prompt_file" bash "$sf" "$PROJECT_ROOT" "$dummy_log" "$task_with_context" "1" "$MAX_LOOPS"; then
+
             ok "✅ Smart Fix görevi tamamladı!"
             exit 0
         else
