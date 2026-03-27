@@ -322,9 +322,11 @@ main() {
             if [[ $api_fail_streak -ge 2 ]]; then
                 warn "Hafıza şişti, geçmiş temizleniyor..."
                 conversation=""
-                user_msg="SİSTEM: API limiti aşıldı. Geçmiş silindi. Lütfen doğrudan REPLACE_BLOCK ver."
+                # Sadece hataları ver ve dosyayı KENDİSİNİN okumasını emret!
+                user_msg="${task_context}SİSTEM: Hafıza şiştiği için sohbet geçmişi silindi.\n\nMEVCUT HATALAR:\n${error_text}\n\nKaldığın yerden devam et. Dosya içeriklerini unuttuysan ezberden YAZMA! Hemen 'CMD: cat' veya 'CMD: grep' kullanarak hatalı dosyayı kendin oku."
                 api_fail_streak=0
             fi
+
             sleep 2
             continue
         fi
