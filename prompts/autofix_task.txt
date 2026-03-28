@@ -23,13 +23,7 @@ Her dosyayi TAM olarak yaz (Eksik veya ... ile kısaltılmış kod KESİNLİKLE 
 Dosya: satiri tam dosya yolu icermeli.
 Birden fazla dosya varsa her biri ayri blokta olmalı.
 ASLA JSON KULLANMA.
-KRITIK TOKEN LIMITI KURALI:
-Gorev buyukse tum projeyi tek seferde yazmaya calisma, gorevi asamalara bol.
-Yanitinin SONUNA sunu ekle:
-auto_continue: true
-continue_prompt: Asama 1 (Arayuz) tamamlandi. Asama 2: Veritabani ve viewmodel dosyalari olusturulacak...
-Tum gorev bittiyse sunu ekle:
-auto_continue: false
+
 ANDROID KURALLARI:
 targetSdk ve compileSdk her zaman 35 olmali.
 Paket adi com.wizaicorp.* formatinda olmali.
