@@ -47,8 +47,8 @@ load_provider() {
 call_ai() {
     local sp="$1" um="$2" out="$ST_TMP/response.json"
     local payload
-    echo "$sp" > "$ST_TMP/sp.txt"
-    echo "$um" > "$ST_TMP/um.txt"
+    printf '%s' "$sp" > "$ST_TMP/sp.txt"
+    printf '%s' "$um" > "$ST_TMP/um.txt"
     payload=$(python3 -c "
 import json, sys
 name, model, tokens = sys.argv[1], sys.argv[2], int(sys.argv[3])
