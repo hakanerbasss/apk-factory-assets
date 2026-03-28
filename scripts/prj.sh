@@ -103,6 +103,43 @@ bump_version() {
     echo -e "  ${DIM}v$V_NAME ($V_CODE)${NC}"
 }
 
+# ── AI Öncesi Otomatik Yedek (Zaman Kapsülü) ──────────────────────────────
+take_pre_ai_backup() {
+    local TASK_MSG="$1"
+    local BKP_DIR="$SISTEM_DIR/yedekler"
+    mkdir -p "$BKP_DIR"
+    local TIMESTAMP=$(date +%Y%m%d-%H%M)
+    
+    # Python scriptinin orijinal dışlama parametreleri
+    local EXCLUDE_FLAGS="--exclude=*/build --exclude=*/.gradle"
+
+    if [ -n "$TASK_MSG" ]; then
+        # Promptun ilk 4 kelimesinden güvenli not üret
+        local SAFE_NOTE=$(echo "$TASK_MSG" | awk '{print $1"_"$2"_"$3"_"$4}' | tr '[:upper:]' '[:lower:]' | tr -dc 'a-z0-9_')
+        [ -z "$SAFE_NOTE" ] && SAFE_NOTE="otonom_gorev"
+        
+        # Tam metni proje içine yaz ki tar komutu onu da içine alsın
+        echo "$TASK_MSG" > "$P_DIR/otonom_gorev_prompt.txt"
+        
+        # ws_bridge.py ile %100 aynı isim formatı
+        local BKP_FILE="$BKP_DIR/${P_NAME}-not(${SAFE_NOTE})-${TIMESTAMP}-yedek.tar.gz"
+        echo -e "  ${DIM}🛡️ Otonom görev öncesi orijinal yedek alınıyor...${NC}"
+        
+        # ws_bridge.py ile %100 aynı paketleme (Üst klasörden paketleme)
+        tar -czf "$BKP_FILE" $EXCLUDE_FLAGS -C "$(dirname "$P_DIR")" "$(basename "$P_DIR")" 2>/dev/null
+        
+        # Operasyon sonrası TXT dosyasını sil ki ortalık kirlenmesin
+        rm -f "$P_DIR/otonom_gorev_prompt.txt"
+    else
+        # AutoFix modu için not
+        local BKP_FILE="$BKP_DIR/${P_NAME}-not(autofix_hata_cozumu)-${TIMESTAMP}-yedek.tar.gz"
+        echo -e "  ${DIM}🛡️ AutoFix hata çözümü öncesi orijinal yedek alınıyor...${NC}"
+        
+        tar -czf "$BKP_FILE" $EXCLUDE_FLAGS -C "$(dirname "$P_DIR")" "$(basename "$P_DIR")" 2>/dev/null
+    fi
+
+    echo -e "  ${G}✅ Orijinal Kod Güvende:${NC} $(basename "$BKP_FILE")"
+}
 
 # ══════════════════════════════════════════════════════════════════
 # d  — Build debug APK
@@ -474,6 +511,7 @@ if [ -n "$1" ]; then
                 echo -e "${R}❌ Görev belirtmedin! Örnek: prj e \"görev metni\"${NC}"
             else
                 export P_PKG="$P_PKG"; export P_NAME="$P_NAME"
+                take_pre_ai_backup "$2"
                 bash "$AUTOFIX_SCRIPT" task "$2" "$P_DIR"
             fi
             ;;
@@ -517,6 +555,7 @@ while true; do
                 echo "autofix.sh bulunamadı. Önce: bash /sdcard/Download/autofix.sh install"
             else
                 export P_PKG="$P_PKG"; export P_NAME="$P_NAME"
+                take_pre_ai_backup ""
                 bash "$AUTOFIX_SCRIPT" run "$P_DIR"
             fi
             ;;
@@ -524,6 +563,7 @@ while true; do
             AUTOFIX_SCRIPT="/storage/emulated/0/termux-otonom-sistem/autofix.sh"
             read -p "Görev nedir?: " user_task
             if [[ -n "$user_task" ]]; then
+                take_pre_ai_backup "$user_task"
                 bash "$AUTOFIX_SCRIPT" task "$user_task" "$P_DIR"
             fi
             ;;
