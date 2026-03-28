@@ -1122,14 +1122,6 @@ ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B
 
         err "Build başarısız"
 
-        # --- HATA YOGUNLUK KONTROLU ---
-        local tek_gecis_zorla="false"
-        HATALI_DOSYA_SAYISI=$(grep -c "^e:" "$TMP_DIR/build_output.txt" 2>/dev/null)
-        if [[ "$HATALI_DOSYA_SAYISI" -gt 15 && "$loop" -le 2 ]]; then
-            warn "Cok fazla hata ($HATALI_DOSYA_SAYISI) — kod cok bozuk, sifirdan yazmak daha verimli"
-            warn "Orkestrator/tek gecis tekrar denenecek..."
-            tek_gecis_zorla="true"
-        fi
 
 
         # --- YENİ: Yedek varsa ve bot bozduysa iptal etme şansı ---
@@ -1153,6 +1145,15 @@ ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B
         apply_smart_fix "$ef"
         if [[ $? -eq 0 ]]; then
             continue
+        fi
+
+        # --- HATA YOGUNLUK KONTROLU ---
+        local tek_gecis_zorla="false"
+        HATALI_DOSYA_SAYISI=$(grep -c "^e:" "$TMP_DIR/build_output.txt" 2>/dev/null)
+        if [[ "$HATALI_DOSYA_SAYISI" -gt 15 && "$loop" -le 2 ]]; then
+            warn "Cok fazla hata ($HATALI_DOSYA_SAYISI) — kod cok bozuk, sifirdan yazmak daha verimli"
+            warn "Orkestrator/tek gecis tekrar denenecek..."
+            tek_gecis_zorla="true"
         fi
 
         local src; src=$(collect_source_files)
