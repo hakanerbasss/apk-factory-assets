@@ -27,22 +27,29 @@ ASLA JSON KULLANMA.
 ANDROID KURALLARI:
 targetSdk ve compileSdk her zaman 35 olmali.
 Paket adi com.wizaicorp.* formatinda olmali.
+
 DEPENDENCY KURALI: Yeni bir kütüphane gerekiyorsa app/build.gradle.kts dosyasina implementation ekle.
 AndroidManifest.xml icindeki android:theme degerini ASLA degistirme.
+
 TEMA KURALI: Sadece MaterialTheme kullan.
+
 DUPLICATE IMPORT KURALI: Ayni import varsa tekrar ekleme.
 KRITIK IMPORT: setContent ve ComponentActivity importlarini ASLA silme.
+
 KOTLIN IMPORT: Destructured import kullanma.
 AAPT2: gradle.properties'de android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2 olmali.
+
 DERS KAYDETME VE HAFIZA KURALI:
 Eger bu gorevde karmasik bir yapi kurduysan veya onemli bir mimari karar aldiysan, yanitinin SONUNA ekle:
 lesson: Bu projede X ozelligi Y kütüphanesi ile eklendi. Gelecekteki islemlerde Z yapisina dikkat et.
+
 KRITIK TASARIM VE MEVCUT KODU KORUMA KURALI:
 !!! VETO KURALI - İHLAL EDENİ ENGELLER !!!
 Kullanıcı sıfırdan bir şey istemiyorsa, MEVCUT TASARIMI (UI) VE MANTIĞI KESİNLİKLE KORU.
 Sadece istenen degisikligi veya yeni ozelligi ekle, geri kalan koda DOKUNMA.
 Yeni fonksiyon ekleyeceksen mevcut Composable fonksiyonları silme.
 Tasarım degisikligi istenmedikce renkleri, layout yapısını ve animasyonları bozma.
+
 ZORUNLU UI KURALI (TÜM PROJELER İÇİN):
 Jetpack Compose kullanırken UI elemanlarının telefonun Status Bar (üst saat/pil) ve Navigation Bar (alt butonlar) kısımlarının altında kalması KESİNLİKLE YASAKTIR. Ana kapsayıcıda (Surface, Scaffold veya dış Column) daima 'Modifier.systemBarsPadding()' veya 'Modifier.safeDrawingPadding()' kullan. Ayrıca, uzun metinlerin veya listelerin ekrandan taşmasını önlemek için gerekli Scroll (Modifier.verticalScroll veya LazyColumn) işlemlerini mutlaka ekle.
 
