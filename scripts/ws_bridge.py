@@ -1584,6 +1584,31 @@ class App : Application() {{
                     except Exception as e:
                         await ws.send(json.dumps({"type":"error","text":f"Silinemedi: {e}"}))
 
+                elif t == "read_backup_note":
+                    name = d.get("name", "")
+                    tar_path = f"{BACKUP_DIR}/{name}"
+                    if not os.path.exists(tar_path):
+                        await ws.send(json.dumps({"type":"backup_note_result", "content":"Yedek dosyası bulunamadı."}))
+                        continue
+
+                    import subprocess
+                    cmd = f"tar -axf '{tar_path}' -O --wildcards '*/otonom_gorev_prompt.txt' 2>/dev/null"
+
+                    try:
+                        note_content = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
+                        if not note_content:
+                            note_content = "Bu yedekte Zaman Kapsülü notu bulunmuyor (Eski format veya Manuel Yedek)."
+                    except subprocess.CalledProcessError:
+                        note_content = "Bu yedekte Zaman Kapsülü notu bulunmuyor (Eski format veya Manuel Yedek)."
+                    except Exception as e:
+                        note_content = f"Not okunamadı: {str(e)}"
+
+                    await ws.send(json.dumps({
+                        "type": "backup_note_result",
+                        "content": note_content
+                    }))
+
+
                 elif t == "list_keystores":
                     ks = []
                     if os.path.exists(KEYSTORE_DIR):
