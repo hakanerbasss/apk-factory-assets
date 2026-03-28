@@ -1,24 +1,22 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# smart_task.sh v1.0
+# smart_task.sh v2.0 — smart_fix temel alınarak yazıldı
 # Kullanım: bash smart_task.sh <proje_dizini> <kullanici_gorevi>
-# Görev: apply_fixes ile run_autofix arasında çalışır.
-# Projeyi okur, eksikleri tespit eder, cerrahi REPLACE ile doldurur.
-# Build ALMAZ. Tüm eksikler biter → sessizce çıkar → run_autofix devam eder.
+# apply_fixes ile run_autofix arasında çalışır.
+# Build ALMAZ. Eksikleri cerrahi doldurur → sessizce çıkar.
 
 set +e
 
 PROJECT_ROOT="${1:-}"
 USER_TASK="${2:-}"
 
-[[ -z "$PROJECT_ROOT" || ! -d "$PROJECT_ROOT" ]] && { echo "[st] HATA: Proje dizini gerekli"; exit 0; }
-[[ -z "$USER_TASK" ]] && { echo "[st] Görev belirtilmedi, atlanıyor."; exit 0; }
+[[ -z "$PROJECT_ROOT" || ! -d "$PROJECT_ROOT" ]] && { echo "[st] Proje dizini yok, atlanıyor."; exit 0; }
+[[ -z "$USER_TASK" ]] && { echo "[st] Görev yok, atlanıyor."; exit 0; }
 
 SISTEM_DIR="/storage/emulated/0/termux-otonom-sistem"
 APILER_DIR="$SISTEM_DIR/apiler"
-PROMPTS_DIR="$SISTEM_DIR/prompts"
 TMP_DIR="$HOME/.autofix_tmp"
-ST_TMP="$TMP_DIR/smart_task"
-mkdir -p "$ST_TMP"
+SNAPSHOT_FILE="$TMP_DIR/st_snapshot_${RANDOM}.tar.gz"
+mkdir -p "$TMP_DIR"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
@@ -28,32 +26,25 @@ warn() { echo -e "${YELLOW}[st] ⚠️  $*${NC}"; }
 err()  { echo -e "${RED}[st] ❌ $*${NC}"; }
 title(){ echo -e "\n${BOLD}${CYAN}══ [SmartTask] $* ══${NC}\n"; }
 
-# ── Provider yükle ────────────────────────────────────────────────────────────
 load_provider() {
     local default_prov conf_file=""
     default_prov=$(grep "^DEFAULT_PROVIDER=" ~/.config/autofix.conf 2>/dev/null | cut -d'"' -f2 || echo "")
     [[ -n "$default_prov" ]] && conf_file="$APILER_DIR/$(echo "$default_prov" | tr '[:upper:]' '[:lower:]').conf"
     [[ -z "$conf_file" || ! -f "$conf_file" ]] && conf_file=$(ls "$APILER_DIR"/*.conf 2>/dev/null | head -1 || true)
-    [[ -z "$conf_file" || ! -f "$conf_file" ]] && { err "Provider conf bulunamadı, smart_task atlanıyor."; exit 0; }
-
-    ST_NAME=$(grep  "^NAME="        "$conf_file" | cut -d'"' -f2)
-    ST_URL=$(grep   "^API_URL="     "$conf_file" | cut -d'"' -f2)
-    ST_KEY=$(grep   "^API_KEY="     "$conf_file" | cut -d'"' -f2)
-    ST_MODEL=$(grep "^MODEL="       "$conf_file" | cut -d'"' -f2)
-    ST_TOKENS=$(grep "^MAX_TOKENS=" "$conf_file" 2>/dev/null | cut -d= -f2 || echo 8000)
+    [[ -z "$conf_file" || ! -f "$conf_file" ]] && { err "Provider conf bulunamadı, atlanıyor."; exit 0; }
+    SF_NAME=$(grep  "^NAME="        "$conf_file" | cut -d'"' -f2)
+    SF_URL=$(grep   "^API_URL="     "$conf_file" | cut -d'"' -f2)
+    SF_KEY=$(grep   "^API_KEY="     "$conf_file" | cut -d'"' -f2)
+    SF_MODEL=$(grep "^MODEL="       "$conf_file" | cut -d'"' -f2)
+    SF_TOKENS=$(grep "^MAX_TOKENS=" "$conf_file" 2>/dev/null | cut -d= -f2 || echo 8000)
 }
 
-# ── API çağrısı ───────────────────────────────────────────────────────────────
 call_ai() {
-    local sp="$1" um="$2" out="$ST_TMP/response.json"
+    local sp="$1" um="$2" out="$TMP_DIR/st_response.json"
     local payload
-    printf '%s' "$sp" > "$ST_TMP/sp.txt"
-    printf '%s' "$um" > "$ST_TMP/um.txt"
     payload=$(python3 -c "
 import json, sys
-name, model, tokens = sys.argv[1], sys.argv[2], int(sys.argv[3])
-sp = open('$ST_TMP/sp.txt').read()
-um = open('$ST_TMP/um.txt').read()
+sp, um, name, model, tokens = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
 if name == 'Claude':
     print(json.dumps({'model': model, 'max_tokens': tokens, 'system': sp,
         'messages': [{'role': 'user', 'content': um}]}))
@@ -64,35 +55,38 @@ elif name == 'Gemini':
 else:
     print(json.dumps({'model': model, 'max_tokens': tokens, 'temperature': 0.1,
         'messages': [{'role': 'system', 'content': sp}, {'role': 'user', 'content': um}]}))
-" "$ST_NAME" "$ST_MODEL" "$ST_TOKENS" 2>/dev/null)
+" "$sp" "$um" "$SF_NAME" "$SF_MODEL" "$SF_TOKENS")
 
     local hc
-    if [[ "$ST_NAME" == "Gemini" ]]; then
+    if [[ "$SF_NAME" == "Gemini" ]]; then
         hc=$(curl -s -w "%{http_code}" -X POST \
-            "https://generativelanguage.googleapis.com/v1beta/models/${ST_MODEL}:generateContent?key=${ST_KEY}" \
+            "https://generativelanguage.googleapis.com/v1beta/models/${SF_MODEL}:generateContent?key=${SF_KEY}" \
             -H "Content-Type: application/json" -d "$payload" -o "$out" \
-            --connect-timeout 30 --max-time 120 2>/dev/null)
-    elif [[ "$ST_NAME" == "Claude" ]]; then
-        hc=$(curl -s -w "%{http_code}" -X POST "$ST_URL" \
+            --connect-timeout 30 2>/dev/null)
+    elif [[ "$SF_NAME" == "Claude" ]]; then
+        hc=$(curl -s -w "%{http_code}" -X POST "$SF_URL" \
             -H "Content-Type: application/json" \
-            -H "x-api-key: $ST_KEY" \
+            -H "x-api-key: $SF_KEY" \
             -H "anthropic-version: 2023-06-01" \
-            -d "$payload" -o "$out" --connect-timeout 30 --max-time 120 2>/dev/null)
+            -d "$payload" -o "$out" --connect-timeout 30 2>/dev/null)
     else
-        hc=$(curl -s -w "%{http_code}" -X POST "$ST_URL" \
+        hc=$(curl -s -w "%{http_code}" -X POST "$SF_URL" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $ST_KEY" \
-            -d "$payload" -o "$out" --connect-timeout 30 --max-time 120 2>/dev/null)
+            -H "Authorization: Bearer $SF_KEY" \
+            -d "$payload" -o "$out" --connect-timeout 30 2>/dev/null)
     fi
 
-    [[ "$hc" != "200" ]] && { err "API HTTP $hc"; return 1; }
-    if   [[ "$ST_NAME" == "Claude" ]]; then jq -r '.content[0].text'                     "$out" 2>/dev/null
-    elif [[ "$ST_NAME" == "Gemini" ]]; then jq -r '.candidates[0].content.parts[0].text' "$out" 2>/dev/null
+    [[ "$hc" != "200" ]] && return 1
+    if   [[ "$SF_NAME" == "Claude" ]]; then jq -r '.content[0].text'                     "$out" 2>/dev/null
+    elif [[ "$SF_NAME" == "Gemini" ]]; then jq -r '.candidates[0].content.parts[0].text' "$out" 2>/dev/null
     else                                    jq -r '.choices[0].message.content'           "$out" 2>/dev/null
     fi
 }
 
-# ── SEARCH/REPLACE motoru (smart_fix ile aynı) ────────────────────────────────
+is_safe_cmd() {
+    echo "$1" | grep -qE '(>>|\brm\b|\bmv\b|\bchmod\b|\bsed\s.*-i\b|gradlew)' && return 1 || return 0
+}
+
 apply_search_replace() {
     local rel_path="$1" search_text="$2" replace_text="$3"
     local abs_path="$rel_path"
@@ -107,7 +101,6 @@ replace_text = sys.argv[3]
 content = open(path, encoding='utf-8').read()
 lines   = content.splitlines(keepends=True)
 
-# Strateji 1: Tam eşleşme
 if search_text in content:
     ob = search_text.count('{') - search_text.count('}')
     nb = replace_text.count('{') - replace_text.count('}')
@@ -119,7 +112,6 @@ if search_text in content:
     print(f"REPLACE OK (tam): {len(lines)} -> {len(new_content.splitlines())} satir")
     sys.exit(0)
 
-# Strateji 2: Fuzzy satır bazlı
 search_lines = [l.strip() for l in search_text.splitlines() if l.strip()]
 file_bare    = [l.strip() for l in lines]
 if not search_lines:
@@ -170,180 +162,172 @@ sys.exit(0)
 PYEOF
 }
 
-# ── Yeni dosya oluşturma ──────────────────────────────────────────────────────
-apply_new_file() {
-    local rel_path="$1" content="$2"
-    local abs_path="$PROJECT_ROOT/$rel_path"
-    mkdir -p "$(dirname "$abs_path")"
-    echo "$content" > "$abs_path"
-    ok "Yeni dosya oluşturuldu: $rel_path"
+take_snapshot() {
+    tar -czf "$SNAPSHOT_FILE" -C "$PROJECT_ROOT" app/ 2>/dev/null || true
 }
 
-# ── Proje haritası (bir kez alınır) ──────────────────────────────────────────
 build_project_map() {
-    local map_file="$ST_TMP/project_map.txt"
-    echo "=== PROJE DOSYA AĞACI ===" > "$map_file"
-    find "$PROJECT_ROOT" -maxdepth 5 \
-        -not -path "*/build/*" \
-        -not -path "*/.gradle/*" \
-        -not -path "*/.git/*" \
-        -not -path "*/outputs/*" \
-        -type f -name "*.kt" >> "$map_file" 2>/dev/null
-    find "$PROJECT_ROOT" -maxdepth 5 \
-        -not -path "*/build/*" \
-        -type f -name "*.gradle" >> "$map_file" 2>/dev/null
-    echo "=========================" >> "$map_file"
-
-    # Her kt dosyasının ilk 15 satırını ekle (harita için yeterli)
-    echo "" >> "$map_file"
-    echo "=== DOSYA ÖZETLERİ ===" >> "$map_file"
+    local map_file="$TMP_DIR/st_map.txt"
+    echo "=== KT DOSYALARI ===" > "$map_file"
     while IFS= read -r f; do
-        [[ "$f" == *".kt" && -f "$f" ]] || continue
         local rel="${f#$PROJECT_ROOT/}"
-        local lines
-        lines=$(wc -l < "$f" 2>/dev/null || echo 0)
+        local lines; lines=$(wc -l < "$f" 2>/dev/null || echo 0)
         echo "--- $rel ($lines satır) ---" >> "$map_file"
-        head -n 15 "$f" >> "$map_file"
+        head -n 20 "$f" >> "$map_file"
         echo "" >> "$map_file"
     done < <(find "$PROJECT_ROOT/app/src/main" -name "*.kt" -not -path "*/build/*" 2>/dev/null)
-
     echo "$map_file"
 }
 
-# ── Checker: Eksikleri tespit et ─────────────────────────────────────────────
 run_checker() {
     local map_file="$1"
-    local checker_sp="Sen bir Android kod denetçisisin. Sadece kod eksiklerini raporla, kod yazma.
+    local checker_sp="Sen Android kod denetçisisin. SADECE eksik KOD yapılarını raporla.
 
-RAPOR FORMATI — SADECE BUNLARI YAZ:
-Eksik yoksa tek satır yaz: TEMİZ
+RAPOR FORMATI:
+Eksik yoksa tek satır: TEMİZ
 
-Eksik varsa her biri için:
+Eksik varsa her biri için (birer satır):
 EKSIK: <dosya_yolu> | <ne eksik>
-IMPORT_EKSIK: <dosya_yolu> | <eksik import>
-BAGIMLILIK_EKSIK: app/build.gradle | <eksik kütüphane>
+IMPORT_EKSIK: <dosya_yolu> | <eksik import satırı>
+BAGIMLILIK_EKSIK: app/build.gradle | <eksik dependency satırı>
 
-KONTROL KURALLARI:
-- Placeholder/Coming soon/TODO/Yapılacak içeren sayfaları işaretle
-- Boş veya tek satır içerikli Composable fonksiyonları işaretle
-- Kullanıcı görevinde isteyip kodda hiç olmayan özellikleri işaretle
-- Ses/resim/font dosyası eksikliğini SAYMA (validator halleder)
-- Gradle build hatalarını SAYMA (autofix halleder)
-- Sadece KOD eksiklerini say"
+SAYMA:
+- Ses/resim/font dosyası eksikleri (validator halleder)
+- Gradle build hataları (autofix halleder)
+- Sadece placeholder/boş composable/eksik ekran/eksik navigasyon say"
 
     local checker_um="KULLANICI GÖREVİ: $USER_TASK
 
 PROJE DURUMU:
 $(cat "$map_file")
 
-Yukarıdaki göreve göre kodda eksik olan şeyleri raporla."
+Raporla."
 
     call_ai "$checker_sp" "$checker_um"
 }
 
-# ── Dosya içeriğini oku (tam) ─────────────────────────────────────────────────
-read_file_content() {
-    local rel_path="$1"
-    local abs_path="$PROJECT_ROOT/$rel_path"
-    [[ ! -f "$abs_path" ]] && { echo "DOSYA YOK: $rel_path"; return; }
-    local lines
-    lines=$(wc -l < "$abs_path" 2>/dev/null || echo 0)
-    echo "=== $rel_path ($lines satır) ==="
-    cat "$abs_path"
-}
-
-# ── Eksikliği doldur ──────────────────────────────────────────────────────────
-fix_missing() {
+fix_one_missing() {
     local target_file="$1"
     local missing_desc="$2"
 
-    log "Eksiklik gideriliyor: $target_file — $missing_desc"
+    log "Gideriliyor: $target_file — $missing_desc"
 
     local fixer_sp
-    fixer_sp=$(cat "$PROMPTS_DIR/smart_fix_system.txt" 2>/dev/null || echo "Sen Android uzmanısın. REPLACE_BLOCK formatında cerrahi düzeltme yap.")
+    fixer_sp=$(cat "$SISTEM_DIR/prompts/smart_fix_system.txt" 2>/dev/null || echo "Sen Android uzmanısın. REPLACE_BLOCK formatında cerrahi düzelt.")
 
     local file_content
-    file_content=$(read_file_content "$target_file")
+    file_content=$(cat "$PROJECT_ROOT/$target_file" 2>/dev/null | head -n 300 | cat -n || echo "DOSYA YOK")
 
-    local fixer_um="GÖREV: $USER_TASK
+    local user_msg="GÖREV: $USER_TASK
 
 EKSİKLİK: $missing_desc
 
-DOSYA İÇERİĞİ:
+DOSYA ($target_file):
 $file_content
 
-Bu eksikliği REPLACE_BLOCK formatında cerrahi olarak doldur.
-Tüm dosyayı yeniden yazma. Sadece eksik olan kısmı doldur.
-İLK ADIMIN CMD OLMALI."
+Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
 
     local conversation=""
-    local attempts=0
-    local max_attempts=8
+    local api_calls=0
+    local MAX_API_CALLS=15
+    local replace_fail_streak=0
+    local has_read_file=0
+    local cmd_streak=0
     local last_cmd=""
+    local api_fail_streak=0
 
-    while [[ $attempts -lt $max_attempts ]]; do
-        attempts=$((attempts + 1))
+    while [[ $api_calls -lt $MAX_API_CALLS ]]; do
+        api_calls=$((api_calls+1))
 
-        local full_msg="$fixer_um"
-        [[ -n "$conversation" ]] && full_msg="${conversation}\n\n---\n${fixer_um}"
+        local full_msg="$user_msg"
+        [[ -n "$conversation" ]] && full_msg="${conversation}\n\n---\n${user_msg}"
 
         local ai_response
         if ! ai_response=$(call_ai "$fixer_sp" "$full_msg"); then
-            err "API yanıt vermedi ($attempts/$max_attempts)"
+            api_fail_streak=$((api_fail_streak+1))
+            [[ $api_fail_streak -ge 3 ]] && { err "API sürekli hata, vazgeçildi."; return 1; }
             sleep 2; continue
         fi
-        [[ -z "$ai_response" ]] && continue
+        [[ -z "$ai_response" ]] && { err "Boş yanıt."; continue; }
         conversation="${full_msg}\n\nAI: ${ai_response}"
+        api_fail_streak=0
 
-        # AI düşüncesini göster
-        local reasoning
-        reasoning=$(echo "$ai_response" | grep -vE "^CMD:|^REPLACE_BLOCK:|^<<<|^===|^>>>|^NEW_FILE:" | grep -v '^\s*$' | head -2 | xargs || true)
-        [[ -n "$reasoning" ]] && echo -e "\033[2m🤖 $reasoning\033[0m"
+        local ai_reasoning
+        ai_reasoning=$(echo "$ai_response" | grep -vE "^CMD:|^REPLACE_BLOCK:|^<<<|^===|^>>>|^NEW_FILE:" | grep -v '^\s*$' | head -n 2 | xargs || true)
+        [[ -n "$ai_reasoning" ]] && echo -e "\033[2m🤖 ${ai_reasoning:0:120}\033[0m"
 
-        # ── CMD işle ──
+        if echo "$ai_response" | grep -q "^REPLACE_BLOCK:" && [[ $has_read_file -eq 0 ]]; then
+            local rp_early
+            rp_early=$(echo "$ai_response" | grep "^REPLACE_BLOCK:" | head -1 | cut -d: -f2- | xargs)
+            local auto_read=""
+            [[ -f "$PROJECT_ROOT/$rp_early" ]] && auto_read=$(cat "$PROJECT_ROOT/$rp_early" | head -n 200 | cat -n)
+            has_read_file=1
+            user_msg="KURAL İHLALİ: Önce CMD ver. Dosya otomatik okundu:\n=== $rp_early ===\n${auto_read}\n\nREPLACE_BLOCK ver."
+            continue
+        fi
+
         if echo "$ai_response" | grep -q "^CMD:" && ! echo "$ai_response" | grep -q "^REPLACE_BLOCK:"; then
             local cmd
             cmd=$(echo "$ai_response" | grep "^CMD:" | head -1 | sed 's/^CMD: *//')
 
-            # Tekrar eden CMD engelle
+            if [[ $cmd_streak -ge 5 ]]; then
+                warn "CMD limiti aşıldı, REPLACE_BLOCK zorlanıyor."
+                user_msg="CMD LİMİTİ: $cmd_streak komut çalıştırdın. Artık REPLACE_BLOCK ver.\n\nDOSYA:\n$(cat "$PROJECT_ROOT/$target_file" 2>/dev/null | head -n 200 | cat -n)"
+                cmd_streak=0; last_cmd=""; conversation=""
+                continue
+            fi
+
             if [[ -n "$last_cmd" && "$cmd" == "$last_cmd" ]]; then
                 warn "Tekrar eden CMD engellendi."
-                fixer_um="TEKRAR EDEN CMD: Aynı komutu tekrar çalıştırdın. Direkt REPLACE_BLOCK ver."
-                last_cmd=""
+                user_msg="TEKRAR EDEN CMD. Direkt REPLACE_BLOCK ver.\n\nDOSYA:\n$(cat "$PROJECT_ROOT/$target_file" 2>/dev/null | head -n 200 | cat -n)"
+                last_cmd=""; cmd_streak=$((cmd_streak+1))
                 continue
             fi
 
-            # Güvenli CMD kontrolü
-            if echo "$cmd" | grep -qE '(>>|\brm\b|\bmv\b|\bchmod\b|\bsed\s.*-i\b|gradlew)'; then
-                fixer_um="GÜVENSİZ KOMUT: '$cmd' yasak. Sadece cat, grep, find, head, tail kullan."
-                continue
+            if is_safe_cmd "$cmd"; then
+                last_cmd="$cmd"; cmd_streak=$((cmd_streak+1))
+                log "CMD ($cmd_streak/5): $cmd"
+                cd "$PROJECT_ROOT"
+                local cmd_out
+                cmd_out=$(eval "$cmd" 2>&1 | head -n 300 | cat -n || true)
+                local clean_out
+                clean_out=$(echo "$cmd_out" | grep -v '^\s*$' | head -2 | xargs || true)
+                echo -e "\033[2m   ↳ ${clean_out:0:100}\033[0m"
+                has_read_file=1; replace_fail_streak=0
+                local pressure=""
+                [[ $cmd_streak -ge 3 ]] && pressure="\n\n⚠️ $cmd_streak CMD kullandın. Sonraki adımın REPLACE_BLOCK olmalı."
+                user_msg="CMD ÇIKTISI:\n${cmd_out}\n\nBu çıktıdan <<<SEARCH için AYNEN kopyala.${pressure}"
+            else
+                user_msg="Güvensiz komut: '${cmd}'. Sadece cat, grep, find, head, tail kullan."
             fi
-
-            last_cmd="$cmd"
-            log "CMD: $cmd"
-            cd "$PROJECT_ROOT"
-            local cmd_out
-            cmd_out=$(eval "$cmd" 2>&1 | head -n 200 | cat -n || true)
-            echo -e "\033[2m   ↳ $(echo "$cmd_out" | head -2 | xargs)\033[0m"
-            fixer_um="CMD ÇIKTISI:\n${cmd_out}\n\nBu çıktıya göre REPLACE_BLOCK ver."
             continue
         fi
 
-        # ── NEW_FILE işle ──
+        if echo "$ai_response" | grep -q "^REPLACE_BLOCK:" && [[ $replace_fail_streak -ge 2 ]]; then
+            local rp_lock
+            rp_lock=$(echo "$ai_response" | grep "^REPLACE_BLOCK:" | head -1 | cut -d: -f2- | xargs)
+            warn "REPLACE $replace_fail_streak kez başarısız — otomatik okunuyor: $rp_lock"
+            local auto_ctx
+            auto_ctx=$(cat "$PROJECT_ROOT/$rp_lock" 2>/dev/null | head -n 150 | cat -n)
+            has_read_file=1
+            user_msg="REPLACE $replace_fail_streak KER BAŞARISIZ.\n\nDOSYA ($rp_lock):\n${auto_ctx}\n\nAYNEN kopyala."
+            continue
+        fi
+
         if echo "$ai_response" | grep -q "^NEW_FILE:"; then
             local nf_path
             nf_path=$(echo "$ai_response" | grep "^NEW_FILE:" | head -1 | cut -d: -f2- | xargs)
             local nf_content
             nf_content=$(echo "$ai_response" | awk '/^<<<CONTENT/{f=1;next} /^>>>END/{f=0} f{print}')
             if [[ -n "$nf_path" && -n "$nf_content" ]]; then
-                apply_new_file "$nf_path" "$nf_content"
-                ok "Yeni dosya eklendi: $nf_path"
+                mkdir -p "$PROJECT_ROOT/$(dirname "$nf_path")"
+                echo "$nf_content" > "$PROJECT_ROOT/$nf_path"
+                ok "Yeni dosya: $nf_path"
                 return 0
             fi
             continue
         fi
 
-        # ── REPLACE_BLOCK işle ──
         if echo "$ai_response" | grep -q "^REPLACE_BLOCK:"; then
             local rp
             rp=$(echo "$ai_response" | grep "^REPLACE_BLOCK:" | head -1 | cut -d: -f2- | xargs)
@@ -352,9 +336,17 @@ Tüm dosyayı yeniden yazma. Sadece eksik olan kısmı doldur.
             local replace_text
             replace_text=$(echo "$ai_response" | awk '/^===/{f=1;next} /^>>>END/{f=0} f{print}')
 
+            local s_head; s_head=$(echo "$search_text" | grep -v '^\s*$' | head -1 | xargs || true)
+            local r_head; r_head=$(echo "$replace_text" | grep -v '^\s*$' | head -1 | xargs || true)
+            echo -e "\033[0;31m   - ${s_head:0:80}\033[0m"
+            echo -e "\033[0;32m   + ${r_head:0:80}\033[0m"
+
+            cmd_streak=0; last_cmd=""
+
             if [[ "$search_text" == "$replace_text" ]]; then
-                warn "AI hiçbir şeyi değiştirmedi."
-                fixer_um="HATA: SEARCH ve REPLACE aynı! Gerçekten değişiklik yap."
+                warn "AI hiçbir şey değiştirmedi."
+                replace_fail_streak=$((replace_fail_streak+1))
+                user_msg="HATA: SEARCH ve REPLACE aynı! Gerçekten değiştir."
                 continue
             fi
 
@@ -363,89 +355,83 @@ Tüm dosyayı yeniden yazma. Sadece eksik olan kısmı doldur.
                 ok "Düzeltme uygulandı: $replace_output"
                 return 0
             else
-                warn "REPLACE başarısız: $replace_output"
-                local file_ctx
-                file_ctx=$(read_file_content "$rp")
-                fixer_um="REPLACE BAŞARISIZ.\nHata: $replace_output\n\nDOSYA:\n$file_ctx\n\nDosyadan AYNEN kopyala."
-                last_cmd=""
-                continue
+                replace_fail_streak=$((replace_fail_streak+1))
+                warn "REPLACE başarısız ($replace_fail_streak): $replace_output"
+                local s_first
+                s_first=$(echo "$search_text" | grep -v '^\s*$' | head -1 | sed 's/^[[:space:]]*//' | cut -c1-80)
+                local grep_hits
+                grep_hits=$(grep -n "$s_first" "$PROJECT_ROOT/$rp" 2>/dev/null | head -5 || true)
+                local auto_ctx
+                auto_ctx=$(cat "$PROJECT_ROOT/$rp" 2>/dev/null | head -n 150 | cat -n)
+                user_msg="REPLACE BAŞARISIZ.\nHata: ${replace_output}\nAranan: '${s_first}'\nEşleşmeler: ${grep_hits:-yok}\n\nDOSYA:\n${auto_ctx}\n\nAYNEN kopyala."
             fi
+            continue
         fi
 
-        fixer_um="Geçersiz format. CMD: veya REPLACE_BLOCK: kullan."
+        user_msg="Geçersiz format. CMD: veya REPLACE_BLOCK: kullan."
     done
 
-    warn "Eksiklik giderilemedi (max deneme): $missing_desc"
+    warn "Max deneme doldu: $missing_desc"
     return 1
 }
 
-# ── ANA DÖNGÜ ─────────────────────────────────────────────────────────────────
 main() {
     load_provider
     title "Smart Task Kalite Kontrolü"
     log "Görev: $USER_TASK"
     log "Proje: $PROJECT_ROOT"
 
-    local MAX_ROUNDS=10
+    take_snapshot
+
+    local MAX_ROUNDS=8
     local round=0
     local total_fixed=0
 
-    # Proje haritasını bir kez oluştur
-    local map_file
-    map_file=$(build_project_map)
-    log "Proje haritası oluşturuldu."
-
     while [[ $round -lt $MAX_ROUNDS ]]; do
-        round=$((round + 1))
+        round=$((round+1))
         title "Kontrol Turu $round / $MAX_ROUNDS"
 
-        # Checker çalıştır
-        log "🔍 Checker AI projeyi analiz ediyor..."
+        local map_file
+        map_file=$(build_project_map)
+
+        log "🔍 Checker AI analiz ediyor..."
         local checker_result
         if ! checker_result=$(run_checker "$map_file"); then
             warn "Checker API hatası, tur atlanıyor..."
             continue
         fi
 
-        echo -e "\033[2m📋 Checker raporu:\n$checker_result\033[0m"
+        echo -e "\033[2m📋 Checker:\n$checker_result\033[0m"
 
-        # TEMİZ mi?
         if echo "$checker_result" | grep -q "^TEMİZ"; then
-            ok "Proje temiz! Tüm görev özellikleri eksiksiz uygulanmış."
-            ok "Toplam $total_fixed eksiklik giderildi."
+            ok "Proje temiz! $total_fixed eksiklik giderildi."
             exit 0
         fi
 
-        # Eksiklikleri parse et
         local eksikler=()
         while IFS= read -r line; do
             [[ "$line" == EKSIK:* || "$line" == IMPORT_EKSIK:* || "$line" == BAGIMLILIK_EKSIK:* ]] && eksikler+=("$line")
         done <<< "$checker_result"
 
         if [[ ${#eksikler[@]} -eq 0 ]]; then
-            ok "Raporlanacak eksiklik yok, çıkılıyor."
+            ok "Raporlanacak eksiklik yok."
             exit 0
         fi
 
-        log "${#eksikler[@]} eksiklik tespit edildi, sırayla gideriliyor..."
-
-        # Her eksikliği sırayla gider
+        log "${#eksikler[@]} eksiklik tespit edildi."
         local round_fixed=0
+
         for eksik in "${eksikler[@]}"; do
             local target_file
             target_file=$(echo "$eksik" | cut -d'|' -f1 | sed 's/^EKSIK: //;s/^IMPORT_EKSIK: //;s/^BAGIMLILIK_EKSIK: //' | xargs)
             local missing_desc
             missing_desc=$(echo "$eksik" | cut -d'|' -f2 | xargs)
 
-            log "Gideriliyor [$((round_fixed+1))/${#eksikler[@]}]: $target_file → $missing_desc"
-
-            if fix_missing "$target_file" "$missing_desc"; then
-                total_fixed=$((total_fixed + 1))
-                round_fixed=$((round_fixed + 1))
-                # Haritayı güncelle (değişen dosya için)
-                map_file=$(build_project_map)
+            if fix_one_missing "$target_file" "$missing_desc"; then
+                total_fixed=$((total_fixed+1))
+                round_fixed=$((round_fixed+1))
             else
-                warn "Bu eksiklik giderilemedi, sonraki tura kalıyor: $missing_desc"
+                warn "Giderilemedi: $missing_desc"
             fi
         done
 
@@ -455,7 +441,7 @@ main() {
         fi
     done
 
-    warn "Maksimum tur sayısına ulaşıldı ($MAX_ROUNDS). Kalan eksiklikler autofix'e kalıyor."
+    warn "Max tur ($MAX_ROUNDS) doldu."
     exit 0
 }
 
