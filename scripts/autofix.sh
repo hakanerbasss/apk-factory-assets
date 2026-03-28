@@ -1426,7 +1426,8 @@ for p in set(paths):
         echo "GÖREV MODU" > "$dummy_errors"
         if call_ai "$dummy_errors" "$collected"; then
             if apply_fixes; then
-                ok "Kodlar başarıyla yazıldı! Test ediliyor..."
+                ok "Kodlar başarıyla yazıldı!"
+                bash "$SISTEM_DIR/smart_task.sh" "$PROJECT_ROOT" "$user_task"
                 run_autofix "$user_task"
                 exit $?
             fi
