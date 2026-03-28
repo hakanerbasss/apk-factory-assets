@@ -40,25 +40,34 @@ take_ui_backup() {
     mkdir -p "$bkp_dir"
     local ts=$(date +%Y%m%d-%H%M)
     local ex="--exclude=*/build --exclude=*/.gradle"
+    local label_file="$PROJECT_ROOT/otonom_gorev_prompt.txt"
 
     if [[ -n "$msg" ]]; then
-        # Görev Modu: Promptun ilk 4 kelimesinden not üret
+        # ── 1. GÖREV MODU (prj e) ──
+        # Txt dosyasının içine o meşhur "önce alınan yedek" notunu ekliyoruz
+        echo -e "🕒 ZAMAN KAPSÜLÜ NOTU\n====================\n✅ BU ÖZELLİĞİ EKLEMEDEN ÖNCE ALINAN YEDEK:\n\n\"$msg\"\n\n(Bu yedeği geri yüklerseniz yukarıdaki işlem hiç yapılmamış gibi orijinal koda dönersiniz.)" > "$label_file"
+        
+        # Not üretimi (ilk 4 kelime)
         local note=$(echo "$msg" | awk '{print $1"_"$2"_"$3"_"$4}' | tr '[:upper:]' '[:lower:]' | tr -dc 'a-z0-9_')
         [[ -z "$note" ]] && note="otonom_gorev"
-        
-        # Tam promptu txt'ye yaz ve yedeğe dahil et
-        echo "$msg" > "$PROJECT_ROOT/otonom_gorev_prompt.txt"
         local bkp_file="$bkp_dir/${p_name}-not(${note})-${ts}-yedek.tar.gz"
-        
-        echo -e "  ${DIM}🛡️ Otonom görev öncesi orijinal yedek alınıyor...${NC}"
-        tar -czf "$bkp_file" $ex -C "$(dirname "$PROJECT_ROOT")" "$(basename "$PROJECT_ROOT")" 2>/dev/null
-        rm -f "$PROJECT_ROOT/otonom_gorev_prompt.txt"
     else
-        # Hata Çözme Modu (af)
+        # ── 2. HATA DÜZELTME MODU (af) ──
+        # Görev yoksa bile yarınki diyalog kutusunda bu not görünecek
+        echo -e "🕒 ZAMAN KAPSÜLÜ NOTU\n====================\n⚠️ HATA DÜZELTME (AUTOFIX) ÖNCESİ ALINAN SON SAĞLAM YEDEK.\n\nEğer ajan kodun yapısını bozarsa bu yedeğe dönerek orijinal (hatalı ama sağlam) haline dönebilirsiniz." > "$label_file"
+        
         local bkp_file="$bkp_dir/${p_name}-not(autofix_hata_cozumu)-${ts}-yedek.tar.gz"
-        echo -e "  ${DIM}🛡️ AutoFix hata çözümü öncesi orijinal yedek alınıyor...${NC}"
-        tar -czf "$bkp_file" $ex -C "$(dirname "$PROJECT_ROOT")" "$(basename "$PROJECT_ROOT")" 2>/dev/null
     fi
+
+    echo -e "  ${DIM}🛡️ Orijinal kod zırhlanıyor...${NC}"
+    
+    # Paketleme (Üst klasörden, orijinal mimariyle uyumlu)
+    tar -czf "$bkp_file" $ex -C "$(dirname "$PROJECT_ROOT")" "$(basename "$PROJECT_ROOT")" 2>/dev/null
+    
+    # ── KRİTİK TEMİZLİK ──
+    # Txt dosyasını siliyoruz ki proje klasöründe çöp kalmasın
+    rm -f "$label_file"
+    
     echo -e "  ${GREEN}✅ Orijinal Kod Güvende:${NC} $(basename "$bkp_file")"
 }
 
