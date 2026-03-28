@@ -71,6 +71,47 @@ take_ui_backup() {
     echo -e "  ${GREEN}✅ Orijinal Kod Güvende:${NC} $(basename "$bkp_file")"
 }
 
+apply_smart_fix() {
+    local err_log="$1"
+    local app_gradle="$PROJECT_ROOT/app/build.gradle"
+    local changed=0
+
+    echo -e "  ${DIM}🧠 Smart Fix: Hata logları analiz ediliyor...${NC}"
+
+    # 1. Jetpack Navigation Compose Eksikliği
+    if grep -q -E "Unresolved reference: navigation|rememberNavController|NavHost|NavHostController" "$err_log"; then
+        if ! grep -q "navigation-compose" "$app_gradle"; then
+            echo -e "  ${GREEN}✨ [SMART FIX] Navigation Compose kütüphanesi Gradle'a ekleniyor...${NC}"
+            sed -i "/dependencies {/a\    implementation 'androidx.navigation:navigation-compose:2.7.7'" "$app_gradle"
+            changed=1
+        fi
+    fi
+
+    # 2. Material Icons Extended Eksikliği (Puzzle vb. ikonlar için)
+    if grep -q -E "Unresolved reference: Puzzle|Icons.Filled|ImageVector|material-icons-extended" "$err_log"; then
+        if ! grep -q "material-icons-extended" "$app_gradle"; then
+            echo -e "  ${GREEN}✨ [SMART FIX] Material Icons Extended kütüphanesi Gradle'a ekleniyor...${NC}"
+            sed -i "/dependencies {/a\    implementation 'androidx.compose.material:material-icons-extended:1.6.0'" "$app_gradle"
+            changed=1
+        fi
+    fi
+
+    # 3. Coil (Resim Yükleme) Eksikliği
+    if grep -q -E "Unresolved reference: AsyncImage|rememberAsyncImagePainter" "$err_log"; then
+        if ! grep -q "coil-compose" "$app_gradle"; then
+            echo -e "  ${GREEN}✨ [SMART FIX] Coil (AsyncImage) kütüphanesi Gradle'a ekleniyor...${NC}"
+            sed -i "/dependencies {/a\    implementation 'io.coil-kt:coil-compose:2.5.0'" "$app_gradle"
+            changed=1
+        fi
+    fi
+
+    if [[ $changed -eq 1 ]]; then
+        echo -e "  ${YELLOW}🚀 Smart Fix başarıyla uygulandı! Gradle güncellendi, build baştan tetikleniyor...${NC}"
+        return 0 # Bir şeyler düzeltildi
+    else
+        return 1 # Düzeltilecek bir şey bulunamadı
+    fi
+}
 
 check_deps() {
     local missing=()
@@ -1108,6 +1149,11 @@ ${YELLOW}Değişiklikleri kalıcı yap veya Yedeğe dön [Enter=Kalıcı Yap / B
         [[ ! -s "$ef" ]] && cp "$TMP_DIR/build_output.txt" "$ef"
         log "Hata Logu Oku: $(wc -l < "$ef") satır"
         head -100 "$ef"; echo
+
+        apply_smart_fix "$ef"
+        if [[ $? -eq 0 ]]; then
+            continue
+        fi
 
         local src; src=$(collect_source_files)
         
