@@ -1204,15 +1204,7 @@ Dosya: app/src/main/java/PKG/DosyaAdi.kt
                             local pn; pn=$(grep "^NAME=" "$cf" 2>/dev/null | cut -d'"' -f2)
                             [[ "${pn,,}" == "${senior_prov_name,,}" ]] && {
                                 local s_url; s_url=$(grep "^API_URL=" "$cf" | cut -d'"' -f2)
-apply_fixes() {
-    local py_script="$TMP_DIR/markdown_parser.py"
-
-    # Markdown parser'ı oluştur
-    cat > "$py_script" << 'PYEOF'
-import re, os, shutil, sys
-bash "$SISTEM_DIR/smart_task.sh" "$PROJECT_ROOT" "$user_task"
-
-def extract_path_from_code(code_content, ext):                                local s_key; s_key=$(grep "^API_KEY=" "$cf" | cut -d'"' -f2)
+                                local s_key; s_key=$(grep "^API_KEY=" "$cf" | cut -d'"' -f2)
                                 local s_model="$senior_model_name"
                                 break
                             }
@@ -1434,7 +1426,6 @@ for p in set(paths):
         echo "GÖREV MODU" > "$dummy_errors"
         if call_ai "$dummy_errors" "$collected"; then
             if apply_fixes; then
-                bash "$SISTEM_DIR/smart_task.sh" "$PROJECT_ROOT" "$user_task"
                 ok "Kodlar başarıyla yazıldı! Test ediliyor..."
                 run_autofix "$user_task"
                 exit $?
@@ -1470,7 +1461,7 @@ for p in set(paths):
         # Icerigi goreve dahil et ki Smart Fix kör kalmasin
         local task_with_context="$user_task\n\n=== İLGİLİ DOSYALAR ===\n$(cat "$collected")"
         if SMART_FIX_PROMPT="$sf_prompt_file" bash "$sf" "$PROJECT_ROOT" "$dummy_log" "$task_with_context" "1" "$MAX_LOOPS"; then
-            ok "✅ Smart Fix görevi tamamladı! Son bir kontrol için AutoFix döngüsü başlatılıyor..."
+            ok "✅ Smart Fix görevi tamamladı!"
             bash "$SISTEM_DIR/smart_task.sh" "$PROJECT_ROOT" "$user_task"
             run_autofix "$user_task"
             exit $?
@@ -1484,7 +1475,8 @@ for p in set(paths):
         # --- YENİ EKLENEN KISIM: ORKESTRATÖR BAŞARILIYSA ---
         log "Orkestratör çıktıları projeye uygulanıyor..."
         if apply_fixes; then
-            ok "Dosyalar uygulandı! Test ve hata çözümü için AutoFix döngüsü başlatılıyor..."
+            ok "Dosyalar uygulandı!"
+            bash "$SISTEM_DIR/smart_task.sh" "$PROJECT_ROOT" "$user_task"
             run_autofix "$user_task"
             exit $?
         else
