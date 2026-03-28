@@ -32,6 +32,37 @@ warn()  { echo -e "${YELLOW}⚠️  $*${NC}" | tee -a "$LOG_FILE"; }
 err()   { echo -e "${RED}❌ $*${NC}" | tee -a "$LOG_FILE"; }
 title() { echo -e "\n${BOLD}${BLUE}══ $* ══${NC}\n"; }
 
+# ── UI Uyumlu Zaman Kapsülü Yedeği (APK Factory Listesinde Görünür) ─────
+take_ui_backup() {
+    local msg="$1"
+    local bkp_dir="$SISTEM_DIR/yedekler"
+    local p_name=$(basename "$PROJECT_ROOT")
+    mkdir -p "$bkp_dir"
+    local ts=$(date +%Y%m%d-%H%M)
+    local ex="--exclude=*/build --exclude=*/.gradle"
+
+    if [[ -n "$msg" ]]; then
+        # Görev Modu: Promptun ilk 4 kelimesinden not üret
+        local note=$(echo "$msg" | awk '{print $1"_"$2"_"$3"_"$4}' | tr '[:upper:]' '[:lower:]' | tr -dc 'a-z0-9_')
+        [[ -z "$note" ]] && note="otonom_gorev"
+        
+        # Tam promptu txt'ye yaz ve yedeğe dahil et
+        echo "$msg" > "$PROJECT_ROOT/otonom_gorev_prompt.txt"
+        local bkp_file="$bkp_dir/${p_name}-not(${note})-${ts}-yedek.tar.gz"
+        
+        echo -e "  ${DIM}🛡️ Otonom görev öncesi orijinal yedek alınıyor...${NC}"
+        tar -czf "$bkp_file" $ex -C "$(dirname "$PROJECT_ROOT")" "$(basename "$PROJECT_ROOT")" 2>/dev/null
+        rm -f "$PROJECT_ROOT/otonom_gorev_prompt.txt"
+    else
+        # Hata Çözme Modu (af)
+        local bkp_file="$bkp_dir/${p_name}-not(autofix_hata_cozumu)-${ts}-yedek.tar.gz"
+        echo -e "  ${DIM}🛡️ AutoFix hata çözümü öncesi orijinal yedek alınıyor...${NC}"
+        tar -czf "$bkp_file" $ex -C "$(dirname "$PROJECT_ROOT")" "$(basename "$PROJECT_ROOT")" 2>/dev/null
+    fi
+    echo -e "  ${GREEN}✅ Orijinal Kod Güvende:${NC} $(basename "$bkp_file")"
+}
+
+
 check_deps() {
     local missing=()
     for dep in curl jq python3; do
@@ -1404,6 +1435,8 @@ main() {
         task|e)
             detect_project "${3:-}"
             select_provider
+            # --- ZIRH BURAYA TAKILDI ---
+            take_ui_backup "$2"
             run_task "$2"
             ;;
         apiler|api|a)  apiler_menu ;;
@@ -1420,7 +1453,8 @@ main() {
         run|*)
             detect_project "${2:-}"
             select_provider
-            
+            # --- ZIRH BURAYA TAKILDI ---
+            take_ui_backup ""
             # --- YENİ: Normal hata çözmede de yedekleri temizle ---
             clean_agent_backups
             if ! run_autofix; then
