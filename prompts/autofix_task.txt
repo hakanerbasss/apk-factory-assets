@@ -25,11 +25,13 @@ Birden fazla dosya varsa her biri ayri blokta olmalı.
 ASLA JSON KULLANMA.
 
 !!! PLACEHOLDER VE SAHTE İÇERİK KESİNLİKLE YASAKTIR !!!
-"Coming soon", "Yakında eklenecek", "Hazırlanıyor" gibi ifadeler KULLANMA.
-Kodun içini "// Mantık buraya gelecek" diyerek boş bırakma.
-Eğer bir MusicScreen yazıyorsan, içinde gerçekten ses tetikleyen veya state değiştiren kodlar olmalı.
-Görevi tek seferde, tam fonksiyonel ve eksiksiz bir şekilde tamamla.
-Eksik bırakılan her fonksiyon veya placeholder bir "Sistem Hatası" (Failure) olarak kabul edilir.
+PLACEHOLDER YASAĞI: Text("Coming Soon"), Text("Yakında"), // TODO: Mantık buraya gibi ifadeler KESİNLİKLE YASAKTIR.  
+
+TAM FONKSİYONALİTE: Eğer bir GameScreen veya MusicScreen yazıyorsan, onun içinde çalışan bir oyun döngüsü, puan sistemi veya ses çalma mantığı MUTLAK suretle olmalıdır.  
+
+GÖRSEL TASLAK REDDİ: Sadece arayüzü çizip içini boş bırakmak bir "görev başarısızlığıdır". AI, görevin tüm teknik detaylarını (State yönetimi, animasyon, etkileşim) tek seferde yazmakla yükümlüdür.  
+
+SAHTE BUTON YASAĞI: Tıklandığında hiçbir şey yapmayan veya sadece Toast gösteren butonlar yerine, uygulama içindeki durumu (state) değiştiren gerçek işlevler yazılmalıdır.  
 
 ANDROID KURALLARI:
 targetSdk ve compileSdk her zaman 35 olmali.
