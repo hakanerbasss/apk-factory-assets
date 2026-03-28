@@ -47,9 +47,13 @@ load_provider() {
 call_ai() {
     local sp="$1" um="$2" out="$ST_TMP/response.json"
     local payload
+    echo "$sp" > "$ST_TMP/sp.txt"
+    echo "$um" > "$ST_TMP/um.txt"
     payload=$(python3 -c "
 import json, sys
-sp, um, name, model, tokens = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
+name, model, tokens = sys.argv[1], sys.argv[2], int(sys.argv[3])
+sp = open('$ST_TMP/sp.txt').read()
+um = open('$ST_TMP/um.txt').read()
 if name == 'Claude':
     print(json.dumps({'model': model, 'max_tokens': tokens, 'system': sp,
         'messages': [{'role': 'user', 'content': um}]}))
@@ -60,7 +64,7 @@ elif name == 'Gemini':
 else:
     print(json.dumps({'model': model, 'max_tokens': tokens, 'temperature': 0.1,
         'messages': [{'role': 'system', 'content': sp}, {'role': 'user', 'content': um}]}))
-" "$sp" "$um" "$ST_NAME" "$ST_MODEL" "$ST_TOKENS" 2>/dev/null)
+" "$ST_NAME" "$ST_MODEL" "$ST_TOKENS" 2>/dev/null)
 
     local hc
     if [[ "$ST_NAME" == "Gemini" ]]; then
