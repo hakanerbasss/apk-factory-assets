@@ -253,7 +253,7 @@ Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
         api_fail_streak=0
 
         local ai_reasoning
-        ai_reasoning=$(echo "$ai_response" | grep -vE "^CMD:|^REPLACE_BLOCK:|^<<<|^===|^>>>|^NEW_FILE:" | grep -v '^\s*$' | head -n 2 | xargs || true)
+        ai_reasoning=$(echo "$ai_response" | grep -vE "^CMD:|^REPLACE_BLOCK:|^<<<|^===|^>>>|^NEW_FILE:" | grep -v '^\s*$' 2>/dev/null | head -n 2 | xargs || true)
         [[ -n "$ai_reasoning" ]] && echo -e "\033[2m🤖 ${ai_reasoning:0:120}\033[0m"
 
         if echo "$ai_response" | grep -q "^REPLACE_BLOCK:" && [[ $has_read_file -eq 0 ]]; then
@@ -291,7 +291,7 @@ Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
                 local cmd_out
                 cmd_out=$(eval "$cmd" 2>&1 | head -n 300 | cat -n || true)
                 local clean_out
-                clean_out=$(echo "$cmd_out" | grep -v '^\s*$' | head -2 | xargs || true)
+                clean_out=$(echo "$cmd_out" | grep -v '^\s*$' 2>/dev/null | head -2 | xargs || true)
                 echo -e "\033[2m   ↳ ${clean_out:0:100}\033[0m"
                 has_read_file=1; replace_fail_streak=0
                 local pressure=""
@@ -336,8 +336,8 @@ Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
             local replace_text
             replace_text=$(echo "$ai_response" | awk '/^===/{f=1;next} /^>>>END/{f=0} f{print}')
 
-            local s_head; s_head=$(echo "$search_text" | grep -v '^\s*$' | head -1 | xargs || true)
-            local r_head; r_head=$(echo "$replace_text" | grep -v '^\s*$' | head -1 | xargs || true)
+            local s_head; s_head=$(echo "$search_text" | grep -v '^\s*$' 2>/dev/null | head -1 | xargs || true)
+            local r_head; r_head=$(echo "$replace_text" | grep -v '^\s*$' 2>/dev/null | head -1 | xargs || true)
             echo -e "\033[0;31m   - ${s_head:0:80}\033[0m"
             echo -e "\033[0;32m   + ${r_head:0:80}\033[0m"
 
@@ -358,7 +358,7 @@ Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
                 replace_fail_streak=$((replace_fail_streak+1))
                 warn "REPLACE başarısız ($replace_fail_streak): $replace_output"
                 local s_first
-                s_first=$(echo "$search_text" | grep -v '^\s*$' | head -1 | sed 's/^[[:space:]]*//' | cut -c1-80)
+                s_first=$(echo "$search_text" | grep -v '^\s*$' 2>/dev/null | head -1 | sed 's/^[[:space:]]*//' | cut -c1-80)
                 local grep_hits
                 grep_hits=$(grep -n "$s_first" "$PROJECT_ROOT/$rp" 2>/dev/null | head -5 || true)
                 local auto_ctx
