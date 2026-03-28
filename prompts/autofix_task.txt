@@ -24,6 +24,13 @@ Dosya: satiri tam dosya yolu icermeli.
 Birden fazla dosya varsa her biri ayri blokta olmalı.
 ASLA JSON KULLANMA.
 
+!!! PLACEHOLDER VE SAHTE İÇERİK KESİNLİKLE YASAKTIR !!!
+"Coming soon", "Yakında eklenecek", "Hazırlanıyor" gibi ifadeler KULLANMA.
+Kodun içini "// Mantık buraya gelecek" diyerek boş bırakma.
+Eğer bir MusicScreen yazıyorsan, içinde gerçekten ses tetikleyen veya state değiştiren kodlar olmalı.
+Görevi tek seferde, tam fonksiyonel ve eksiksiz bir şekilde tamamla.
+Eksik bırakılan her fonksiyon veya placeholder bir "Sistem Hatası" (Failure) olarak kabul edilir.
+
 ANDROID KURALLARI:
 targetSdk ve compileSdk her zaman 35 olmali.
 Paket adi com.wizaicorp.* formatinda olmali.
