@@ -213,7 +213,7 @@ fix_one_missing() {
     log "Gideriliyor: $target_file — $missing_desc"
 
     local fixer_sp
-    fixer_sp=$(cat "$SISTEM_DIR/prompts/smart_fix_system.txt" 2>/dev/null || echo "Sen Android uzmanısın. REPLACE_BLOCK formatında cerrahi düzelt.")
+    fixer_sp=$(cat "$SISTEM_DIR/prompts/smart_task_system.txt" 2>/dev/null || echo "Sen Android uzmanısın. REPLACE_BLOCK formatında cerrahi düzelt.")
 
     local file_content
     file_content=$(cat "$PROJECT_ROOT/$target_file" 2>/dev/null | head -n 300 | cat -n || echo "DOSYA YOK")
