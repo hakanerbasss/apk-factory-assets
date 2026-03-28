@@ -349,6 +349,18 @@ Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
                 user_msg="HATA: SEARCH ve REPLACE aynı! Gerçekten değiştir."
                 continue
             fi
+            # --- ANTI-BLOAT (KOD ŞİŞİRME) KONTROLÜ ---
+            local file_lines=$(wc -l < "$PROJECT_ROOT/$rp" 2>/dev/null || echo 0)
+            local replace_lines=$(echo "$replace_text" | wc -l)
+            local search_lines=$(echo "$search_text" | wc -l)
+
+            # Eğer REPLACE bloğu tüm dosya boyutuna eşit/büyükse ve SEARCH bloğu çok küçükse AI tüm dosyayı kopyalamıştır!
+            if [[ $replace_lines -ge $file_lines && $file_lines -gt 30 && $search_lines -lt $((file_lines / 2)) ]]; then
+                warn "ŞİŞİRME TESPİTİ: AI tüm dosyayı REPLACE bloğuna kopyaladı."
+                replace_fail_streak=$((replace_fail_streak+1))
+                user_msg="HATA: KOD ŞİŞİRME TESPİT EDİLDİ! \nBütün dosyayı REPLACE bloğunun içine kopyaladın. Bu kurnazlık dosyada aynı kodların 2 kez yazılmasına (duplicate) sebep olur.\nTüm dosyayı ASLA kopyalama! SADECE değiştireceğin veya ekleyeceğin kısmı (cerrahi olarak) ver!"
+                continue
+            fi
 
             local replace_output
             if replace_output=$(apply_search_replace "$rp" "$search_text" "$replace_text" 2>&1); then
