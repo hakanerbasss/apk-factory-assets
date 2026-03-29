@@ -1396,6 +1396,14 @@ for p in set(paths):
         GOREV_KARMASIKLIK="karmasik"
     fi
 
+    # --- ORKESTRATÖR ŞALTERİ ---
+    ORK_ENABLED=$(grep "^ORCHESTRATOR_ENABLED=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo "true")
+    if [[ "$ORK_ENABLED" == "false" || "$ORK_ENABLED" == "0" ]]; then
+        echo -e "${YELLOW}🛑 Orkestratör çevrimdışı! Proje bölünmeden tek geçişe (Single Pass) devam ediliyor...${NC}"
+        GOREV_KARMASIKLIK="basit"
+    fi
+    # ---------------------------
+
     # 1. YENİ PROJE VE KARMAŞIK GÖREV -> ORKESTRATÖR
     if [[ -f "$ork_script" ]] && [[ "$is_new_project" == "true" ]] && [[ "$GOREV_KARMASIKLIK" == "karmasik" ]]; then
         echo -e "${YELLOW}🏗️ Orkestratör: Proje planlanıyor ve dosya dosya yazılıyor...${NC}"
