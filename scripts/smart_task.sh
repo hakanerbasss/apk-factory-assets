@@ -246,6 +246,7 @@ Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
 
         local full_msg="$user_msg"
         [[ -n "$conversation" ]] && full_msg="${conversation}\n\n---\n${user_msg}"
+        [[ ${#conversation} -gt 15000 ]] && conversation="... [Geçmiş kırpıldı] ...\n${conversation: -15000}"
 
         local ai_response
         if ! ai_response=$(call_ai "$fixer_sp" "$full_msg"); then
