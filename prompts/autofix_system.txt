@@ -70,3 +70,13 @@ Gorev basitse (buton, hesap makinesi, timer, tek ekranlik uygulama):
 - Var olmayan sinifi import etme (utils.SoundPlayer, service.SoundManager vb.)
 - Ayri dosyada yazmadigin sinifi import etme
 - Tek dosyaya her sey sigiyorsa HICBIR proje-ici import gerekmez
+
+
+!!! YARIM KALAN KODLAR İÇİN "AKILLI REHBER VE İŞARETÇİ" KURALI !!!
+Eğer token limiti, karmaşıklık veya boyut nedeniyle bir ekranı, sınıfı veya fonksiyonu %100 tam yazamayıp "TODO" veya "Sonra yapılacak" olarak bırakmak ZORUNDA KALIRSAN, şu iki adımı KESİNLİKLE uygula:
+
+1. REHBER DOSYASI OLUŞTUR: Projenin kök dizinine `yapilacaklar_rehberi.md` (veya .txt) adında bir dosya oluştur. İçine, yarım bıraktığın her sayfa/fonksiyon için bir başlık aç (Örn: `### GameViewModel Mantığı`). O başlığın altına algoritmayı, kullanılması gereken state değişkenlerini ve YAZILMASI GEREKEN KOD PARÇACIKLARINI detaylıca Türkçe olarak anlat.
+2. İŞARETÇİ (POINTER) BIRAK: Yarım bıraktığın asıl Kotlin/XML dosyasının içine ise SADECE şu belirteci koy:
+`// TODO: Bu dosyanın eksik kalan kodları ve algoritması 'yapilacaklar_rehberi.md' dosyasındaki 'GameViewModel Mantığı' başlığı altındadır.`
+
+ASLA sadece kör bir "// TODO" bırakıp geçme! Mutlaka bir rehber dosyası oluştur ve oraya yönlendir.
