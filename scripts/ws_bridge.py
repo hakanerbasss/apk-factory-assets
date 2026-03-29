@@ -1960,6 +1960,113 @@ class App : Application() {{
                     except Exception as ex:
                         await ws.send(json.dumps({"type":"error","text":f"Export hatası: {ex}"}))
 
+                elif t == "list_project_files":
+                    pname = d.get("project", "")
+                    rel_path = d.get("path", "")
+                    proj_dir = get_proj_dir(pname)
+                    target_dir = os.path.join(proj_dir, rel_path) if rel_path else proj_dir
+                    SKIP_DIRS  = {"build", ".gradle", ".idea", ".git", "outputs", "intermediates", "tmp", "__pycache__"}
+                    SKIP_FILES = {".DS_Store", "gradlew.bat"}
+                    entries = []
+                    try:
+                        if not os.path.isdir(target_dir):
+                            await ws.send(json.dumps({"type":"error","text":f"Klasör bulunamadı: {target_dir}"}))
+                        else:
+                            items = sorted(os.listdir(target_dir), key=lambda x: (not os.path.isdir(os.path.join(target_dir, x)), x.lower()))
+                            for name in items:
+                                if name in SKIP_DIRS or name in SKIP_FILES: continue
+                                full = os.path.join(target_dir, name)
+                                rel  = os.path.relpath(full, proj_dir)
+                                is_dir = os.path.isdir(full)
+                                size   = 0 if is_dir else os.path.getsize(full)
+                                entries.append({"name":name,"path":rel,"type":"dir" if is_dir else "file","size":size,"ext":"" if is_dir else os.path.splitext(name)[1].lower()})
+                            await ws.send(json.dumps({"type":"project_files","project":pname,"path":rel_path,"entries":entries}))
+                    except Exception as e:
+                        await ws.send(json.dumps({"type":"error","text":f"list_project_files: {e}"}))
+
+                elif t == "read_project_file":
+                    pname    = d.get("project", "")
+                    rel_path = d.get("path", "")
+                    proj_dir = get_proj_dir(pname)
+                    full     = os.path.join(proj_dir, rel_path)
+                    try:
+                        if not os.path.isfile(full):
+                            await ws.send(json.dumps({"type":"error","text":f"Dosya yok: {rel_path}"}))
+                        else:
+                            size = os.path.getsize(full)
+                            TEXT_EXTS = {".kt",".java",".xml",".gradle",".properties",".json",".txt",".md",".py",".sh",".yaml",".yml",".html",".css",".js",".pro"}
+                            ext = os.path.splitext(full)[1].lower()
+                            if ext not in TEXT_EXTS:
+                                await ws.send(json.dumps({"type":"project_file_content","path":rel_path,"content":f"[Binary dosya — {size} byte, düzenlenemez]","binary":True,"size":size}))
+                            elif size > 500000:
+                                await ws.send(json.dumps({"type":"project_file_content","path":rel_path,"content":f"[Dosya çok büyük: {size//1024}KB]","binary":True,"size":size}))
+                            else:
+                                content = open(full, encoding="utf-8", errors="replace").read()
+                                await ws.send(json.dumps({"type":"project_file_content","path":rel_path,"content":content,"binary":False,"size":size}))
+                    except Exception as e:
+                        await ws.send(json.dumps({"type":"error","text":f"read_project_file: {e}"}))
+
+                elif t == "write_project_file":
+                    pname    = d.get("project", "")
+                    rel_path = d.get("path", "")
+                    content  = d.get("content", "")
+                    proj_dir = get_proj_dir(pname)
+                    full     = os.path.join(proj_dir, rel_path)
+                    try:
+                        os.makedirs(os.path.dirname(full), exist_ok=True)
+                        open(full, "w", encoding="utf-8").write(content)
+                        await ws.send(json.dumps({"type":"project_file_written","path":rel_path,"ok":True}))
+                    except Exception as e:
+                        await ws.send(json.dumps({"type":"project_file_written","path":rel_path,"ok":False,"error":str(e)}))
+
+                elif t == "rename_project_file":
+                    pname    = d.get("project", "")
+                    rel_path = d.get("path", "")
+                    new_name = d.get("new_name", "")
+                    proj_dir = get_proj_dir(pname)
+                    old_full = os.path.join(proj_dir, rel_path)
+                    new_full = os.path.join(os.path.dirname(old_full), new_name)
+                    try:
+                        if not os.path.exists(old_full):
+                            await ws.send(json.dumps({"type":"error","text":f"Bulunamadı: {rel_path}"}))
+                        elif os.path.exists(new_full):
+                            await ws.send(json.dumps({"type":"error","text":f"Bu isim zaten var: {new_name}"}))
+                        else:
+                            os.rename(old_full, new_full)
+                            new_rel = os.path.relpath(new_full, proj_dir)
+                            await ws.send(json.dumps({"type":"project_file_renamed","old_path":rel_path,"new_path":new_rel,"ok":True}))
+                    except Exception as e:
+                        await ws.send(json.dumps({"type":"error","text":f"rename: {e}"}))
+
+                elif t == "delete_project_file":
+                    pname    = d.get("project", "")
+                    rel_path = d.get("path", "")
+                    is_dir   = d.get("is_dir", False)
+                    proj_dir = get_proj_dir(pname)
+                    full     = os.path.join(proj_dir, rel_path)
+                    try:
+                        if not os.path.exists(full):
+                            await ws.send(json.dumps({"type":"error","text":f"Bulunamadı: {rel_path}"}))
+                        else:
+                            if is_dir:
+                                import shutil as _sh; _sh.rmtree(full)
+                            else:
+                                os.remove(full)
+                            await ws.send(json.dumps({"type":"project_file_deleted","path":rel_path,"ok":True}))
+                    except Exception as e:
+                        await ws.send(json.dumps({"type":"project_file_deleted","path":rel_path,"ok":False,"error":str(e)}))
+
+                elif t == "create_project_folder":
+                    pname    = d.get("project", "")
+                    rel_path = d.get("path", "")
+                    proj_dir = get_proj_dir(pname)
+                    full     = os.path.join(proj_dir, rel_path)
+                    try:
+                        os.makedirs(full, exist_ok=True)
+                        await ws.send(json.dumps({"type":"project_file_written","path":rel_path,"ok":True}))
+                    except Exception as e:
+                        await ws.send(json.dumps({"type":"project_file_written","path":rel_path,"ok":False,"error":str(e)}))
+
                 elif t == "system_info":
                     await ws.send(json.dumps({"type":"system_info","data":{
                         "sistem_dir":SISTEM_DIR,"home":HOME,
