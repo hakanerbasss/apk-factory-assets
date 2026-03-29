@@ -142,6 +142,11 @@ for i in range(len(file_bare)):
     if all(file_bare[i+j] == search_lines[j] for j in range(len(search_lines))):
         match_start = i; break
 
+if match_start == -1 and len(search_lines) > 1:
+    for i in range(len(file_bare)-1):
+        if file_bare[i] == search_lines[0] and file_bare[i+1] == search_lines[1]:
+            match_start = i; break
+
 if match_start == -1:
     first = search_lines[0]
     hints = []
