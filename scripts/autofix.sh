@@ -1431,7 +1431,7 @@ for p in set(paths):
     elif [[ "$is_new_project" == "true" ]] && [[ "$GOREV_KARMASIKLIK" == "basit" ]]; then
         echo -e "${YELLOW}⚡ Basit Görev: Tek geçiş (Single Pass) ile hızlıca yazılıyor...${NC}"
         local dummy_errors="$TMP_DIR/dummy_errors.txt"
-        echo "GÖREV MODU" > "$dummy_errors"
+        echo -e "GÖREV MODU\n\n=== YAPILACAK GÖREV ===\n$user_task" > "$dummy_errors"
         if call_ai "$dummy_errors" "$collected"; then
             if apply_fixes; then
                 ok "Kodlar başarıyla yazıldı!"
