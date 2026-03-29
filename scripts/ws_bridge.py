@@ -1963,12 +1963,12 @@ class App : Application() {{
                 elif t == "check_syntax":
                     pname = d.get("project", "")
                     proj_dir = get_proj_dir(pname)
-                    import subprocess
                     cmd = f"cd {proj_dir} && ./gradlew compileDebugKotlin"
                     try:
-                        res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-                        log = res.stdout + "\n" + res.stderr
-                        await ws.send(json.dumps({"type":"syntax_check_result", "ok": (res.returncode == 0), "log": log}))
+                        proc = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+                        stdout, _ = await proc.communicate()
+                        log = stdout.decode("utf-8", errors="replace")
+                        await ws.send(json.dumps({"type":"syntax_check_result", "ok": (proc.returncode == 0), "log": log}))
                     except Exception as e:
                         await ws.send(json.dumps({"type":"syntax_check_result", "ok": False, "log": str(e)}))
 
