@@ -83,6 +83,14 @@ JSON format\u0131:
   }
 }
 
+!!! EKSİK KOD (TO DO) BIRAKMA VE İSKELETLEME KURALI !!!
+Eğer token limiti veya karmaşıklık nedeniyle bir fonksiyonu %100 tam yazamayacaksan, ASLA boş bırakma!
+Bunun yerine, o bölümün 'AKILLI İSKELETİNİ' (Pseudocode) detaylı Türkçe yorum satırlarıyla oluştur.
+İçine şunları yaz:
+1. Fonksiyonun amacı.
+2. Kullanacağı state/parametreler.
+3. Adım adım algoritması (1. Şunu yap, 2. Buraya gönder vb.).
+
 !!! KURALLAR !!!
 - BASIT gorev (buton, hesap makinesi, timer, tek ekran) = MAKSIMUM 2 dosya (MainActivity.kt + 1 yardimci)
 - ORTA gorev (liste, form, ayarlar) = MAKSIMUM 3 dosya
@@ -193,6 +201,15 @@ Dosya: {path}
 ```kotlin
 // tam dosya
 ```
+
+
+!!! EKSİK KOD (TO DO) BIRAKMA VE İSKELETLEME KURALI !!!
+Eğer token limiti veya karmaşıklık nedeniyle bir fonksiyonu %100 tam yazamayacaksan, ASLA boş bırakma!
+Bunun yerine, o bölümün 'AKILLI İSKELETİNİ' (Pseudocode) detaylı Türkçe yorum satırlarıyla oluştur.
+İçine şunları yaz:
+1. Fonksiyonun amacı.
+2. Kullanacağı state/parametreler.
+3. Adım adım algoritması (1. Şunu yap, 2. Buraya gönder vb.).
 
 KURALLAR:
 - SADECE {os.path.basename(path)} yaz

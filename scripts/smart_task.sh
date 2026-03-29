@@ -6,6 +6,14 @@
 
 set +e
 
+# --- SMART TASK AÇ/KAPA KONTROLÜ ---
+ST_ENABLED=$(grep "^SMART_TASK_ENABLED=" ~/.config/autofix.conf 2>/dev/null | cut -d= -f2 || echo "true")
+if [[ "$ST_ENABLED" == "false" || "$ST_ENABLED" == "0" ]]; then
+    echo -e "\033[0;33m[st] 🛑 Smart Task devre dışı bırakılmış. Pas geçiliyor...\033[0m"
+    exit 0
+fi
+# -----------------------------------
+
 PROJECT_ROOT="${1:-}"
 USER_TASK="${2:-}"
 
