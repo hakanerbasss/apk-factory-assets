@@ -42,9 +42,14 @@ load_provider() {
 call_ai() {
     local sp="$1" um="$2" out="$TMP_DIR/st_response.json"
     local payload
+    echo "$sp" > "$TMP_DIR/st_sp.txt"
+    echo "$um" > "$TMP_DIR/st_um.txt"
+    local payload
     payload=$(python3 -c "
 import json, sys
-sp, um, name, model, tokens = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
+name, model, tokens = sys.argv[1], sys.argv[2], int(sys.argv[3])
+sp = open('$TMP_DIR/st_sp.txt', encoding='utf-8').read()
+um = open('$TMP_DIR/st_um.txt', encoding='utf-8').read()
 if name == 'Claude':
     print(json.dumps({'model': model, 'max_tokens': tokens, 'system': sp,
         'messages': [{'role': 'user', 'content': um}]}))
@@ -55,7 +60,7 @@ elif name == 'Gemini':
 else:
     print(json.dumps({'model': model, 'max_tokens': tokens, 'temperature': 0.1,
         'messages': [{'role': 'system', 'content': sp}, {'role': 'user', 'content': um}]}))
-" "$sp" "$um" "$SF_NAME" "$SF_MODEL" "$SF_TOKENS")
+" "$SF_NAME" "$SF_MODEL" "$SF_TOKENS")
 
     local hc
     if [[ "$SF_NAME" == "Gemini" ]]; then
@@ -216,7 +221,7 @@ fix_one_missing() {
     fixer_sp=$(cat "$SISTEM_DIR/prompts/smart_task_system.txt" 2>/dev/null || echo "Sen Android uzmanısın. REPLACE_BLOCK formatında cerrahi düzelt.")
 
     local file_content
-    file_content=$(cat "$PROJECT_ROOT/$target_file" 2>/dev/null | head -n 300 | cat -n || echo "DOSYA YOK")
+    file_content=$(cat "$PROJECT_ROOT/$target_file" 2>/dev/null | head -n 300 || echo "DOSYA YOK")
 
     local user_msg="GÖREV: $USER_TASK
 
@@ -253,14 +258,14 @@ Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
         api_fail_streak=0
 
         local ai_reasoning
-        ai_reasoning=$(echo "$ai_response" | grep -vE "^CMD:|^REPLACE_BLOCK:|^<<<|^===|^>>>|^NEW_FILE:" | grep -v '^\s*$' 2>/dev/null | head -n 2 | xargs || true)
+        ai_reasoning=$(echo "$ai_response" | grep -vE "^CMD:|^REPLACE_BLOCK:|^<<<|^===|^>>>|^NEW_FILE:" | grep -v '^\s*$' 2>/dev/null | head -n 2 || true)
         [[ -n "$ai_reasoning" ]] && echo -e "\033[2m🤖 ${ai_reasoning:0:120}\033[0m"
 
         if echo "$ai_response" | grep -q "^REPLACE_BLOCK:" && [[ $has_read_file -eq 0 ]]; then
             local rp_early
-            rp_early=$(echo "$ai_response" | grep "^REPLACE_BLOCK:" | head -1 | cut -d: -f2- | xargs)
+            rp_early=$(echo "$ai_response" | grep "^REPLACE_BLOCK:" | head -1 | cut -d: -f2- | tr -d " " | tr -d "\r" | tr -d "\n")
             local auto_read=""
-            [[ -f "$PROJECT_ROOT/$rp_early" ]] && auto_read=$(cat "$PROJECT_ROOT/$rp_early" | head -n 200 | cat -n)
+            [[ -f "$PROJECT_ROOT/$rp_early" ]] && auto_read=$(cat "$PROJECT_ROOT/$rp_early" | head -n 200)
             has_read_file=1
             user_msg="KURAL İHLALİ: Önce CMD ver. Dosya otomatik okundu:\n=== $rp_early ===\n${auto_read}\n\nREPLACE_BLOCK ver."
             continue
@@ -272,14 +277,14 @@ Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
 
             if [[ $cmd_streak -ge 5 ]]; then
                 warn "CMD limiti aşıldı, REPLACE_BLOCK zorlanıyor."
-                user_msg="CMD LİMİTİ: $cmd_streak komut çalıştırdın. Artık REPLACE_BLOCK ver.\n\nDOSYA:\n$(cat "$PROJECT_ROOT/$target_file" 2>/dev/null | head -n 200 | cat -n)"
+                user_msg="CMD LİMİTİ: $cmd_streak komut çalıştırdın. Artık REPLACE_BLOCK ver.\n\nDOSYA:\n$(cat "$PROJECT_ROOT/$target_file" 2>/dev/null | head -n 200)"
                 cmd_streak=0; last_cmd=""; conversation=""
                 continue
             fi
 
             if [[ -n "$last_cmd" && "$cmd" == "$last_cmd" ]]; then
                 warn "Tekrar eden CMD engellendi."
-                user_msg="TEKRAR EDEN CMD. Direkt REPLACE_BLOCK ver.\n\nDOSYA:\n$(cat "$PROJECT_ROOT/$target_file" 2>/dev/null | head -n 200 | cat -n)"
+                user_msg="TEKRAR EDEN CMD. Direkt REPLACE_BLOCK ver.\n\nDOSYA:\n$(cat "$PROJECT_ROOT/$target_file" 2>/dev/null | head -n 200)"
                 last_cmd=""; cmd_streak=$((cmd_streak+1))
                 continue
             fi
@@ -289,9 +294,9 @@ Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
                 log "CMD ($cmd_streak/5): $cmd"
                 cd "$PROJECT_ROOT"
                 local cmd_out
-                cmd_out=$(eval "$cmd" 2>&1 | head -n 300 | cat -n || true)
+                cmd_out=$(eval "$cmd" 2>&1 | head -n 300 || true)
                 local clean_out
-                clean_out=$(echo "$cmd_out" | grep -v '^\s*$' 2>/dev/null | head -2 | xargs || true)
+                clean_out=$(echo "$cmd_out" | grep -v '^\s*$' 2>/dev/null | head -2 || true)
                 echo -e "\033[2m   ↳ ${clean_out:0:100}\033[0m"
                 has_read_file=1; replace_fail_streak=0
                 local pressure=""
@@ -305,10 +310,10 @@ Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
 
         if echo "$ai_response" | grep -q "^REPLACE_BLOCK:" && [[ $replace_fail_streak -ge 2 ]]; then
             local rp_lock
-            rp_lock=$(echo "$ai_response" | grep "^REPLACE_BLOCK:" | head -1 | cut -d: -f2- | xargs)
+            rp_lock=$(echo "$ai_response" | grep "^REPLACE_BLOCK:" | head -1 | cut -d: -f2- | tr -d " " | tr -d "\r" | tr -d "\n")
             warn "REPLACE $replace_fail_streak kez başarısız — otomatik okunuyor: $rp_lock"
             local auto_ctx
-            auto_ctx=$(cat "$PROJECT_ROOT/$rp_lock" 2>/dev/null | head -n 150 | cat -n)
+            auto_ctx=$(cat "$PROJECT_ROOT/$rp_lock" 2>/dev/null | head -n 150)
             has_read_file=1
             user_msg="REPLACE $replace_fail_streak KER BAŞARISIZ.\n\nDOSYA ($rp_lock):\n${auto_ctx}\n\nAYNEN kopyala."
             continue
@@ -316,7 +321,7 @@ Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
 
         if echo "$ai_response" | grep -q "^NEW_FILE:"; then
             local nf_path
-            nf_path=$(echo "$ai_response" | grep "^NEW_FILE:" | head -1 | cut -d: -f2- | xargs)
+            nf_path=$(echo "$ai_response" | grep "^NEW_FILE:" | head -1 | cut -d: -f2- | tr -d " " | tr -d "\r" | tr -d "\n")
             local nf_content
             nf_content=$(echo "$ai_response" | awk '/^<<<CONTENT/{f=1;next} /^>>>END/{f=0} f{print}')
             if [[ -n "$nf_path" && -n "$nf_content" ]]; then
@@ -330,14 +335,14 @@ Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
 
         if echo "$ai_response" | grep -q "^REPLACE_BLOCK:"; then
             local rp
-            rp=$(echo "$ai_response" | grep "^REPLACE_BLOCK:" | head -1 | cut -d: -f2- | xargs)
+            rp=$(echo "$ai_response" | grep "^REPLACE_BLOCK:" | head -1 | cut -d: -f2- | tr -d " " | tr -d "\r" | tr -d "\n")
             local search_text
             search_text=$(echo "$ai_response" | awk '/^<<<SEARCH/{f=1;next} /^===/{f=0} f{print}')
             local replace_text
             replace_text=$(echo "$ai_response" | awk '/^===/{f=1;next} /^>>>END/{f=0} f{print}')
 
-            local s_head; s_head=$(echo "$search_text" | grep -v '^\s*$' 2>/dev/null | head -1 | xargs || true)
-            local r_head; r_head=$(echo "$replace_text" | grep -v '^\s*$' 2>/dev/null | head -1 | xargs || true)
+            local s_head; s_head=$(echo "$search_text" | grep -v '^\s*$' 2>/dev/null | head -1 || true)
+            local r_head; r_head=$(echo "$replace_text" | grep -v '^\s*$' 2>/dev/null | head -1 || true)
             echo -e "\033[0;31m   - ${s_head:0:80}\033[0m"
             echo -e "\033[0;32m   + ${r_head:0:80}\033[0m"
 
@@ -374,7 +379,7 @@ Bu eksikliği REPLACE_BLOCK ile cerrahi olarak doldur. İLK ADIMIN CMD OLMALI."
                 local grep_hits
                 grep_hits=$(grep -n "$s_first" "$PROJECT_ROOT/$rp" 2>/dev/null | head -5 || true)
                 local auto_ctx
-                auto_ctx=$(cat "$PROJECT_ROOT/$rp" 2>/dev/null | head -n 150 | cat -n)
+                auto_ctx=$(cat "$PROJECT_ROOT/$rp" 2>/dev/null | head -n 150)
                 user_msg="REPLACE BAŞARISIZ.\nHata: ${replace_output}\nAranan: '${s_first}'\nEşleşmeler: ${grep_hits:-yok}\n\nDOSYA:\n${auto_ctx}\n\nAYNEN kopyala."
             fi
             continue
@@ -435,9 +440,9 @@ main() {
 
         for eksik in "${eksikler[@]}"; do
             local target_file
-            target_file=$(echo "$eksik" | cut -d'|' -f1 | sed 's/^EKSIK: //;s/^IMPORT_EKSIK: //;s/^BAGIMLILIK_EKSIK: //' | xargs)
+            target_file=$(echo "$eksik" | cut -d'|' -f1 | sed 's/^EKSIK: //;s/^IMPORT_EKSIK: //;s/^BAGIMLILIK_EKSIK: //')
             local missing_desc
-            missing_desc=$(echo "$eksik" | cut -d'|' -f2 | xargs)
+            missing_desc=$(echo "$eksik" | cut -d'|' -f2)
 
             if fix_one_missing "$target_file" "$missing_desc"; then
                 total_fixed=$((total_fixed+1))
@@ -446,6 +451,12 @@ main() {
                 warn "Giderilemedi: $missing_desc"
             fi
         done
+
+        if [[ $round_fixed -gt 0 ]]; then
+            local p_name=$(basename "$PROJECT_ROOT")
+            tar -czf "$SISTEM_DIR/yedekler/${p_name}-SmartTask_AraYedek-$(date +%H%M).tar.gz" --exclude=*/build --exclude=*/.gradle -C "$(dirname "$PROJECT_ROOT")" "$p_name" 2>/dev/null
+            ok "🛡️ Tur başarıyla tamamlandı, Ara Yedek alındı!"
+        fi
 
         if [[ $round_fixed -eq 0 ]]; then
             warn "Bu turda hiçbir eksiklik giderilemedi. Çıkılıyor."
