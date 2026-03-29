@@ -1960,6 +1960,18 @@ class App : Application() {{
                     except Exception as ex:
                         await ws.send(json.dumps({"type":"error","text":f"Export hatası: {ex}"}))
 
+                elif t == "check_syntax":
+                    pname = d.get("project", "")
+                    proj_dir = get_proj_dir(pname)
+                    import subprocess
+                    cmd = f"cd {proj_dir} && ./gradlew compileDebugKotlin"
+                    try:
+                        res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                        log = res.stdout + "\n" + res.stderr
+                        await ws.send(json.dumps({"type":"syntax_check_result", "ok": (res.returncode == 0), "log": log}))
+                    except Exception as e:
+                        await ws.send(json.dumps({"type":"syntax_check_result", "ok": False, "log": str(e)}))
+
                 elif t == "list_project_files":
                     pname = d.get("project", "")
                     rel_path = d.get("path", "")
