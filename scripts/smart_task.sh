@@ -96,7 +96,15 @@ apply_search_replace() {
     local rel_path="$1" search_text="$2" replace_text="$3"
     local abs_path="$rel_path"
     [[ "$rel_path" != /* ]] && abs_path="$PROJECT_ROOT/$rel_path"
-    [[ ! -f "$abs_path" ]] && { echo "HATA: Dosya yok: $abs_path"; return 1; }
+    if [[ ! -f "$abs_path" ]]; then
+        if [[ "$abs_path" == *.kt || "$abs_path" == *.xml || "$abs_path" == *.gradle || "$abs_path" == *.java ]]; then
+            mkdir -p "$(dirname "$abs_path")"
+            touch "$abs_path"
+        else
+            echo "HATA: Dosya yok: $abs_path"
+            return 1
+        fi
+    fi
 
     python3 - "$abs_path" "$search_text" "$replace_text" << 'PYEOF'
 import sys
@@ -119,6 +127,11 @@ if search_text in content:
 
 search_lines = [l.strip() for l in search_text.splitlines() if l.strip()]
 file_bare    = [l.strip() for l in lines]
+if not file_bare:
+    open(path, 'w', encoding='utf-8').write(replace_text)
+    print(f"REPLACE OK (YENI DOSYA): 0 -> {len(replace_text.splitlines())} satir")
+    sys.exit(0)
+
 if not search_lines:
     print("HATA: SEARCH blogu bos"); sys.exit(1)
 
@@ -192,7 +205,11 @@ RAPOR FORMATI:
 Eksik yoksa tek satır: TEMİZ
 
 Eksik varsa her biri için (birer satır):
-EKSIK: <dosya_yolu> | <ne eksik>
+DOSYA YOLLARI İÇİN KESİN KURAL:
+- com.paket.adi gibi noktalı klasör adları YASAKTIR. Her zaman eğik çizgi (/) kullan.
+- Dosya yolu MUHAKKAK bir dosya adı ve uzantısı (.kt vb.) ile bitmelidir. Sonu (/) ile biten yollar KESİNLİKLE YASAKTIR! Sadece yukarıdaki 'PROJE DURUMU' listesinde var olan tam yolları kullan.
+
+EKSIK: <tam_dosya_yolu.kt> | <ne eksik>
 IMPORT_EKSIK: <dosya_yolu> | <eksik import satırı>
 BAGIMLILIK_EKSIK: app/build.gradle | <eksik dependency satırı>
 
