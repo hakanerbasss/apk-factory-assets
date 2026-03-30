@@ -83,3 +83,8 @@ Gorev basitse (buton, ses, hesap makinesi, tek ekran):
 - Yazmadigin sinifi import etme
 - utils, service, helper paketi UYDURMA
 - Tek dosyada her sey sigiyorsa proje-ici import GEREKSIZ
+
+
+KRITIK KURAL: enableEdgeToEdge() ASLA KULLANMA. Bunun yerine:
+WindowCompat.setDecorFitsSystemWindows(window, true)
+Sistem UI barları (status bar, nav bar) uygulama alanına GİRMEMELİ.

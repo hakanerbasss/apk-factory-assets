@@ -122,6 +122,8 @@ import androidx.compose.ui.unit.sp
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Edge-to-edge KAPALI — sistem UI alanlarına girme
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, true)
         setContent { Text("AI Kodluyor...") }
     }
 }
