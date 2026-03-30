@@ -1961,78 +1961,133 @@ class App : Application() {{
                         await ws.send(json.dumps({"type":"error","text":f"Export hatası: {ex}"}))
                 elif t == "ask_ai_solution":
                     async def fetch_solution():
+                        import urllib.request, urllib.error, ssl
                         try:
-                            pname = d.get("project", "")
-                            err_log = d.get("error_log", "")
-                            code = d.get("code", "")
-                            
-                            SDIR = "/storage/emulated/0/termux-otonom-sistem"
+                            pname    = d.get("project", "")
+                            err_log  = d.get("error_log", "")
+                            code     = d.get("code", "")
+
+                            SDIR  = "/storage/emulated/0/termux-otonom-sistem"
                             HOME2 = os.path.expanduser("~")
-                            ac = f"{HOME2}/.config/autofix.conf"
-                            cfg = {"DEFAULT_PROVIDER":"Claude","DEFAULT_MODEL":"claude-haiku-4-5-20251001"}
-                            if __import__("os").path.exists(ac):
+                            ac    = f"{HOME2}/.config/autofix.conf"
+
+                            # autofix.conf oku
+                            cfg = {"DEFAULT_PROVIDER": "Claude"}
+                            if os.path.exists(ac):
                                 for line in open(ac):
-                                    line=line.strip()
+                                    line = line.strip()
                                     if "=" in line and not line.startswith("#"):
-                                        k,v=line.split("=",1)
-                                        cfg[k.strip()]=v.strip().strip('"').strip("'")
-                            
-                            prov = cfg.get("DEFAULT_PROVIDER","Claude").lower()
-                            model = cfg.get("DEFAULT_MODEL","")
-                            api_key = read_api_key(f"{SDIR}/apiler/{prov}.conf")
-                            
+                                        k, v = line.split("=", 1)
+                                        cfg[k.strip()] = v.strip().strip('"').strip("'")
+
+                            prov      = cfg.get("DEFAULT_PROVIDER", "Claude").lower()
+                            prov_conf = f"{SDIR}/apiler/{prov}.conf"
+
+                            # Conf dosyasından oku (autofix.sh / smart_fix.sh mantığı)
+                            def read_conf_val(path, key):
+                                try:
+                                    for line in open(path):
+                                        s = line.strip()
+                                        if s.startswith(f"{key}="):
+                                            return s[len(key)+1:].strip().strip('"').strip("'")
+                                except: pass
+                                return ""
+
+                            api_key = read_conf_val(prov_conf, "API_KEY")
+                            model   = read_conf_val(prov_conf, "MODEL") or cfg.get("DEFAULT_MODEL", "claude-haiku-4-5-20251001")
+                            api_url = read_conf_val(prov_conf, "API_URL")
+
                             if not api_key:
-                                await ws.send(json.dumps({"type":"ai_solution_result", "ok": False, "text": f"❌ API Anahtarı eksik: {prov.title()}\nAyarlar'dan eklediğinizden emin olun."}))
+                                prov_conf_exists = os.path.exists(prov_conf)
+                                detail = f"Conf: {prov_conf} ({'var' if prov_conf_exists else 'YOK'})"
+                                await ws.send(json.dumps({"type":"ai_solution_result", "ok": False,
+                                    "text": f"❌ API Anahtarı eksik: {prov.title()}\n{detail}\nAyarlar'dan eklediğinizden emin olun."}))
                                 return
-                            
-                            sys_p = "Sen kıdemli bir Android geliştiricisisin. Verilen syntax/derleme hatasını incele, sorunun nedenini kısaca açıkla ve sadece düzeltilmesi gereken kod bloğunu ver. Gevezelik yapma, net ol."
+
+                            sys_p    = "Sen kıdemli bir Android geliştiricisisin. Verilen syntax/derleme hatasını incele, sorunun nedenini kısaca açıkla ve sadece düzeltilmesi gereken kod bloğunu ver. Gevezelik yapma, net ol."
                             user_txt = f"Hata Logu:\n{err_log}\n\nDosya Kodu:\n{code}"
-                            
-                            import urllib.request, ssl
+
                             ctx2 = ssl.create_default_context()
                             ctx2.check_hostname = False
-                            ctx2.verify_mode = ssl.CERT_NONE
-                            
-                            req = None
+                            ctx2.verify_mode    = ssl.CERT_NONE
+
+                            # Provider bazlı payload + request oluştur
                             if prov == "claude":
-                                payload = {"model":model,"max_tokens":4000,"system":sys_p,"messages":[{"role":"user","content":user_txt}]}
-                                req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=json.dumps(payload).encode(), headers={"x-api-key":api_key,"anthropic-version":"2023-06-01","content-type":"application/json"}, method="POST")
+                                url     = api_url or "https://api.anthropic.com/v1/messages"
+                                payload = {"model": model, "max_tokens": 4000, "system": sys_p,
+                                           "messages": [{"role": "user", "content": user_txt}]}
+                                headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                                           "content-type": "application/json"}
                             elif prov == "gemini":
-                                payload = {"contents":[{"parts":[{"text": f"{sys_p}\n\n{user_txt}"}]}]}
-                                req = urllib.request.Request(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}", data=json.dumps(payload).encode(), headers={"content-type":"application/json"}, method="POST")
+                                url     = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+                                payload = {"systemInstruction": {"parts": [{"text": sys_p}]},
+                                           "contents": [{"parts": [{"text": user_txt}]}],
+                                           "generationConfig": {"maxOutputTokens": 4000, "temperature": 0.1}}
+                                headers = {"content-type": "application/json"}
                             elif prov == "deepseek":
-                                payload = {"model":model,"messages":[{"role":"system","content":sys_p},{"role":"user","content":user_txt}]}
-                                req = urllib.request.Request("https://api.deepseek.com/chat/completions", data=json.dumps(payload).encode(), headers={"Authorization":f"Bearer {api_key}","content-type":"application/json"}, method="POST")
+                                url     = api_url or "https://api.deepseek.com/chat/completions"
+                                payload = {"model": model, "max_tokens": 4000, "temperature": 0.1,
+                                           "messages": [{"role": "system", "content": sys_p},
+                                                        {"role": "user",   "content": user_txt}]}
+                                headers = {"Authorization": f"Bearer {api_key}", "content-type": "application/json"}
                             elif prov in ["openai", "groq"]:
-                                url = "https://api.openai.com/v1/chat/completions" if prov=="openai" else "https://api.groq.com/openai/v1/chat/completions"
-                                payload = {"model":model,"messages":[{"role":"system","content":sys_p},{"role":"user","content":user_txt}]}
-                                req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={"Authorization":f"Bearer {api_key}","content-type":"application/json"}, method="POST")
+                                url     = api_url or ("https://api.openai.com/v1/chat/completions" if prov == "openai"
+                                                      else "https://api.groq.com/openai/v1/chat/completions")
+                                payload = {"model": model, "max_tokens": 4000, "temperature": 0.1,
+                                           "messages": [{"role": "system", "content": sys_p},
+                                                        {"role": "user",   "content": user_txt}]}
+                                headers = {"Authorization": f"Bearer {api_key}", "content-type": "application/json"}
                             else:
-                                await ws.send(json.dumps({"type":"ai_solution_result", "ok": False, "text": f"❌ Desteklenmeyen sağlayıcı: {prov}"}))
+                                await ws.send(json.dumps({"type":"ai_solution_result", "ok": False,
+                                    "text": f"❌ Desteklenmeyen sağlayıcı: {prov}\nDesteklenenler: claude, gemini, deepseek, openai, groq"}))
                                 return
-                            
+
+                            req = urllib.request.Request(url, data=json.dumps(payload).encode(),
+                                                         headers=headers, method="POST")
+
                             def do_req():
-                                with urllib.request.urlopen(req, timeout=60, context=ctx2) as r:
+                                with urllib.request.urlopen(req, timeout=90, context=ctx2) as r:
                                     return json.loads(r.read().decode())
-                            
-                            rj = await asyncio.to_thread(do_req)
-                            
+
+                            try:
+                                rj = await asyncio.to_thread(do_req)
+                            except urllib.error.HTTPError as http_err:
+                                body = ""
+                                try: body = http_err.read().decode(errors="replace")[:400]
+                                except: pass
+                                await ws.send(json.dumps({"type":"ai_solution_result", "ok": False,
+                                    "text": f"❌ HTTP {http_err.code} Hatası ({prov.title()})\nModel: {model}\n\n{body}"}))
+                                return
+                            except TimeoutError:
+                                await ws.send(json.dumps({"type":"ai_solution_result", "ok": False,
+                                    "text": f"❌ Zaman Aşımı (90sn) — {prov.title()} yanıt vermedi\nModel: {model}"}))
+                                return
+
+                            # Yanıtı parse et
                             ai_txt = ""
                             if prov == "claude":
                                 ai_txt = "".join([b.get("text","") for b in rj.get("content",[]) if b.get("type")=="text"])
                             elif prov == "gemini":
-                                ai_txt = "".join([p.get("text","") for c in rj.get("candidates",[]) for p in c.get("content",{}).get("parts",[])])
-                            elif prov in ["deepseek", "openai", "groq"]:
-                                ai_txt = rj.get("choices",[])[0].get("message",{}).get("content","")
-                            
+                                ai_txt = "".join([p.get("text","") for c in rj.get("candidates",[])
+                                                  for p in c.get("content",{}).get("parts",[])])
+                            else:
+                                choices = rj.get("choices", [])
+                                if choices:
+                                    ai_txt = choices[0].get("message",{}).get("content","")
+
                             if not ai_txt:
-                                await ws.send(json.dumps({"type":"ai_solution_result", "ok": False, "text": "❌ AI boş yanıt döndürdü."}))
+                                raw = str(rj)[:300]
+                                await ws.send(json.dumps({"type":"ai_solution_result", "ok": False,
+                                    "text": f"❌ AI boş yanıt döndürdü ({prov.title()})\nModel: {model}\nHam yanıt: {raw}"}))
                             else:
                                 await ws.send(json.dumps({"type":"ai_solution_result", "ok": True, "text": ai_txt}))
-                                
+
                         except Exception as e:
-                            await ws.send(json.dumps({"type":"ai_solution_result", "ok": False, "text": f"❌ AI API Hatası: {str(e)}"}))
-                    
+                            import traceback
+                            tb = traceback.format_exc()[-500:]
+                            await ws.send(json.dumps({"type":"ai_solution_result", "ok": False,
+                                "text": f"❌ Beklenmeyen Hata:\n{str(e)}\n\nDetay:\n{tb}"}))
+
                     asyncio.create_task(fetch_solution())
 
                 elif t == "check_syntax":
