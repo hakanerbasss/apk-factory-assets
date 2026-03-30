@@ -107,27 +107,31 @@ package $P_PKG
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Edge-to-edge KAPALI — sistem UI alanlarına girme
-        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, true)
-        setContent { Text("AI Kodluyor...") }
+        enableEdgeToEdge()
+        setContent {
+            MaterialTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    Box(modifier = Modifier.systemBarsPadding()) {
+                        Text("AI Kodluyor...")
+                    }
+                }
+            }
+        }
     }
 }
 KOTLIN
+
 
 # Build Gradle Dosyaları
 cat > "$P_DIR/app/build.gradle" << GRADLE
