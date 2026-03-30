@@ -1493,7 +1493,7 @@ class App : Application() {{
                     # factory.sh PTY'de çalışır; Proje Adı + AI Görevi read'lerini AUTO_ENTER
                     # ile değil, özel olarak cevaplıyoruz
                     # factory.sh prompt'una ek kural ekle - MyApplicationTheme referansı kullanma
-                    full_task = task + ". ÖNEMLİ: Tema için sadece MaterialTheme kullan, özel tema sınıfı oluşturma."
+                    full_task = task + ". ÖNEMLİ: Tema için sadece MaterialTheme kullan, özel tema sınıfı oluşturma. KRITIK: enableEdgeToEdge() ASLA KULLANMA, bunun yerine WindowCompat.setDecorFitsSystemWindows(window, true) kullan."
                     pkg = d.get("pkg","")
                     if pkg: os.environ["PKG_OVERRIDE"] = pkg
                     else: os.environ.pop("PKG_OVERRIDE", None)
