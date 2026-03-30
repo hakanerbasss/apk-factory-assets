@@ -1493,6 +1493,17 @@ class App : Application() {{
                     # factory.sh PTY'de çalışır; Proje Adı + AI Görevi read'lerini AUTO_ENTER
                     # ile değil, özel olarak cevaplıyoruz
                     # factory.sh prompt'una ek kural ekle - MyApplicationTheme referansı kullanma
+                    if task == "__EMPTY__":
+                        state["_factory_name"] = n
+                        state["_factory_task"] = "Boş şablon"
+                        state["_factory_task_default"] = "Boş şablon"
+                        async def np_done_empty(rc, _n=n):
+                            state.pop("_factory_name", None)
+                            state.pop("_factory_task", None)
+                            running["task"] = None
+                            await ws.send(json.dumps({"type":"project_done","success":rc==0,"name":_n}))
+                        await start(f"bash {SISTEM_DIR}/factory.sh", HOME, np_done_empty)
+                        continue
                     full_task = task + ". ÖNEMLİ: Tema için sadece MaterialTheme kullan, özel tema sınıfı oluşturma. KRITIK: enableEdgeToEdge() ASLA KULLANMA, bunun yerine WindowCompat.setDecorFitsSystemWindows(window, true) kullan."
                     pkg = d.get("pkg","")
                     if pkg: os.environ["PKG_OVERRIDE"] = pkg
