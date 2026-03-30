@@ -67,6 +67,14 @@ def read_settings():
         if '=' in line and not line.startswith('#'):
             k, v = line.split('=', 1)
             d[k.strip()] = v.strip().strip('"').strip("'")
+    # autofix.conf'tan script ayarlarini oku (override)
+    ac = f"{HOME}/.config/autofix.conf"
+    if os.path.exists(ac):
+        for line in open(ac):
+            line = line.strip()
+            if line.startswith('ORCHESTRATOR_ENABLED=') or line.startswith('SMART_TASK_ENABLED='):
+                k, v = line.split('=', 1)
+                d[k.strip()] = v.strip().strip('"').strip("'")
     return d
 
 def save_settings(data):
