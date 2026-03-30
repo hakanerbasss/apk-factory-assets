@@ -1711,7 +1711,8 @@ class App : Application() {{
                                     else:
                                         m_list = [m["id"] for m in rj.get("data",[])]
                                         if n == "openai": 
-                                            m_list = [m for m in m_list if ("gpt" in m.lower() or "o1" in m.lower() or "o3" in m.lower()) and not any(bad in m.lower() for bad in ["audio", "realtime", "vision", "instruct", "dall-e", "tts", "whisper", "babbage", "davinci"])]
+#                                           m_list = [m for m in m_list if ("gpt" in m.lower() or "o1" in m.lower() or "o3" in m.lower()) and not any(bad in m.lower() for bad in ["audio", "realtime", "vision", "instruct", "dall-e", "tts", "whisper", "babbage", "davinci"])]
+                                            m_list = [m for m in m_list if ("gpt" in m.lower() or "o1" in m.lower() or "o3" in m.lower() or "codex" in m.lower()) and not any(bad in m.lower() for bad in ["audio", "realtime", "vision", "instruct", "dall-e", "tts", "whisper", "babbage", "davinci"])]
                                         elif n == "claude": 
                                             m_list = [m for m in m_list if "claude" in m.lower()]
                                         elif n == "groq": 
