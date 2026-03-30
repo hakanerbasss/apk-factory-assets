@@ -2129,6 +2129,42 @@ class App : Application() {{
                     except Exception as e:
                         await ws.send(json.dumps({"type":"syntax_check_result", "ok": False, "log": str(e)}))
 
+                elif t == "replace_in_file":
+                    pname   = d.get("project", "")
+                    path    = d.get("path", "")
+                    old_str = d.get("old_str", "")
+                    new_str = d.get("new_str", "")
+                    proj_dir = get_proj_dir(pname)
+                    full_path = os.path.join(proj_dir, path)
+                    try:
+                        content_f = open(full_path, "r", encoding="utf-8").read()
+                        if old_str not in content_f:
+                            await ws.send(json.dumps({"type":"project_file_written", "path":path, "ok":False, "error":"Aranılan metin bulunamadı"}))
+                        else:
+                            new_content = content_f.replace(old_str, new_str, 1)
+                            open(full_path, "w", encoding="utf-8").write(new_content)
+                            await ws.send(json.dumps({"type":"project_file_written", "path":path, "ok":True, "error":""}))
+                    except Exception as e:
+                        await ws.send(json.dumps({"type":"project_file_written", "path":path, "ok":False, "error":str(e)}))
+
+                elif t == "run_bash":
+                    pname   = d.get("project", "")
+                    command = d.get("command", "")
+                    proj_dir = get_proj_dir(pname)
+                    # Güvenlik: tehlikeli komutları engelle
+                    blocked = ["rm -rf", "mkfs", "dd if=", ":(){ :|:& };:", "chmod 777 /"]
+                    if any(b in command for b in blocked):
+                        await ws.send(json.dumps({"type":"file_content", "path":"bash", "content":"❌ Engellendi: Tehlikeli komut"}))
+                    else:
+                        try:
+                            full_cmd = f"cd {proj_dir} && {command}"
+                            proc = await asyncio.create_subprocess_shell(full_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+                            stdout, _ = await proc.communicate()
+                            out = stdout.decode("utf-8", errors="replace")[:5000]
+                            await ws.send(json.dumps({"type":"file_content", "path":"bash", "content": out or "(çıktı yok)"}))
+                        except Exception as e:
+                            await ws.send(json.dumps({"type":"file_content", "path":"bash", "content":f"❌ {e}"}))
+
                 elif t == "list_project_files":
                     pname = d.get("project", "")
                     rel_path = d.get("path", "")
