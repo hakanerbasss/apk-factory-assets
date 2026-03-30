@@ -60,7 +60,7 @@ FACTORY_PROMPTS = [
 def read_settings():
     d = {"DEFAULT_PROVIDER":"Claude","DEFAULT_MODEL":"claude-haiku-4-5-20251001",
          "MAX_LOOPS":"5","MAX_TOKENS":"8000","MAX_CHARS":"60000","KEYSTORE_PASS":"android123",
-         "FREESOUND_KEY":""}
+         "FREESOUND_KEY":"","ORCHESTRATOR_ENABLED":"true","SMART_TASK_ENABLED":"true"}
     if not os.path.exists(SETTINGS_FILE): return d
     for line in open(SETTINGS_FILE):
         line = line.strip()
@@ -1769,6 +1769,24 @@ class App : Application() {{
                 elif t == "save_settings":
                     save_settings(d.get("data",{}))
                     await ws.send(json.dumps({"type":"task_done","success":True,"text":"✅ Ayarlar kaydedildi"}))
+
+                elif t == "save_script_settings":
+                    _sc = d.get("data", {})
+                    _ac = f"{HOME}/.config/autofix.conf"
+                    os.makedirs(os.path.dirname(_ac), exist_ok=True)
+                    _lines = []
+                    if os.path.exists(_ac):
+                        with open(_ac, "r") as _f:
+                            _lines = [l for l in _f.readlines()
+                                      if not l.strip().startswith("ORCHESTRATOR_ENABLED=")
+                                      and not l.strip().startswith("SMART_TASK_ENABLED=")]
+                    if "ORCHESTRATOR_ENABLED" in _sc:
+                        _lines.append(f'ORCHESTRATOR_ENABLED={_sc["ORCHESTRATOR_ENABLED"]}\n')
+                    if "SMART_TASK_ENABLED" in _sc:
+                        _lines.append(f'SMART_TASK_ENABLED={_sc["SMART_TASK_ENABLED"]}\n')
+                    with open(_ac, "w") as _f:
+                        _f.writelines(_lines)
+                    await ws.send(json.dumps({"type":"task_done","success":True,"text":"✅ Script ayarları kaydedildi"}))
 
                 elif t == "get_projects_conf":
                     cf = f"{SISTEM_DIR}/projeler.conf"
