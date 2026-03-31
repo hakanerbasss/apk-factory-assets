@@ -176,7 +176,10 @@ def check_resources(kt_files):
     existing_raw = set()
     if os.path.isdir(RAW_DIR):
         for f in os.listdir(RAW_DIR):
-            existing_raw.add(os.path.splitext(f)[0].lower())
+            fpath = os.path.join(RAW_DIR, f)
+            # Boş veya çok küçük dosyaları (100 byte altı) eksik say
+            if os.path.getsize(fpath) >= 100:
+                existing_raw.add(os.path.splitext(f)[0].lower())
 
     existing_drawable = set()
     if os.path.isdir(DRAWABLE_DIR):
