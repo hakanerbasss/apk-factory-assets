@@ -1458,6 +1458,19 @@ class App : Application() {{
                 elif t == "build_debug":
                     p = d.get("project",""); pd = get_proj_dir(p)
                     await ws.send(json.dumps({"type":"status","text":f"🔨 Build: {p}"}))
+                    # Validator — build öncesi ses/asset kontrolü
+                    validator = os.path.join(SISTEM_DIR, "pre_build_validator.py")
+                    if os.path.exists(validator):
+                        await ws.send(json.dumps({"type":"status","text":"🔍 Validator çalışıyor..."}))
+                        val_proc = await asyncio.create_subprocess_shell(
+                            f"python3 {validator} {pd}",
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.STDOUT
+                        )
+                        val_out, _ = await val_proc.communicate()
+                        val_text = val_out.decode("utf-8", errors="replace").strip()
+                        if val_text:
+                            await ws.send(json.dumps({"type":"log","text":val_text}))
                     async def bd_done(rc, _p=p, _pd=pd):
                         apk = copy_apk(_pd, _p) if rc == 0 else None
                         await ws.send(json.dumps({"type":"build_done","success":rc==0,
