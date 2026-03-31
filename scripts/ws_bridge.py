@@ -2144,14 +2144,30 @@ class App : Application() {{
                 elif t == "check_syntax":
                     pname = d.get("project", "")
                     proj_dir = get_proj_dir(pname)
-                    cmd = f"cd {proj_dir} && ./gradlew compileDebugKotlin"
+                    cmd = f"cd {proj_dir} && ./gradlew compileDebugKotlin --no-daemon"
                     try:
-                        proc = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
-                        stdout, _ = await proc.communicate()
-                        log = stdout.decode("utf-8", errors="replace")
-                        await ws.send(json.dumps({"type":"syntax_check_result", "ok": (proc.returncode == 0), "log": log}))
+                        proc = await asyncio.create_subprocess_shell(
+                            cmd,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.STDOUT
+                        )
+                        try:
+                            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=120)
+                            log = stdout.decode("utf-8", errors="replace")
+                            ok = proc.returncode == 0
+                        except asyncio.TimeoutError:
+                            try: proc.kill()
+                            except: pass
+                            log = "⏱ Syntax kontrol zaman aşımı (120sn) — bridge devam ediyor"
+                            ok = False
+                        try:
+                            await ws.send(json.dumps({"type":"syntax_check_result", "ok": ok, "log": log}))
+                        except Exception as send_err:
+                            print(f"[syntax] send error: {send_err}")
                     except Exception as e:
-                        await ws.send(json.dumps({"type":"syntax_check_result", "ok": False, "log": str(e)}))
+                        try:
+                            await ws.send(json.dumps({"type":"syntax_check_result", "ok": False, "log": f"Hata: {str(e)}"}))
+                        except: pass
 
                 elif t == "replace_in_file":
                     pname   = d.get("project", "")
