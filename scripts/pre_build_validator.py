@@ -571,6 +571,100 @@ def check_permissions(kt_files):
         "ACCESS_FINE_LOCATION": ("android.permission.ACCESS_FINE_LOCATION",  ["FusedLocationProvider", "LocationManager", "GPS_PROVIDER"]),
         "BLUETOOTH":            ("android.permission.BLUETOOTH",     ["BluetoothAdapter", "BluetoothManager"]),
         "VIBRATE":              ("android.permission.VIBRATE",       ["Vibrator", "VibrationEffect", "vibrate("]),
+        "FOREGROUND_SERVICE":   ("android.permission.FOREGROUND_SERVICE", ["startForeground(", "ForegroundService", "Service()"]),
+        "RECEIVE_BOOT_COMPLETED":("android.permission.RECEIVE_BOOT_COMPLETED", ["BOOT_COMPLETED", "BootReceiver"]),
+        "REQUEST_INSTALL_PACKAGES":("android.permission.REQUEST_INSTALL_PACKAGES", ["REQUEST_INSTALL_PACKAGES", "PackageInstaller", "ACTION_INSTALL_PACKAGE"]),
+        "READ_MEDIA_IMAGES":    ("android.permission.READ_MEDIA_IMAGES",  ["READ_MEDIA_IMAGES", "MediaStore.Images", "pickMedia"]),
+        "READ_MEDIA_VIDEO":     ("android.permission.READ_MEDIA_VIDEO",   ["READ_MEDIA_VIDEO", "MediaStore.Video"]),
+        "READ_MEDIA_AUDIO":     ("android.permission.READ_MEDIA_AUDIO",   ["READ_MEDIA_AUDIO", "MediaStore.Audio"]),
+    }
+    
+    if not os.path.exists(MANIFEST):
+        return
+    
+    manifest = open(MANIFEST).read()
+    all_kt = " ".join(kt_files.values())
+    
+    for perm_name, (perm_str, keywords) in PERMISSION_PATTERNS.items():
+        if perm_str in manifest:
+            continue  # Zaten var
+        if any(kw in all_kt for kw in keywords):
+            # İzni manifest'e ekle
+            manifest = manifest.replace(
+                "<application",
+                f'    <uses-permission android:name="{perm_str}" />\n\n    <application'
+            )
+            fix(f"Manifest: {perm_str} izni eklendi")
+    
+    open(MANIFEST, "w").write(manifest)
+
+
+
+# KONTROL 11: R.string.xxx referanslari — strings.xml'de tanimli mi?
+def check_string_resources(kt_files):
+    strings_xml = os.path.join(PROJECT, "app", "src", "main", "res", "values", "strings.xml")
+    
+    # Mevcut string'leri oku
+    existing_strings = set()
+    if os.path.exists(strings_xml):
+        try:
+            import xml.etree.ElementTree as ET
+            tree = ET.parse(strings_xml)
+            for elem in tree.getroot().iter():
+                if elem.get("name"):
+                    existing_strings.add(elem.get("name"))
+        except: pass
+    
+    # KT dosyalarinda R.string.xxx referanslarini bul
+    needed = set()
+    skip = {"app_name"}  # Varsayilan olarak zaten var
+    for fpath, content in kt_files.items():
+        for m in re.finditer(r'R\.string\.([a-z_][a-z0-9_]*)', content):
+            s = m.group(1)
+            if s not in existing_strings and s not in skip:
+                needed.add(s)
+    
+    if not needed:
+        return
+    
+    log(f"{len(needed)} eksik string kaynagi tespit edildi")
+    
+    # strings.xml yoksa olustur
+    values_dir = os.path.join(PROJECT, "app", "src", "main", "res", "values")
+    os.makedirs(values_dir, exist_ok=True)
+    
+    if not os.path.exists(strings_xml):
+        open(strings_xml, "w").write('''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">App</string>
+</resources>''')
+        existing_strings.add("app_name")
+    
+    # Eksik string'leri ekle
+    xml_content = open(strings_xml).read()
+    for s in needed:
+        if f'name="{s}"' not in xml_content:
+            # </resources> dan once ekle
+            placeholder = s.replace("_", " ").title()
+            xml_content = xml_content.replace(
+                "</resources>",
+                f'    <string name="{s}">{placeholder}</string>\n</resources>'
+            )
+            fix(f"strings.xml: '{s}' eklendi (placeholder)")
+    
+    open(strings_xml, "w").write(xml_content)
+
+
+# KONTROL 12: Kamera, Mikrofon gibi izinler manifest'te var mi?
+def check_permissions(kt_files):
+    PERMISSION_PATTERNS = {
+        "CAMERA":               ("android.permission.CAMERA",        ["CameraX", "Camera2", "camera", "Camera(", "ImageCapture"]),
+        "RECORD_AUDIO":         ("android.permission.RECORD_AUDIO",  ["AudioRecord", "MediaRecorder", "RECORD_AUDIO"]),
+        "READ_EXTERNAL_STORAGE":("android.permission.READ_EXTERNAL_STORAGE", ["READ_EXTERNAL_STORAGE", "openFileDescriptor"]),
+        "WRITE_EXTERNAL_STORAGE":("android.permission.WRITE_EXTERNAL_STORAGE", ["WRITE_EXTERNAL_STORAGE"]),
+        "ACCESS_FINE_LOCATION": ("android.permission.ACCESS_FINE_LOCATION",  ["FusedLocationProvider", "LocationManager", "GPS_PROVIDER"]),
+        "BLUETOOTH":            ("android.permission.BLUETOOTH",     ["BluetoothAdapter", "BluetoothManager"]),
+        "VIBRATE":              ("android.permission.VIBRATE",       ["Vibrator", "VibrationEffect", "vibrate("]),
     }
     
     if not os.path.exists(MANIFEST):
@@ -699,6 +793,16 @@ def main():
         check_internet_permission(kt_files)
     except Exception as e:
         warn(f"Internet permission kontrol hatasi: {e}")
+
+    try:
+        check_string_resources(kt_files)
+    except Exception as e:
+        warn(f"String resource kontrol hatasi: {e}")
+
+    try:
+        check_permissions(kt_files)
+    except Exception as e:
+        warn(f"Permission kontrol hatasi: {e}")
 
     try:
         check_string_resources(kt_files)

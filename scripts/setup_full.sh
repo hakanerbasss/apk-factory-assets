@@ -50,12 +50,12 @@ pip install Pillow --quiet >> "$LOG_FILE" 2>&1
 log "Python + WebSocket hazır"
 
 # ══════════════════════════════════════════════
-# ADIM 4: Java (OpenJDK 17)
+# ADIM 4: Java (OpenJDK 17) ve Kotlin
 # ══════════════════════════════════════════════
-status "java kuruluyor"
-log "Java (OpenJDK 17) kuruluyor..."
-pkg install -y openjdk-17 >> "$LOG_FILE" 2>&1
-log "Java kuruldu"
+status "java ve kotlin kuruluyor"
+log "Java (OpenJDK 17) ve Kotlin kuruluyor..."
+pkg install -y openjdk-17 kotlin >> "$LOG_FILE" 2>&1
+log "Java ve Kotlin kuruldu"
 
 # ══════════════════════════════════════════════
 # ADIM 5: Android SDK
