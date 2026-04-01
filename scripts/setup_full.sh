@@ -101,21 +101,21 @@ else
 fi
 log "SDK araçları indirildi"
 
+
 # ══════════════════════════════════════════════
 # ADIM 8: aapt2 düzeltiliyor
 # ══════════════════════════════════════════════
 status "aapt2 düzeltiliyor"
 log "aapt2 düzeltiliyor..."
-AAPT2_PATH=$(find "$HOME/android-sdk/build-tools" -name "aapt2" 2>/dev/null | head -1)
+AAPT2_PATH=$(find "$HOME/android-sdk/build-tools" -name "aapt2" 2>/dev/null | head -1)                                                                  
 if [ -n "$AAPT2_PATH" ]; then
     wget -q "https://github.com/lzhiyong/android-sdk-tools/releases/download/34.0.0/android-sdk-tools-aarch64.zip" \
-        -O /tmp/sdk-tools.zip >> "$LOG_FILE" 2>&1
-    unzip -qo /tmp/sdk-tools.zip aapt2 -d "$(dirname "$AAPT2_PATH")" >> "$LOG_FILE" 2>&1 || true
+        -O ~/sdk-tools.zip >> "$LOG_FILE" 2>&1
+    unzip -qo ~/sdk-tools.zip aapt2 -d "$(dirname "$AAPT2_PATH")" >> "$LOG_FILE" 2>&1 || true
     chmod +x "$AAPT2_PATH" 2>/dev/null || true
-    rm -f /tmp/sdk-tools.zip
+    rm -f ~/sdk-tools.zip
 fi
 log "aapt2 hazır"
-
 
 
 # ══════════════════════════════════════════════
