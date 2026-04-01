@@ -36,7 +36,7 @@ log "Paket listesi güncellendi"
 # ══════════════════════════════════════════════
 status "temel araçlar kuruluyor"
 log "Temel araçlar kuruluyor..."
-pkg install -y curl wget git unzip zip tar nano >> "$LOG_FILE" 2>&1
+pkg install -y curl wget git unzip zip tar nano jq inotify-tools >> "$LOG_FILE" 2>&1
 log "Temel araçlar kuruldu"
 
 # ══════════════════════════════════════════════
