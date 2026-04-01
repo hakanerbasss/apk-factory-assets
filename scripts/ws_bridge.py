@@ -2194,16 +2194,16 @@ class App : Application() {{
                     # Güvenlik: tehlikeli komutları engelle
                     blocked = ["rm -rf", "mkfs", "dd if=", ":(){ :|:& };:", "chmod 777 /"]
                     if any(b in command for b in blocked):
-                        await ws.send(json.dumps({"type":"file_content", "path":"bash", "content":"❌ Engellendi: Tehlikeli komut"}))
+                        await ws.send(json.dumps({"type":"bash_result", "content":"❌ Engellendi: Tehlikeli komut"}))
                     else:
                         try:
                             full_cmd = f"cd {proj_dir} && {command}"
                             proc = await asyncio.create_subprocess_shell(full_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
                             stdout, _ = await proc.communicate()
                             out = stdout.decode("utf-8", errors="replace")[:5000]
-                            await ws.send(json.dumps({"type":"file_content", "path":"bash", "content": out or "(çıktı yok)"}))
+                            await ws.send(json.dumps({"type":"bash_result", "content": out or "(çıktı yok)"}))
                         except Exception as e:
-                            await ws.send(json.dumps({"type":"file_content", "path":"bash", "content":f"❌ {e}"}))
+                            await ws.send(json.dumps({"type":"bash_result", "content":f"❌ {e}"}))
 
                 elif t == "list_project_files":
                     pname = d.get("project", "")
