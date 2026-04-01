@@ -2179,7 +2179,7 @@ class App : Application() {{
                     try:
                         content_f = open(full_path, "r", encoding="utf-8").read()
                         if old_str not in content_f:
-                            await ws.send(json.dumps({"type":"project_file_written", "path":path, "ok":False, "error":"Aranılan metin bulunamadı"}))
+                            await ws.send(json.dumps({"type":"project_file_written", "path":path, "ok":False, "error":f"Metin bulunamadı. Dosya {len(content_f)} karakter. İlk satır: {old_str.strip().split(chr(10))[0][:80]}"}))
                         else:
                             new_content = content_f.replace(old_str, new_str, 1)
                             open(full_path, "w", encoding="utf-8").write(new_content)
