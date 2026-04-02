@@ -455,56 +455,7 @@ def check_system_bars_padding(kt_files):
                     open(fpath, 'w', encoding='utf-8').write(content)
                     fix(f"{os.path.basename(fpath)}: systemBarsPadding import eklendi")
 
-# ════════════════════════════════════════════════════════════════
-# KONTROL 8: build.gradle tutarliligi (VERSION_17 vs VERSION_1_8)
-# ════════════════════════════════════════════════════════════════
-def check_build_gradle():
-    if not os.path.exists(BUILD_GRADLE):
-        return
-    bg = open(BUILD_GRADLE, 'r').read()
-
-    # Compose projesi icin VERSION_1_8 + jvmTarget 1.8 olmali
-    # (factory.sh VERSION_17 kullaniyor ama orkestrator VERSION_1_8 — tutarsiz)
-    # Compose + Kotlin 1.9.22 icin 1.8 daha guvenli
-    if 'compose' in bg.lower():
-        if 'VERSION_17' in bg:
-            bg = bg.replace('VERSION_17', 'VERSION_1_8')
-            bg = bg.replace("jvmTarget = '17'", "jvmTarget = '1.8'")
-            bg = bg.replace('jvmTarget = "17"', "jvmTarget = '1.8'")
-            open(BUILD_GRADLE, 'w').write(bg)
-            fix("build.gradle: VERSION_17 → VERSION_1_8 (Compose uyumluluk)")
-
-# ════════════════════════════════════════════════════════════════
-# KONTROL 9: Eksik/hatali package declaration
-# ════════════════════════════════════════════════════════════════
-def check_package_declarations(kt_files):
-    pkg_name = get_package_name()
-    if not pkg_name:
-        return
-
-    for fpath, content in kt_files.items():
-        # Dosya yolundan beklenen paket adini cikar
-        rel = os.path.relpath(fpath, SRC_DIR)
-        dir_parts = os.path.dirname(rel).replace(os.sep, '.')
-        if not dir_parts:
-            continue
-
-        # Dosyadaki package satiri
-        pkg_match = re.match(r'^package\s+([a-zA-Z0-9_.]+)', content)
-        if pkg_match:
-            declared_pkg = pkg_match.group(1)
-            if declared_pkg != dir_parts:
-                # Paket adi klasor yapisindan farkli — duzelt
-                content = re.sub(r'^package\s+[a-zA-Z0-9_.]+', f'package {dir_parts}', content, count=1)
-                open(fpath, 'w', encoding='utf-8').write(content)
-                fix(f"{os.path.basename(fpath)}: package {declared_pkg} → {dir_parts}")
-        else:
-            # package satiri yok → ekle
-            content = f"package {dir_parts}\n\n" + content
-            open(fpath, 'w', encoding='utf-8').write(content)
-            fix(f"{os.path.basename(fpath)}: package {dir_parts} eklendi")
-
-# ════════════════════════════════════════════════════════════════
+# ════════════════════════════════════
 
 # KONTROL 11: R.string.xxx referanslari — strings.xml'de tanimli mi?
 def check_string_resources(kt_files):
@@ -736,7 +687,7 @@ def main():
 
     # Kontrolleri calistir
     try:
-        check_package_declarations(kt_files)
+       #check_package_declarations(kt_files)
     except Exception as e:
         warn(f"Package kontrol hatasi: {e}")
 
