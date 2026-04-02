@@ -153,7 +153,8 @@ cmd_build() {
         APK=$(find "$P_DIR/app/build/outputs/apk/debug/" -name "*.apk" 2>/dev/null | head -1)
         if [ -n "$APK" ]; then
             rm -f "$DOWNLOAD/apk-cikti/${P_NAME}"*.apk 2>/dev/null
-            DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
+            mkdir -p "$DOWNLOAD/apk-cikti"
+            DEST="$DOWNLOAD/apk-cikti/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
             cp "$APK" "$DEST" && touch "$DEST"
             SIZE=$(ls -lh "$DEST" | awk '{print $5}')
             echo -e "  ${G}✅ APK hazır!${NC}  $SIZE"
@@ -178,7 +179,8 @@ cmd_transfer() {
     fi
     get_version
     rm -f "$DOWNLOAD/apk-cikti/${P_NAME}"*.apk 2>/dev/null
-    DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
+    mkdir -p "$DOWNLOAD/apk-cikti"
+    DEST="$DOWNLOAD/apk-cikti/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
     cp "$APK" "$DEST"
     SIZE=$(ls -lh "$DEST" | awk '{print $5}')
     echo -e "  ${G}✅ APK taşındı!${NC}  $SIZE"
@@ -198,7 +200,8 @@ cmd_build_errors() {
         if [ -n "$APK" ]; then
             get_version
             rm -f "$DOWNLOAD/apk-cikti/${P_NAME}"*.apk 2>/dev/null
-    DEST="$DOWNLOAD/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
+            mkdir -p "$DOWNLOAD/apk-cikti"
+            DEST="$DOWNLOAD/apk-cikti/${P_NAME}-v${V_NAME}(${V_CODE})-debug.apk"
             cp "$APK" "$DEST"
             SIZE=$(ls -lh "$DEST" | awk '{print $5}')
             echo -e "  ${G}✅ Build başarılı! APK hazır.${NC}  $SIZE"
