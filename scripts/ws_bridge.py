@@ -2251,6 +2251,22 @@ class App : Application() {{
                     except Exception as e:
                         await ws.send(json.dumps({"type":"error","text":f"read_project_file: {e}"}))
 
+                elif t == "read_file_binary":
+                    pname    = d.get("project", "")
+                    rel_path = d.get("path", "")
+                    proj_dir = get_proj_dir(pname)
+                    full     = os.path.join(proj_dir, rel_path)
+                    try:
+                        import base64 as _b64
+                        if not os.path.isfile(full):
+                            await ws.send(json.dumps({"type":"file_binary_content","project":pname,"path":rel_path,"data":"","error":"Dosya bulunamadı"}))
+                        else:
+                            raw = open(full, "rb").read()
+                            b64 = _b64.b64encode(raw).decode("utf-8")
+                            await ws.send(json.dumps({"type":"file_binary_content","project":pname,"path":rel_path,"data":b64,"error":""}))
+                    except Exception as e:
+                        await ws.send(json.dumps({"type":"file_binary_content","project":pname,"path":rel_path,"data":"","error":str(e)}))
+
                 elif t == "write_project_file":
                     pname    = d.get("project", "")
                     rel_path = d.get("path", "")
