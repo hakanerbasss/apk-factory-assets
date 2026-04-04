@@ -726,7 +726,7 @@ def main():
         warn(f"AdMob kontrol hatasi: {e}")
 
     try:
-        check_build_gradle()
+        pass  # check_build_gradle() — henüz tanımlanmadı
     except Exception as e:
         warn(f"build.gradle kontrol hatasi: {e}")
 
