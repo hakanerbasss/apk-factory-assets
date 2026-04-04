@@ -687,7 +687,7 @@ def main():
 
     # Kontrolleri calistir
     try:
-       #check_package_declarations(kt_files)
+       pass  #check_package_declarations(kt_files)
     except Exception as e:
         warn(f"Package kontrol hatasi: {e}")
 
