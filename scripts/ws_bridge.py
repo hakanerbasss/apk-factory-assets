@@ -2251,7 +2251,7 @@ class App : Application() {{
                             elif size > 500000:
                                 await ws.send(json.dumps({"type":"project_file_content","path":rel_path,"content":f"[Dosya çok büyük: {size//1024}KB]","binary":True,"size":size}))
                             else:
-                                content = open(full, encoding="utf-8", errors="replace").read()
+                                content = open(full, encoding="utf-8", errors="replace").read(15000)
                                 await ws.send(json.dumps({"type":"project_file_content","path":rel_path,"content":content,"binary":False,"size":size}))
                     except Exception as e:
                         await ws.send(json.dumps({"type":"error","text":f"read_project_file: {e}"}))
