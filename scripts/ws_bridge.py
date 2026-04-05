@@ -515,6 +515,11 @@ async def pty_run(cmd, cwd, ws, state, on_done):
         preexec_fn=os.setsid
     )
     os.close(slave)
+    try:
+        import fcntl, termios, struct
+        fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', 50, 220, 0, 0))
+    except Exception:
+        pass
     state["proc"]   = proc
     state["master"] = master
 
